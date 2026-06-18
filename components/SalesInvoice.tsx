@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
@@ -178,12 +178,33 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   return (
     <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-8 max-w-6xl mx-auto border border-gray-100 animate-in fade-in dynamic-layouts relative">
+      {/* Dynamic Embedded Rules for Standard A4 Canvas Printing */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden; background: white !important; }
+          .dynamic-layouts, .dynamic-layouts * { visibility: visible; }
+          .dynamic-layouts { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 0 !important; }
+          .no-print-el { display: none !important; }
+          select { -webkit-appearance: none; -moz-appearance: none; appearance: none; border: none !important; padding: 0.25rem !important; font-weight: bold; }
+          input { border: none !important; background: transparent !important; box-shadow: none !important; }
+        }
+      `}</style>
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
           <span className="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md"><ShoppingCart size={20} /></span>
           Create Sales Invoice
         </h2>
-        <span className="text-[10px] bg-green-50 text-green-600 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-green-100"><LinkIcon size={12} className="inline mr-1"/>Live Sync</span>
+        <div className="flex items-center gap-3 no-print-el">
+          {/* ⭐ Clean Integrated PDF/Print Button */}
+          <button 
+            onClick={() => window.print()} 
+            className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-sm"
+          >
+            <Printer size={15} /> Export PDF / Print
+          </button>
+          <span className="text-[10px] bg-green-50 text-green-600 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-green-100"><LinkIcon size={12} className="inline mr-1"/>Live Sync</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 bg-slate-50 border border-gray-200/60 rounded-2xl mb-6">
@@ -192,7 +213,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           <select value={customerId} onChange={e => e.target.value === 'QUICK_ADD_CUST' ? setIsCustModalOpen(true) : setCustomerId(e.target.value)} className="w-full p-3 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none">
             <option value="">Select Customer Registry...</option>
             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            <option value="QUICK_ADD_CUST" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Customer</option>
+            <option value="QUICK_ADD_CUST" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Customer</option>
           </select>
         </div>
         <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Invoice #</label><input type="text" value={invoiceNo} readOnly className="w-full p-3 bg-white border border-gray-200 rounded-xl text-indigo-600 font-mono font-black text-xs text-center shadow-inner" /></div>
@@ -202,7 +223,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       {/* RESTORED FULL MATRIX GRID TABLE WITH FOOTER TOTALS */}
       <div className="border border-gray-200 rounded-2xl overflow-hidden mb-6 shadow-sm bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1000px]">
+          <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-full">
             <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-400 font-black text-[10px] uppercase tracking-widest">
               <tr>
                 <th className="p-4 pl-6">Product Detail / Notes</th>
@@ -211,7 +232,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                 <th className="p-4 w-20 text-center">Qty</th>
                 <th className="p-4 w-28 text-right">Unit Price</th>
                 <th className="p-4 w-32 text-right pr-6">Line Total</th>
-                <th className="p-4 w-10"></th>
+                <th className="p-4 w-10 no-print-el"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-xs font-bold text-gray-700">
@@ -224,14 +245,14 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                     <select value={line.departmentId} onChange={e => handleRowMetricChange(idx, 'departmentId', e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-xl outline-none text-xs text-gray-700 font-medium">
                       <option value="">Global / Unallocated</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="QUICK_ADD_ROW_DEPT" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Department</option>
+                      <option value="QUICK_ADD_ROW_DEPT" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Department</option>
                     </select>
                   </td>
                   <td className="p-3">
                     <select value={line.divisionId} onChange={e => handleRowMetricChange(idx, 'divisionId', e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-xl outline-none text-xs text-gray-700 font-medium">
                       <option value="">Whole Strategy</option>
                       {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Division</option>
+                      <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Division</option>
                     </select>
                   </td>
                   <td className="p-3"><input type="number" value={line.qty} onChange={e => handleRowMetricChange(idx, 'qty', e.target.value)} className="w-full p-2 border border-gray-300 rounded-xl text-center font-black" /></td>
@@ -239,7 +260,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                   <td className="p-3 text-right font-mono text-gray-900 pr-6 text-sm">
                     {line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="p-3 text-center">
+                  <td className="p-3 text-center no-print-el">
                     <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500 transition-colors disabled:opacity-30"><Trash2 size={16}/></button>
                   </td>
                 </tr>
@@ -248,13 +269,13 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
               <tr className="bg-slate-50/60 font-black text-sm">
                 <td colSpan={5} className="p-4 text-right uppercase tracking-wider text-slate-400 text-[10px]">Total Amount:</td>
                 <td className="p-4 text-right font-mono text-base text-gray-900 pr-6">${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                <td></td>
+                <td className="no-print-el"></td>
               </tr>
             </tbody>
           </table>
         </div>
         {/* RESTORED ADD NEW ROW CONTROLS FOOTER */}
-        <div className="p-4 bg-gray-50/50 border-t">
+        <div className="p-4 bg-gray-50/50 border-t no-print-el">
           <button onClick={() => setLineItems([...lineItems, { itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }])} className="text-xs font-bold text-indigo-600 border border-dashed border-indigo-300 px-4 py-2 rounded-xl bg-white hover:bg-indigo-50 transition-all shadow-sm">
             + ADD NEW ROW
           </button>
@@ -268,7 +289,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       </div>
 
       {/* RESTORED SAVE DISCARD ACTIONS FOOTER */}
-      <div className="flex justify-end gap-3 pt-4 border-t">
+      <div className="flex justify-end gap-3 pt-4 border-t no-print-el">
         <button onClick={onCancel} className="px-6 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">Discard Draft</button>
         <button onClick={handleSubmit} className="px-10 py-3 bg-gray-900 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-black flex items-center gap-2 shadow-md transition-all">
           <Save size={16} /> Save Invoice
@@ -277,7 +298,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
       {/* MODALS */}
       {isCustModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Customer</h3>
             <form onSubmit={handleAddCustomerSubmit} className="space-y-4">
@@ -289,7 +310,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       )}
 
       {isDeptModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Department</h3>
             <form onSubmit={handleQuickDeptSubmit} className="space-y-4">
@@ -301,7 +322,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       )}
 
       {isDivModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Division</h3>
             <form onSubmit={handleQuickDivSubmit} className="space-y-4">
