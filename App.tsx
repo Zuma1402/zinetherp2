@@ -407,18 +407,17 @@ const App: React.FC = () => {
         <SidebarContent />
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Main Desktop & Mobile Header Panel with Company Dropdown Switcher */}
+      {/* Main Desktop & Mobile Header Panel with FIXED Company Dropdown Switcher */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-sm">
             <div className="flex items-center gap-4">
               <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition md:hidden">
                   <Menu size={24} />
               </button>
               
-              {/* Premium Company Selector Dropdown Switcher layout */}
+              {/* Premium Company Selector Dropdown Switcher layout - Fixed Visibility */}
               {companies.length > 0 && (
-                <div className="relative flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
-                  <Building2 size={16} className="text-indigo-600" />
+                <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5 shadow-sm">
+                  <Building2 size={16} className="text-indigo-600 shrink-0" />
                   <select 
                     value={activeCompanyId} 
                     onChange={(e) => {
@@ -428,14 +427,16 @@ const App: React.FC = () => {
                         setCompanyName(comp.name);
                       }
                     }}
-                    className="bg-transparent text-xs font-black text-slate-700 focus:outline-none cursor-pointer pr-2 border-none"
+                    className="bg-transparent text-xs font-bold text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
+                    style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
                   >
                     {companies.map((comp) => (
-                      <option key={comp.id} value={comp.id} className="font-sans font-medium text-slate-800">
+                      <option key={comp.id} value={comp.id} className="bg-white text-gray-800 font-sans font-medium">
                         {comp.name}
                       </option>
                     ))}
                   </select>
+                  <ChevronDown size={14} className="text-indigo-500 absolute right-2 pointer-events-none" />
                 </div>
               )}
             </div>
