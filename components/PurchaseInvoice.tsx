@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingBag, Factory, Link as LinkIcon, Check, X } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { supabase } from '../services/supabaseService';
 import ItemAutocomplete from './ItemAutocomplete';
@@ -17,16 +17,11 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [invoiceNo, setInvoiceNo] = useState(`PUR-${Math.floor(Math.random() * 10000)}`);
   const [supplierId, setSupplierId] = useState('');
+  const [narration, setNarration] = useState('');
 
-  // Dimensions Master States
+  // Dimensions Master Lists
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
-  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
-  const [isDivModalOpen, setIsDivModalOpen] = useState(false);
-  const [isVendModalOpen, setIsVendModalOpen] = useState(false);
-  const [newDeptName, setNewDeptName] = useState('');
-  const [newDivName, setNewDivName] = useState('');
-  const [newVendName, setNewVendName] = useState('');
 
   const [lineItems, setLineItems] = useState([
     { itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
@@ -43,20 +38,8 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
     fetchLookups();
   }, []);
 
-  const handleSupplierDropdownChange = (val: string) => {
-    if (val === 'QUICK_ADD_VEND') {
-      setIsVendModalOpen(true);
-      setSupplierId('');
-    } else {
-      setSupplierId(val);
-    }
-  };
-
   const handleRowMetricChange = (index: number, field: string, value: any) => {
     const updated = [...lineItems];
-    if (value === 'ADD_ROW_DEPT') { setIsDeptModalOpen(true); return; }
-    if (value === 'ADD_ROW_DIV') { setIsDivModalOpen(true); return; }
-
     if (field === 'itemId') {
       const item = items.find(i => i.id === value);
       updated[index].itemId = value;
@@ -71,22 +54,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
     updated[index].taxAmount = (base * updated[index].taxRate) / 100;
     updated[index].amount = base + updated[index].taxAmount;
     setLineItems(updated);
-  };
-
-  const handleAddVendorSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newVendName.trim()) return;
-    const newId = crypto.randomUUID();
-    onAddLedger({
-      id: newId,
-      name: newVendName.trim(),
-      type: AccountType.LIABILITY,
-      group: 'Sundry Creditors',
-      openingBalance: 0
-    });
-    setSupplierId(newId);
-    setNewVendName('');
-    setIsVendModalOpen(false);
   };
 
   const suppliers = ledgers.filter(l => l.group.includes('Creditors') || l.type === AccountType.LIABILITY);
@@ -113,7 +80,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
       date,
       number: invoiceNo,
       type: VoucherType.PURCHASE,
-      narration: `Purchase from Vendor #${invoiceNo}`,
+      narration: narration || `Purchase from Vendor #${invoiceNo}`,
       entries: finalEntries
     }, lineItems.map(line => ({ itemId: line.itemId, qty: line.qty, rate: line.rate, voucherId: voucherId })));
   };
@@ -128,14 +95,13 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
         <span className="text-[10px] bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-bold uppercase tracking-widest border border-blue-100">Procurement</span>
       </div>
 
-      {/* Clean Dynamic Header matching image_e06ee6.png */}
+      {/* Clean Header Grid matching image_e06ee6.png */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-blue-50/20 rounded-[2rem] border border-blue-50 mb-6">
         <div>
           <label className="block text-[10px] font-black text-blue-900/40 uppercase tracking-[0.2em] mb-1">Supplier / Vendor Source</label>
-          <select value={supplierId} onChange={e => handleSupplierDropdownChange(e.target.value)} className="w-full p-3 bg-white border border-blue-100 rounded-xl text-xs font-black text-gray-900 shadow-sm outline-none">
+          <select value={supplierId} onChange={e => setSupplierId(e.target.value)} className="w-full p-3 bg-white border border-blue-100 rounded-xl text-xs font-black text-gray-900 shadow-sm outline-none">
             <option value="">Select Supplier Registry...</option>
             {suppliers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            <option value="QUICK_ADD_VEND" className="text-blue-600 font-bold bg-blue-50">➕ Add New Vendor</option>
           </select>
         </div>
         <div>
@@ -148,7 +114,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
         </div>
       </div>
 
-      {/* Columns Alignment Matrix layout identical to image_e075c9.png */}
+      {/* Matrix Table Matrix matching image_e075c9.png */}
       <div className="border border-blue-50 rounded-[2.5rem] overflow-hidden mb-8 shadow-sm bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px]">
@@ -173,14 +139,12 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
                     <select value={line.departmentId} onChange={e => handleRowMetricChange(idx, 'departmentId', e.target.value)} className="w-full p-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs text-gray-700 font-medium">
                       <option value="">Global / Unallocated</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="ADD_ROW_DEPT" className="text-blue-600 font-bold">➕ Add New</option>
                     </select>
                   </td>
                   <td className="p-4">
                     <select value={line.divisionId} onChange={e => handleRowMetricChange(idx, 'divisionId', e.target.value)} className="w-full p-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs text-gray-700 font-medium">
                       <option value="">Whole Strategy</option>
                       {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="ADD_ROW_DIV" className="text-blue-600 font-bold">➕ Add New</option>
                     </select>
                   </td>
                   <td className="p-4"><input type="number" value={line.qty} onChange={e => handleRowMetricChange(idx, 'qty', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-black" /></td>
@@ -204,59 +168,17 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
         </div>
       </div>
 
+      <div className="bg-white p-5 border border-gray-200 rounded-2xl mb-6">
+        <label className="block text-[10px] font-black text-blue-900/40 uppercase tracking-[0.2em] mb-2">Narration / Internal Remarks</label>
+        <textarea rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Purchase notes..." className="w-full border p-3 rounded-xl text-xs outline-none bg-white font-medium" />
+      </div>
+
       <div className="flex justify-end gap-3 pt-4 border-t">
         <button onClick={onCancel} className="px-6 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-700">Abort Post</button>
         <button onClick={handleSubmit} className="px-12 py-3.5 bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-blue-700 flex items-center gap-2 shadow-md">
           <Save size={16} /> Record Purchase Bill
         </button>
       </div>
-
-      {/* Quick Add Vendor Modal */}
-      {isVendModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Vendor / Supplier</h3>
-            <form onSubmit={handleAddVendorSubmit} className="space-y-4">
-              <input autoFocus type="text" value={newVendName} onChange={e => setNewVendName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-blue-500" placeholder="Legal vendor name" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsVendModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold">Save</button></div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {isDeptModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-sm font-bold text-gray-900 mb-4">Add Department</h3>
-            <form onSubmit={async e => {
-              e.preventDefault(); if (!newDeptName.trim()) return;
-              const id = newDeptName.trim().toLowerCase().replace(/\s+/g, '_');
-              await supabase.from('departments').insert([{ id, name: newDeptName.trim() }]);
-              await fetchLookups(); setIsDeptModalOpen(false); setNewDeptName('');
-            }} className="space-y-4">
-              <input autoFocus type="text" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs">Cancel</button><button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs">Save</button></div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {isDivModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-sm font-bold text-gray-900 mb-4">Add Division</h3>
-            <form onSubmit={async e => {
-              e.preventDefault(); if (!newDivName.trim()) return;
-              const id = newDivName.trim().toLowerCase().replace(/\s+/g, '_');
-              await supabase.from('divisions').insert([{ id, name: newDivName.trim() }]);
-              await fetchLookups(); setIsDivModalOpen(false); setNewDivName('');
-            }} className="space-y-4">
-              <input autoFocus type="text" value={newDivName} onChange={e => setNewDivName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs">Cancel</button><button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs">Save</button></div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
