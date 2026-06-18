@@ -1,7 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
-import { FinancialSummary, TrialBalanceRow, Ledger } from "../types";
+import { createClient } from "@supabase/supabase-js";
+import { FinancialSummary, TrialBalanceRow } from "../types";
 
-// Helper to sanitize data for the prompt to save tokens
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 const formatFinancialContext = (summary: FinancialSummary, tb: TrialBalanceRow[]) => {
   const tbString = tb.map(r => `${r.ledgerName}: ${r.balanceType} ${r.netBalance}`).join('\n');
   return `
@@ -22,19 +27,25 @@ export const askFinancialAssistant = async (
   summary: FinancialSummary,
   tb: TrialBalanceRow[]
 ): Promise<string> => {
-  // PERMANENT FIX: Vite handles env variables through import.meta.env
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    return "Error: API Key is missing. Please check your configuration.";
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-  const context = formatFinancialContext(summary, tb);
-
   try {
+    // PERMANENT FIX: Fetching the API key dynamically from Supabase database instead of Vercel env
+    const { data, error } = await supabase
+      .from('app_secrets')
+      .select('secret_value')
+      .eq('id', 'gemini_api_key')
+      .single();
+
+    if (error || !data?.secret_value) {
+      console.error("Database secret fetch error:", error);
+      return "Error: Unable to retrieve the AI API Key from database config.";
+    }
+
+    const apiKey = data.secret_value;
+    const ai = new GoogleGenAI({ apiKey });
+    const context = formatFinancialContext(summary, tb);
+
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash', // PERMANENT FIX: Using stable current model
+      model: 'gemini-2.5-flash',
       contents: `
 You are an expert Accountant and Financial Analyst for a small business.
 The user is asking a question about their accounting data.
@@ -49,6 +60,7 @@ Dr [Account] [Amount]
 Cr [Account] [Amount]
       `,
     });
+
     return response.text || "I couldn't generate a response.";
   } catch (error) {
     console.error("Gemini API Error:", error);
