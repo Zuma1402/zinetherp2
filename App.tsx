@@ -17,7 +17,7 @@ import {
   LayoutDashboard,
   Menu,
   X,
-  Building2 // Naya icon company selector ke liye
+  Building2 
 } from 'lucide-react';
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
@@ -56,7 +56,7 @@ import { calculateTrialBalance, calculateFinancialSummary } from './services/acc
 import { getCurrentUser, logout } from './services/authService';
 import { getCompanySettings, activateSubscription, getDaysRemaining } from './services/settingsService';
 import { CloudService } from './services/cloudService';
-import { supabase } from './services/supabaseService'; // Real-time mapping logic ke liye connection
+import { supabase } from './services/supabaseService'; 
 
 type View = 
   | 'DASHBOARD'
@@ -113,21 +113,21 @@ const App: React.FC = () => {
 
   // Helper to completely reload fresh state from Cloud DB on any update
   const reloadCloudData = async () => {
-  try {
-    const data = await CloudService.fetchAllData(activeCompanyId); // <--- activeCompanyId pass kar di
-    setLedgers(data.ledgers);
-    setVouchers(data.vouchers);
-    setInventoryItems(data.inventory);
-    setUnits(data.units);
-    setStockTransactions(data.transactions);
-    if (data.ledgers.length > 0 && !selectedLedgerForView) {
-      setSelectedLedgerForView(data.ledgers[0].id);
+    try {
+      const data = await CloudService.fetchAllData(activeCompanyId); 
+      setLedgers(data.ledgers);
+      setVouchers(data.vouchers);
+      setInventoryItems(data.inventory);
+      setUnits(data.units);
+      setStockTransactions(data.transactions);
+      if (data.ledgers.length > 0 && !selectedLedgerForView) {
+        setSelectedLedgerForView(data.ledgers[0].id);
+      }
+    } catch (error) {
+      console.error("Cloud reload failed", error);
+      setSyncStatus('error');
     }
-  } catch (error) {
-    console.error("Cloud reload failed", error);
-    setSyncStatus('error');
-  }
-};
+  };
 
   // New function to load companies mapped to user
   const fetchUserCompanies = async () => {
@@ -157,12 +157,12 @@ const App: React.FC = () => {
         if (settings.companyName) setCompanyName(settings.companyName);
         setSubscriptionStatus(settings.subscriptionStatus);
 
-        await fetchUserCompanies(); // Load corporate profiles safely
+        await fetchUserCompanies(); 
         await reloadCloudData();
         setIsLoading(false);
     };
     init();
-  }, [activeCompanyId]); // Re-run fetch matrix securely if company id switches
+  }, [activeCompanyId]); 
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
@@ -178,7 +178,7 @@ const App: React.FC = () => {
     setSyncStatus('syncing');
     try {
         await operation();
-        await reloadCloudData(); // Force app to read what was just written to Supabase
+        await reloadCloudData(); 
         setSyncStatus('synced');
     } catch (e) {
         console.error("Operation Sync Failed:", e);
@@ -188,7 +188,6 @@ const App: React.FC = () => {
   };
 
   const handleSaveVoucher = (newVoucher: Voucher) => {
-    // Inject custom active company id payload securely
     const customPayload = { ...newVoucher, company_id: activeCompanyId };
     handleCloudOperation(() => CloudService.saveVoucher(customPayload));
   };
@@ -224,7 +223,6 @@ const App: React.FC = () => {
         if (stockUpdates && stockUpdates.length > 0) {
             const stockWithCompany = stockUpdates.map(t => ({ ...t, company_id: activeCompanyId }));
             await CloudService.saveStockTransactions(stockWithCompany);
-            // Calculate final map values for remote inventory sync
             const updatedInventoryMap = inventoryItems.map(item => {
                 const transaction = stockUpdates.find(t => t.itemId === item.id);
                 if (transaction) {
@@ -407,14 +405,16 @@ const App: React.FC = () => {
         <SidebarContent />
       </aside>
 
-      {/* Main Desktop & Mobile Header Panel with FIXED Company Dropdown Switcher */}
+      {/* Main Structural Frame holding Header and Pages layout safely */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Main Header Panel with FIXED Company Dropdown Switcher */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-sm">
             <div className="flex items-center gap-4">
               <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition md:hidden">
                   <Menu size={24} />
               </button>
               
-              {/* Premium Company Selector Dropdown Switcher layout - Fixed Visibility */}
+              {/* Premium Company Selector Dropdown Switcher layout */}
               {companies.length > 0 && (
                 <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5 shadow-sm">
                   <Building2 size={16} className="text-indigo-600 shrink-0" />
@@ -448,6 +448,7 @@ const App: React.FC = () => {
             <div className="w-10 md:hidden"></div>
         </header>
 
+        {/* Inner Content Area holding view routing wrappers */}
         <div className="flex-1 overflow-auto p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
                 {currentView === 'DASHBOARD' && (
