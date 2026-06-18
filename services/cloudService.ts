@@ -1,29 +1,24 @@
 import { Ledger, Voucher, InventoryItem, Unit, StockTransaction, User } from '../types';
 import { supabase, handleSupabaseError } from './supabaseService';
 
-// Supabase-based Cloud Service
-// All data is now stored and managed centrally in Supabase
-
 export const CloudService = {
-  // --- Initialization & Fetching (Updated safely with companyId parameter) ---
-  async fetchAllData(companyId?: string) {
+  // --- Fetching Data Safely with Strict Parameter Casting ---
+  async fetchAllData(companyId: string | null | undefined = null) {
     try {
-      // Build queries without modifying base schemas
       let ledgersQuery = supabase.from('ledgers').select('*');
       let vouchersQuery = supabase.from('vouchers').select('*, voucher_entries(*)');
       let inventoryQuery = supabase.from('inventory').select('*');
       let unitsQuery = supabase.from('units').select('*');
       let transactionsQuery = supabase.from('stock_transactions').select('*');
 
-      // Secure Multi-Company Filtration isolation layer
-      if (companyId) {
+      // Secure Filter Application Matrix
+      if (companyId && typeof companyId === 'string' && companyId.trim() !== '') {
         ledgersQuery = ledgersQuery.eq('company_id', companyId);
         vouchersQuery = vouchersQuery.eq('company_id', companyId);
         inventoryQuery = inventoryQuery.eq('company_id', companyId);
         transactionsQuery = transactionsQuery.eq('company_id', companyId);
       }
 
-      // Fetch data in parallel exactly as legacy model
       const [ledgersRes, vouchersRes, inventoryRes, unitsRes, transactionsRes] = await Promise.all([
         ledgersQuery,
         vouchersQuery,
@@ -97,8 +92,7 @@ export const CloudService = {
   },
 
   // --- Write Operations ---
-
-  async saveLedger(ledger: Ledger & { company_id?: string }) {
+  async saveLedger(ledger: any) {
     try {
       const payload = {
         id: ledger.id,
@@ -128,7 +122,7 @@ export const CloudService = {
     }
   },
 
-  async updateLedger(ledger: Ledger & { company_id?: string }) {
+  async updateLedger(ledger: any) {
     try {
       const payload = {
         name: ledger.name,
@@ -160,18 +154,14 @@ export const CloudService = {
 
   async deleteLedger(id: string) {
     try {
-      const { error } = await supabase
-        .from('ledgers')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('ledgers').delete().eq('id', id);
       if (error) throw error;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
     }
   },
 
-  async saveVoucher(voucher: Voucher & { company_id?: string }) {
+  async saveVoucher(voucher: any) {
     try {
       const { data: voucherData, error: voucherError } = await supabase
         .from('vouchers')
@@ -188,7 +178,7 @@ export const CloudService = {
 
       if (voucherError) throw voucherError;
 
-      const entries = voucher.entries.map(e => ({
+      const entries = (voucher.entries || []).map((e: any) => ({
         voucher_id: voucher.id,
         ledger_id: e.ledgerId,
         debit: e.debit,
@@ -201,7 +191,6 @@ export const CloudService = {
         .insert(entries);
 
       if (entriesError) throw entriesError;
-
       return voucherData;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
@@ -210,25 +199,17 @@ export const CloudService = {
 
   async deleteVoucher(id: string) {
     try {
-      const { error: entriesError } = await supabase
-        .from('voucher_entries')
-        .delete()
-        .eq('voucher_id', id);
-
+      const { error: entriesError } = await supabase.from('voucher_entries').delete().eq('voucher_id', id);
       if (entriesError) throw entriesError;
 
-      const { error } = await supabase
-        .from('vouchers')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('vouchers').delete().eq('id', id);
       if (error) throw error;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
     }
   },
 
-  async saveInventoryItem(item: InventoryItem & { company_id?: string }, isUpdate: boolean = false) {
+  async saveInventoryItem(item: any, isUpdate: boolean = false) {
     try {
       const payload = {
         id: item.id,
@@ -243,22 +224,12 @@ export const CloudService = {
 
       let result;
       if (isUpdate) {
-        result = await supabase
-          .from('inventory')
-          .update(payload)
-          .eq('id', item.id)
-          .select()
-          .single();
+        result = await supabase.from('inventory').update(payload).eq('id', item.id).select().single();
       } else {
-        result = await supabase
-          .from('inventory')
-          .insert([payload])
-          .select()
-          .single();
+        result = await supabase.from('inventory').insert([payload]).select().single();
       }
 
       if (result.error) throw result.error;
-
       const d = result.data;
       return {
         id: d.id,
@@ -276,20 +247,16 @@ export const CloudService = {
 
   async deleteInventoryItem(id: string) {
     try {
-      const { error } = await supabase
-        .from('inventory')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('inventory').delete().eq('id', id);
       if (error) throw error;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
     }
   },
 
-  async saveStockTransactions(newTransactions: (StockTransaction & { id?: string; company_id?: string })[]) {
+  async saveStockTransactions(newTransactions: any[]) {
     try {
-      const payloads = newTransactions.map(t => ({
+      const payloads = newTransactions.map((t: any) => ({
         id: t.id,
         item_id: t.itemId,
         qty: t.qty,
@@ -317,20 +284,16 @@ export const CloudService = {
 
   async deleteStockTransactionsByVoucher(voucherId: string) {
     try {
-      const { error } = await supabase
-        .from('stock_transactions')
-        .delete()
-        .eq('voucher_id', voucherId);
-
+      const { error } = await supabase.from('stock_transactions').delete().eq('voucher_id', voucherId);
       if (error) throw error;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
     }
   },
 
-  async updateStockLevels(items: (InventoryItem & { company_id?: string })[]) {
+  async updateStockLevels(items: any[]) {
     try {
-      const payloads = items.map(i => ({
+      const payloads = items.map((i: any) => ({
         id: i.id,
         name: i.name,
         unit: i.unit,
@@ -368,7 +331,6 @@ export const CloudService = {
         .single();
 
       if (error) throw error;
-
       const d = data;
       return {
         id: d.id,
@@ -384,11 +346,7 @@ export const CloudService = {
 
   async deleteUnit(id: string) {
     try {
-      const { error } = await supabase
-        .from('units')
-        .delete()
-        .eq('id', id);
-
+      const { error } = await supabase.from('units').delete().eq('id', id);
       if (error) throw error;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
@@ -405,7 +363,6 @@ export const CloudService = {
         supabase.from('ledgers').delete().neq('id', ''),
         supabase.from('units').delete().neq('id', ''),
       ]);
-
       return this.fetchAllData();
     } catch (error) {
       throw new Error(handleSupabaseError(error));
