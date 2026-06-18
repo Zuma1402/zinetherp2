@@ -20,7 +20,6 @@ export const CloudService = {
         ledgersQuery = ledgersQuery.eq('company_id', companyId);
         vouchersQuery = vouchersQuery.eq('company_id', companyId);
         inventoryQuery = inventoryQuery.eq('company_id', companyId);
-        // Note: units table globally shared rehne di hai generic mapping ke liye
         transactionsQuery = transactionsQuery.eq('company_id', companyId);
       }
 
@@ -78,7 +77,6 @@ export const CloudService = {
       const transactions: StockTransaction[] = (transactionsRes.data || []).map(mapStockFromDb);
 
       const vouchersData: any[] = vouchersRes.data || [];
-      // Transform vouchers with their entries (convert voucher_entries fields)
       const vouchers: Voucher[] = vouchersData.map(v => ({
         id: v.id,
         date: v.date,
@@ -100,7 +98,7 @@ export const CloudService = {
 
   // --- Write Operations ---
 
-  async saveLedger(ledger: Ledger) {
+  async saveLedger(ledger: Ledger & { company_id?: string }) {
     try {
       const payload = {
         id: ledger.id,
@@ -108,7 +106,7 @@ export const CloudService = {
         type: ledger.type,
         group: ledger.group,
         opening_balance: ledger.openingBalance,
-        company_id: (ledger as any).company_id || null, // Safely append company tracking identity key
+        company_id: ledger.company_id || null,
       };
 
       const { data, error } = await supabase
@@ -130,14 +128,14 @@ export const CloudService = {
     }
   },
 
-  async updateLedger(ledger: Ledger) {
+  async updateLedger(ledger: Ledger & { company_id?: string }) {
     try {
       const payload = {
         name: ledger.name,
         type: ledger.type,
         group: ledger.group,
         opening_balance: ledger.openingBalance,
-        company_id: (ledger as any).company_id || null,
+        company_id: ledger.company_id || null,
       };
 
       const { data, error } = await supabase
@@ -173,9 +171,8 @@ export const CloudService = {
     }
   },
 
-  async saveVoucher(voucher: Voucher) {
+  async saveVoucher(voucher: Voucher & { company_id?: string }) {
     try {
-      // Save voucher header with dynamic company ID check
       const { data: voucherData, error: voucherError } = await supabase
         .from('vouchers')
         .insert([{
@@ -184,20 +181,19 @@ export const CloudService = {
           number: voucher.number,
           type: voucher.type,
           narration: voucher.narration,
-          company_id: (voucher as any).company_id || null,
+          company_id: voucher.company_id || null,
         }])
         .select()
         .single();
 
       if (voucherError) throw voucherError;
 
-      // Save voucher entries
       const entries = voucher.entries.map(e => ({
         voucher_id: voucher.id,
         ledger_id: e.ledgerId,
         debit: e.debit,
         credit: e.credit,
-        company_id: (voucher as any).company_id || null,
+        company_id: voucher.company_id || null,
       }));
 
       const { error: entriesError } = await supabase
@@ -214,8 +210,205 @@ export const CloudService = {
 
   async deleteVoucher(id: string) {
     try {
-      // Delete entries first (due to foreign key)
       const { error: entriesError } = await supabase
         .from('voucher_entries')
         .delete()
         .eq('voucher_id', id);
+
+      if (entriesError) throw entriesError;
+
+      const { error } = await supabase
+        .from('vouchers')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async saveInventoryItem(item: InventoryItem & { company_id?: string }, isUpdate: boolean = false) {
+    try {
+      const payload = {
+        id: item.id,
+        name: item.name,
+        unit: item.unit,
+        rate: item.rate,
+        cost_price: item.costPrice ?? null,
+        current_stock: item.currentStock,
+        min_stock_level: item.minStockLevel ?? null,
+        company_id: item.company_id || null,
+      };
+
+      let result;
+      if (isUpdate) {
+        result = await supabase
+          .from('inventory')
+          .update(payload)
+          .eq('id', item.id)
+          .select()
+          .single();
+      } else {
+        result = await supabase
+          .from('inventory')
+          .insert([payload])
+          .select()
+          .single();
+      }
+
+      if (result.error) throw result.error;
+
+      const d = result.data;
+      return {
+        id: d.id,
+        name: d.name,
+        unit: d.unit,
+        rate: d.rate ? Number(d.rate) : 0,
+        costPrice: d.cost_price !== null && d.cost_price !== undefined ? Number(d.cost_price) : undefined,
+        currentStock: d.current_stock ? Number(d.current_stock) : 0,
+        minStockLevel: d.min_stock_level !== null && d.min_stock_level !== undefined ? Number(d.min_stock_level) : undefined,
+      } as InventoryItem;
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async deleteInventoryItem(id: string) {
+    try {
+      const { error } = await supabase
+        .from('inventory')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async saveStockTransactions(newTransactions: (StockTransaction & { id?: string; company_id?: string })[]) {
+    try {
+      const payloads = newTransactions.map(t => ({
+        id: t.id,
+        item_id: t.itemId,
+        qty: t.qty,
+        rate: t.rate,
+        voucher_id: t.voucherId,
+        company_id: t.company_id || null,
+      }));
+
+      const { data, error } = await supabase
+        .from('stock_transactions')
+        .insert(payloads)
+        .select();
+
+      if (error) throw error;
+      return (data || payloads).map((d: any) => ({
+        itemId: d.item_id,
+        qty: Number(d.qty),
+        rate: Number(d.rate),
+        voucherId: d.voucher_id,
+      }));
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async deleteStockTransactionsByVoucher(voucherId: string) {
+    try {
+      const { error } = await supabase
+        .from('stock_transactions')
+        .delete()
+        .eq('voucher_id', voucherId);
+
+      if (error) throw error;
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async updateStockLevels(items: (InventoryItem & { company_id?: string })[]) {
+    try {
+      const payloads = items.map(i => ({
+        id: i.id,
+        name: i.name,
+        unit: i.unit,
+        rate: i.rate,
+        cost_price: i.costPrice ?? null,
+        current_stock: i.currentStock,
+        min_stock_level: i.minStockLevel ?? null,
+        company_id: i.company_id || null,
+      }));
+
+      const { error } = await supabase
+        .from('inventory')
+        .upsert(payloads, { onConflict: 'id' });
+
+      if (error) throw error;
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async saveUnit(unit: Unit) {
+    try {
+      const payload = {
+        id: unit.id,
+        name: unit.name,
+        symbol: unit.symbol,
+        base_unit_id: unit.baseUnitId ?? null,
+        factor: unit.factor,
+      };
+
+      const { data, error } = await supabase
+        .from('units')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const d = data;
+      return {
+        id: d.id,
+        name: d.name,
+        symbol: d.symbol,
+        baseUnitId: d.base_unit_id || undefined,
+        factor: d.factor ? Number(d.factor) : 1,
+      } as Unit;
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async deleteUnit(id: string) {
+    try {
+      const { error } = await supabase
+        .from('units')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+
+  async resetData() {
+    try {
+      await Promise.all([
+        supabase.from('stock_transactions').delete().neq('id', ''),
+        supabase.from('voucher_entries').delete().neq('id', ''),
+        supabase.from('vouchers').delete().neq('id', ''),
+        supabase.from('inventory').delete().neq('id', ''),
+        supabase.from('ledgers').delete().neq('id', ''),
+        supabase.from('units').delete().neq('id', ''),
+      ]);
+
+      return this.fetchAllData();
+    } catch (error) {
+      throw new Error(handleSupabaseError(error));
+    }
+  },
+};
