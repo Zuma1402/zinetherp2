@@ -179,16 +179,16 @@ export const CloudService = {
       if (voucherError) throw voucherError;
 
       const entries = (voucher.entries || []).map((e: any) => ({
-        voucher_id: voucher.id,
-        ledger_id: e.ledgerId,
-        debit: e.debit,
-        credit: e.credit,
-        company_id: voucher.company_id || null,
-      }));
+  voucher_id: voucher.id,
+  ledger_id: e.ledgerId,
+  debit: e.debit,
+  credit: e.credit,
+  company_id: voucher.company_id || null,
+}));
 
-      const { error: entriesError } = await supabase
-        .from('voucher_entries')
-        .insert(entries);
+const { error: entriesError } = await supabase
+  .from('voucher_entries')
+  .insert(entries);
 
       if (entriesError) throw entriesError;
       return voucherData;
