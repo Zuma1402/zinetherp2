@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingCart, User, Link as LinkIcon, UserPlus } from 'lucide-react';
-import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow } from '../types';
+import { Save, Plus, Trash2, ShoppingCart, User, Link as LinkIcon, UserPlus, Layers, Compass } from 'lucide-react';
+import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
+import { supabase } from '../services/supabaseService';
 import ItemAutocomplete from './ItemAutocomplete';
 
 interface SalesInvoiceProps {
@@ -20,6 +21,12 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
 
+  // ⭐ Dimensional Tracking Header States
+  const [selectedDept, setSelectedDept] = useState('');
+  const [selectedDiv, setSelectedDiv] = useState('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+
   const [lineItems, setLineItems] = useState([{ itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0 }]);
 
   useEffect(() => {
@@ -31,10 +38,23 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         setInvoiceNo(`${prefix}${nextNum.toString().padStart(4, '0')}`);
       } catch (error) {
         console.error('Error loading invoice settings:', error);
-        setInvoiceNo('INV-0001'); // Default fallback
+        setInvoiceNo('INV-0001');
       }
     };
+
+    const fetchDimensions = async () => {
+      try {
+        const { data: depts } = await supabase.from('departments').select('*');
+        const { data: divs } = await supabase.from('divisions').select('*');
+        if (depts) setDepartments(depts);
+        if (divs) setDivisions(divs);
+      } catch (err) {
+        console.error('Error fetching structural dimensions:', err);
+      }
+    };
+
     initializeInvoice();
+    fetchDimensions();
   }, []);
 
   const customers = ledgers.filter(l => l.group.includes('Debtors') || l.type === AccountType.ASSET);
@@ -110,10 +130,10 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       type: VoucherType.SALES,
       narration: `Sales Inv #${invoiceNo}: ${itemDetails}`,
       entries: [
-        { ledgerId: customerId, debit: totalAmount, credit: 0 },
-        { ledgerId: salesLedger.id, debit: 0, credit: totalAmount },
-        { ledgerId: cogsLedger.id, debit: totalCost, credit: 0 },
-        { ledgerId: stockLedger.id, debit: 0, credit: totalCost }
+        { ledgerId: customerId, debit: totalAmount, credit: 0, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined },
+        { ledgerId: salesLedger.id, debit: 0, credit: totalAmount, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined },
+        { ledgerId: cogsLedger.id, debit: totalCost, credit: 0, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined },
+        { ledgerId: stockLedger.id, debit: 0, credit: totalCost, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined }
       ]
     };
 
@@ -126,7 +146,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
     onSave(voucher, stockUpdates);
     
-    // Update invoice number
     (async () => {
       try {
         const currentSettings = await getCompanySettings();
@@ -158,7 +177,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-12 p-6 md:p-8 bg-indigo-50/30 rounded-2xl md:rounded-[2rem] border border-indigo-100/50">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-4 p-6 md:p-8 bg-indigo-50/30 rounded-2xl md:rounded-[2rem] border border-indigo-100/50">
         <div className="lg:col-span-2">
           <div className="flex justify-between items-center mb-4">
               <label className="block text-xs font-black text-indigo-900/40 uppercase tracking-[0.15em]">Billed To (Customer)</label>
@@ -200,6 +219,28 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             <label className="block text-xs font-black text-indigo-900/40 uppercase tracking-[0.15em] mb-4">Date</label>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-4 border-2 border-white rounded-2xl bg-white text-gray-900 font-bold shadow-sm focus:ring-4 ring-indigo-50" />
           </div>
+        </div>
+      </div>
+
+      {/* ⭐ Structural Dimension Mapping Filters Panels */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 p-5 bg-slate-50 border border-gray-200/60 rounded-2xl">
+        <div>
+          <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] mb-2">
+            <Layers size={14} className="text-indigo-600"/> Allocation Cost Center (Department)
+          </label>
+          <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-indigo-500">
+            <option value="">Global / Unallocated (HQ)</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] mb-2">
+            <Compass size={14} className="text-indigo-600"/> Profit Center / Segment (Division)
+          </label>
+          <select value={selectedDiv} onChange={e => setSelectedDiv(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-indigo-500">
+            <option value="">Whole Enterprise Strategy</option>
+            {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
         </div>
       </div>
 

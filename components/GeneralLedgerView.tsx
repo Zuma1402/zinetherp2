@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Ledger, Voucher, AccountType } from '../types';
-import { Calendar, Info, TrendingUp, TrendingDown, Clock, ArrowRight } from 'lucide-react';
+import { Ledger, Voucher, AccountType, Department, Division } from '../types';
+import { Calendar, Info, TrendingUp, TrendingDown, Clock, Layers, Compass } from 'lucide-react';
+import { supabase } from '../services/supabaseService';
 
 interface GeneralLedgerViewProps {
   ledgers: Ledger[];
@@ -11,9 +12,25 @@ interface GeneralLedgerViewProps {
 const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers, initialLedgerId }) => {
   const [selectedLedgerId, setSelectedLedgerId] = useState<string>(initialLedgerId || ledgers[0]?.id || '');
   
+  // ⭐ Segment Tracking Filter State Hooks
+  const [filterDept, setFilterDept] = useState('');
+  const [filterDiv, setFilterDiv] = useState('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+
   useEffect(() => {
     if (initialLedgerId) setSelectedLedgerId(initialLedgerId);
   }, [initialLedgerId]);
+
+  useEffect(() => {
+    const loadDimensions = async () => {
+      const { data: d } = await supabase.from('departments').select('*');
+      const { data: v } = await supabase.from('divisions').select('*');
+      if (d) setDepartments(d);
+      if (v) setDivisions(v);
+    };
+    loadDimensions();
+  }, []);
 
   const [startDate, setStartDate] = useState(() => {
       const date = new Date();
@@ -23,10 +40,6 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
 
   const selectedLedger = ledgers.find(l => l.id === selectedLedgerId);
 
-  // Logic: 
-  // 1. Calculate transactions in selected period
-  // 2. Calculate balance PRIOR to start date (Historical Opening + Transactions before startDate)
-  // 3. Generate rows with running balance
   const { transactionsWithRunningBalance, periodTotalDr, periodTotalCr, openingBalForPeriod } = useMemo(() => {
     if (!selectedLedgerId || !selectedLedger) return { transactionsWithRunningBalance: [], periodTotalDr: 0, periodTotalCr: 0, openingBalForPeriod: 0 };
 
@@ -41,9 +54,14 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
     let pDr = 0;
     let pCr = 0;
 
-    // Filter and sort all vouchers for this ledger
+    // Filter and sort all vouchers for this ledger taking dimensional tags into analysis context
     const allRelevantVouchers = vouchers
-      .filter(v => v.entries.some(e => e.ledgerId === selectedLedgerId))
+      .filter(v => v.entries.some(e => {
+        const matchesLedger = e.ledgerId === selectedLedgerId;
+        const matchesDept = !filterDept || e.departmentId === filterDept;
+        const matchesDiv = !filterDiv || e.divisionId === filterDiv;
+        return matchesLedger && matchesDept && matchesDiv;
+      }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Calculate Opening Balance for the period
@@ -88,30 +106,44 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
         periodTotalCr: pCr,
         openingBalForPeriod: historicalNet
     };
-  }, [selectedLedgerId, selectedLedger, vouchers, startDate, endDate]);
+  }, [selectedLedgerId, selectedLedger, vouchers, startDate, endDate, filterDept, filterDiv]);
 
   const netClosing = openingBalForPeriod + (periodTotalDr - periodTotalCr);
   const closingType = netClosing >= 0 ? 'Dr' : 'Cr';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row justify-between md:items-end gap-6">
+      <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6 bg-slate-50 p-6 rounded-2xl border border-gray-200/60">
         <div>
            <h2 className="text-3xl font-black text-gray-900 tracking-tight">Ledger Analysis</h2>
            <p className="text-gray-500 font-medium text-xs uppercase tracking-widest mt-1">Integrated Chart of Account Balances</p>
         </div>
-        <div className="flex gap-4 items-end flex-wrap">
-             <div className="w-72">
+        <div className="flex gap-4 items-end flex-wrap flex-1 lg:justify-end">
+             <div className="w-64">
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Target Account</label>
-                <select className="w-full p-3.5 border-2 border-white rounded-2xl shadow-sm bg-white text-gray-900 font-bold focus:ring-4 ring-indigo-50 outline-none appearance-none cursor-pointer" value={selectedLedgerId} onChange={e => setSelectedLedgerId(e.target.value)}>
+                <select className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold focus:ring-4 ring-indigo-50 outline-none appearance-none cursor-pointer" value={selectedLedgerId} onChange={e => setSelectedLedgerId(e.target.value)}>
                     {ledgers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
              </div>
-             <div className="flex items-center gap-2 bg-white p-3 rounded-2xl border-2 border-white shadow-sm ring-indigo-50">
-                 <Calendar size={18} className="text-indigo-500 ml-1"/>
-                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="text-sm font-bold outline-none bg-white text-gray-700" />
+             <div className="w-44">
+                <label className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Layers size={12}/> Department</label>
+                <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none">
+                  <option value="">All Cost Centers</option>
+                  {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+             </div>
+             <div className="w-44">
+                <label className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Compass size={12}/> Division</label>
+                <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none">
+                  <option value="">All Divisions</option>
+                  {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+             </div>
+             <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-gray-200 shadow-sm">
+                 <Calendar size={16} className="text-indigo-500 ml-1"/>
+                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="text-xs font-bold outline-none bg-white text-gray-700" />
                  <span className="text-gray-300 font-bold px-1">-</span>
-                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="text-sm font-bold outline-none bg-white text-gray-700" />
+                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="text-xs font-bold outline-none bg-white text-gray-700" />
              </div>
         </div>
       </div>

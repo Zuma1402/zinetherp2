@@ -1,6 +1,8 @@
-import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { TrialBalanceRow, FinancialSummary } from '../types';
+import React, { useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { TrialBalanceRow, FinancialSummary, Department, Division } from '../types';
+import { supabase } from '../services/supabaseService';
+import { Layers, Compass } from 'lucide-react';
 
 interface ReportViewProps {
   trialBalance: TrialBalanceRow[];
@@ -8,9 +10,69 @@ interface ReportViewProps {
 }
 
 const ReportView: React.FC<ReportViewProps> = ({ trialBalance, summary }) => {
+  // ⭐ Segments Structural Hooks
+  const [activeDept, setActiveDept] = useState('');
+  const [activeDiv, setActiveDiv] = useState('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  
+  // Dynamic filtered states computed locally
+  const [computedSummary, setComputedSummary] = useState<FinancialSummary>(summary);
+
+  useEffect(() => {
+    const loadDimensions = async () => {
+      const { data: d } = await supabase.from('departments').select('*');
+      const { data: v } = await supabase.from('divisions').select('*');
+      if (d) setDepartments(d);
+      if (v) setDivisions(v);
+    };
+    loadDimensions();
+  }, []);
+
+  // Recalculate dimensional breakdown based on selected tags
+  useEffect(() => {
+    if (!activeDept && !activeDiv) {
+      setComputedSummary(summary);
+      return;
+    }
+
+    const runSegmentedPL = async () => {
+      try {
+        let query = supabase.from('journal_entries').select('debit, credit, ledgers(type)');
+        
+        if (activeDept) query = query.eq('department_id', activeDept);
+        if (activeDiv) query = query.eq('division_id', activeDiv);
+
+        const { data: lines } = await query;
+        
+        let inc = 0;
+        let exp = 0;
+
+        if (lines) {
+          lines.forEach((l: any) => {
+            const type = l.ledgers?.type;
+            if (type === 'INCOME') inc += (l.credit - l.debit);
+            if (type === 'EXPENSE') exp += (l.debit - l.credit);
+          });
+        }
+
+        setComputedSummary({
+          ...summary,
+          totalIncome: inc,
+          totalExpenses: exp,
+          netProfit: inc - exp
+        });
+      } catch (err) {
+        console.error('Error computing segmented statement metrics', err);
+      }
+    };
+
+    runSegmentedPL();
+  }, [activeDept, activeDiv, summary]);
+
   const chartData = [
-    { name: 'Income', amount: summary.totalIncome, color: '#10b981' },
-    { name: 'Expense', amount: summary.totalExpenses, color: '#f59e0b' },
+    { name: 'Income', amount: computedSummary.totalIncome, color: '#10b981' },
+    { name: 'Expense', amount: computedSummary.totalExpenses, color: '#f59e0b' },
     { name: 'Assets', amount: summary.totalAssets, color: '#3b82f6' },
     { name: 'Liabilities', amount: summary.totalLiabilities, color: '#ef4444' },
     { name: 'Equity', amount: summary.totalEquity, color: '#8b5cf6' },
@@ -18,23 +80,44 @@ const ReportView: React.FC<ReportViewProps> = ({ trialBalance, summary }) => {
 
   return (
     <div className="space-y-6">
+      {/* Dimensional Breakdown Management Segment Filters Bar */}
+      <div className="bg-white p-5 rounded-xl border border-gray-200 flex flex-col md:flex-row gap-4 items-center">
+        <span className="text-xs font-black text-gray-500 uppercase tracking-wider block">Segmented P&L Analytical Filters:</span>
+        <div className="flex gap-4 w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-gray-200 flex-1 md:flex-none">
+            <Layers size={14} className="text-indigo-600"/>
+            <select value={activeDept} onChange={e => setActiveDept(e.target.value)} className="bg-transparent text-xs font-bold outline-none text-gray-800">
+              <option value="">All Departments</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-gray-200 flex-1 md:flex-none">
+            <Compass size={14} className="text-indigo-600"/>
+            <select value={activeDiv} onChange={e => setActiveDiv(e.target.value)} className="bg-transparent text-xs font-bold outline-none text-gray-800">
+              <option value="">All Divisions</option>
+              {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <p className="text-sm text-gray-500 uppercase font-semibold">Net Profit</p>
-            <h3 className={`text-3xl font-bold mt-2 ${summary.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {summary.netProfit.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}
+            <p className="text-sm text-gray-500 uppercase font-semibold">Net Profit {(activeDept || activeDiv) && '(Segmented)'}</p>
+            <h3 className={`text-3xl font-bold mt-2 ${computedSummary.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {computedSummary.netProfit.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}
             </h3>
          </div>
          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <p className="text-sm text-gray-500 uppercase font-semibold">Total Revenue</p>
+            <p className="text-sm text-gray-500 uppercase font-semibold">Total Revenue {(activeDept || activeDiv) && '(Segmented)'}</p>
             <h3 className="text-3xl font-bold mt-2 text-gray-800">
-                {summary.totalIncome.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}
+                {computedSummary.totalIncome.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}
             </h3>
          </div>
          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <p className="text-sm text-gray-500 uppercase font-semibold">Total Expenses</p>
+            <p className="text-sm text-gray-500 uppercase font-semibold">Total Expenses {(activeDept || activeDiv) && '(Segmented)'}</p>
             <h3 className="text-3xl font-bold mt-2 text-gray-800">
-                {summary.totalExpenses.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}
+                {computedSummary.totalExpenses.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}
             </h3>
          </div>
       </div>

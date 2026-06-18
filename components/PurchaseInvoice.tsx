@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingBag, UserPlus, Factory, Link as LinkIcon, Check } from 'lucide-react';
-import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow } from '../types';
+import { Save, Plus, Trash2, ShoppingBag, UserPlus, Factory, Link as LinkIcon, Check, Layers, Compass } from 'lucide-react';
+import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
+import { supabase } from '../services/supabaseService';
 import ItemAutocomplete from './ItemAutocomplete';
 
 interface PurchaseInvoiceProps {
@@ -19,7 +20,23 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
   const [isAddingSupplier, setIsAddingSupplier] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState('');
 
+  // ⭐ Structural Dimensions Hooks
+  const [selectedDept, setSelectedDept] = useState('');
+  const [selectedDiv, setSelectedDiv] = useState('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+
   const [lineItems, setLineItems] = useState([{ itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0 }]);
+
+  useEffect(() => {
+    const fetchStructures = async () => {
+      const { data: d } = await supabase.from('departments').select('*');
+      const { data: v } = await supabase.from('divisions').select('*');
+      if (d) setDepartments(d);
+      if (v) setDivisions(v);
+    };
+    fetchStructures();
+  }, []);
 
   const suppliers = ledgers.filter(l => l.group.includes('Creditors') || l.type === AccountType.LIABILITY);
   
@@ -82,8 +99,8 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
       type: VoucherType.PURCHASE,
       narration: `Purchase from Vendor #${invoiceNo}`,
       entries: [
-        { ledgerId: stockLedger.id, debit: totalAmount, credit: 0 },
-        { ledgerId: supplierId, debit: 0, credit: totalAmount }
+        { ledgerId: stockLedger.id, debit: totalAmount, credit: 0, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined },
+        { ledgerId: supplierId, debit: 0, credit: totalAmount, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined }
       ]
     };
 
@@ -115,7 +132,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-12 p-8 bg-blue-50/20 rounded-[2.5rem] border border-blue-50">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-4 p-8 bg-blue-50/20 rounded-[2.5rem] border border-blue-50">
         <div className="lg:col-span-2">
           <div className="flex justify-between items-center mb-4 px-2">
             <label className="block text-[10px] font-black text-blue-900/30 uppercase tracking-[0.2em]">Supplier / Vendor Source</label>
@@ -155,6 +172,28 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
                 <label className="block text-[10px] font-black text-blue-900/30 uppercase tracking-[0.2em] mb-4">Post Date</label>
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-4 border-2 border-white rounded-[1.5rem] bg-white font-bold text-gray-700 shadow-sm focus:ring-4 ring-blue-50 outline-none" />
             </div>
+        </div>
+      </div>
+
+      {/* ⭐ Dynamic Procurement Cost Segment Fields */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 p-5 bg-slate-50 border border-gray-200/60 rounded-2xl">
+        <div>
+          <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] mb-2">
+            <Layers size={14} className="text-blue-600"/> Charge Cost Center (Department)
+          </label>
+          <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-blue-500">
+            <option value="">Global / Unallocated Corporate</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] mb-2">
+            <Compass size={14} className="text-blue-600"/> Target Segment Division (Dimension)
+          </label>
+          <select value={selectedDiv} onChange={e => setSelectedDiv(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-blue-500">
+            <option value="">Whole Enterprise Base</option>
+            {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
         </div>
       </div>
 
