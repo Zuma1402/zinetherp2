@@ -16,7 +16,8 @@ import {
   ClipboardList,
   LayoutDashboard,
   Menu,
-  X
+  X,
+  Building2 // Naya icon company selector ke liye
 } from 'lucide-react';
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
@@ -55,6 +56,7 @@ import { calculateTrialBalance, calculateFinancialSummary } from './services/acc
 import { getCurrentUser, logout } from './services/authService';
 import { getCompanySettings, activateSubscription, getDaysRemaining } from './services/settingsService';
 import { CloudService } from './services/cloudService';
+import { supabase } from './services/supabaseClient'; // Real-time mapping logic ke liye connection
 
 type View = 
   | 'DASHBOARD'
@@ -100,6 +102,10 @@ const App: React.FC = () => {
   const [selectedLedgerForView, setSelectedLedgerForView] = useState<string>('');
   const [subscriptionStatus, setSubscriptionStatus] = useState<'TRIAL' | 'ACTIVE' | 'EXPIRED'>('TRIAL');
 
+  // New Multi-Company States
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [activeCompanyId, setActiveCompanyId] = useState<string>('');
+
   // Menu State
   const [salesMenuOpen, setSalesMenuOpen] = useState(false);
   const [purchaseMenuOpen, setPurchaseMenuOpen] = useState(false);
@@ -107,19 +113,37 @@ const App: React.FC = () => {
 
   // Helper to completely reload fresh state from Cloud DB on any update
   const reloadCloudData = async () => {
+  try {
+    const data = await CloudService.fetchAllData(activeCompanyId); // <--- activeCompanyId pass kar di
+    setLedgers(data.ledgers);
+    setVouchers(data.vouchers);
+    setInventoryItems(data.inventory);
+    setUnits(data.units);
+    setStockTransactions(data.transactions);
+    if (data.ledgers.length > 0 && !selectedLedgerForView) {
+      setSelectedLedgerForView(data.ledgers[0].id);
+    }
+  } catch (error) {
+    console.error("Cloud reload failed", error);
+    setSyncStatus('error');
+  }
+};
+
+  // New function to load companies mapped to user
+  const fetchUserCompanies = async () => {
     try {
-      const data = await CloudService.fetchAllData();
-      setLedgers(data.ledgers);
-      setVouchers(data.vouchers);
-      setInventoryItems(data.inventory);
-      setUnits(data.units);
-      setStockTransactions(data.transactions);
-      if (data.ledgers.length > 0 && !selectedLedgerForView) {
-        setSelectedLedgerForView(data.ledgers[0].id);
+      const { data: mapping, error: mapErr } = await supabase
+        .from('user_companies')
+        .select('company_id, companies(id, name)');
+      
+      if (mapping && mapping.length > 0) {
+        const formattedCompanies = mapping.map((m: any) => m.companies);
+        setCompanies(formattedCompanies);
+        setActiveCompanyId(formattedCompanies[0].id);
+        setCompanyName(formattedCompanies[0].name);
       }
-    } catch (error) {
-      console.error("Cloud reload failed", error);
-      setSyncStatus('error');
+    } catch (err) {
+      console.error("Error fetching multi-companies", err);
     }
   };
 
@@ -133,11 +157,12 @@ const App: React.FC = () => {
         if (settings.companyName) setCompanyName(settings.companyName);
         setSubscriptionStatus(settings.subscriptionStatus);
 
+        await fetchUserCompanies(); // Load corporate profiles safely
         await reloadCloudData();
         setIsLoading(false);
     };
     init();
-  }, []);
+  }, [activeCompanyId]); // Re-run fetch matrix securely if company id switches
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
@@ -163,7 +188,9 @@ const App: React.FC = () => {
   };
 
   const handleSaveVoucher = (newVoucher: Voucher) => {
-    handleCloudOperation(() => CloudService.saveVoucher(newVoucher));
+    // Inject custom active company id payload securely
+    const customPayload = { ...newVoucher, company_id: activeCompanyId };
+    handleCloudOperation(() => CloudService.saveVoucher(customPayload));
   };
 
   const handleDeleteVoucher = (id: string) => {
@@ -174,7 +201,8 @@ const App: React.FC = () => {
   };
 
   const handleAddLedger = (newLedger: Ledger) => {
-    handleCloudOperation(() => CloudService.saveLedger(newLedger));
+    const customPayload = { ...newLedger, company_id: activeCompanyId };
+    handleCloudOperation(() => CloudService.saveLedger(customPayload));
   };
 
   const handleDeleteLedger = (id: string) => {
@@ -191,9 +219,11 @@ const App: React.FC = () => {
 
   const handleSaveInvoiceWithStock = (newVoucher: Voucher, stockUpdates: StockTransaction[]) => {
     handleCloudOperation(async () => {
-        await CloudService.saveVoucher(newVoucher);
+        const voucherWithCompany = { ...newVoucher, company_id: activeCompanyId };
+        await CloudService.saveVoucher(voucherWithCompany);
         if (stockUpdates && stockUpdates.length > 0) {
-            await CloudService.saveStockTransactions(stockUpdates);
+            const stockWithCompany = stockUpdates.map(t => ({ ...t, company_id: activeCompanyId }));
+            await CloudService.saveStockTransactions(stockWithCompany);
             // Calculate final map values for remote inventory sync
             const updatedInventoryMap = inventoryItems.map(item => {
                 const transaction = stockUpdates.find(t => t.itemId === item.id);
@@ -201,7 +231,8 @@ const App: React.FC = () => {
                     return {
                         ...item,
                         currentStock: item.currentStock + transaction.qty,
-                        costPrice: transaction.qty > 0 ? transaction.rate : item.costPrice
+                        costPrice: transaction.qty > 0 ? transaction.rate : item.costPrice,
+                        company_id: activeCompanyId
                     };
                 }
                 return item;
@@ -212,11 +243,13 @@ const App: React.FC = () => {
   };
 
   const handleAddItem = (item: InventoryItem) => {
-      handleCloudOperation(() => CloudService.saveInventoryItem(item));
+      const customPayload = { ...item, company_id: activeCompanyId };
+      handleCloudOperation(() => CloudService.saveInventoryItem(customPayload));
   };
 
   const handleUpdateInventoryItem = (updatedItem: InventoryItem) => {
-    handleCloudOperation(() => CloudService.saveInventoryItem(updatedItem, true));
+    const customPayload = { ...updatedItem, company_id: activeCompanyId };
+    handleCloudOperation(() => CloudService.saveInventoryItem(customPayload, true));
   };
 
   const handleDeleteInventoryItem = (id: string) => {
@@ -375,15 +408,43 @@ const App: React.FC = () => {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:hidden shrink-0">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <Menu size={24} />
-            </button>
-            <div className="flex items-center gap-2 text-indigo-700 font-bold">
-                <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center text-white text-[10px]">Z</div>
-                {companyName}
+        {/* Main Desktop & Mobile Header Panel with Company Dropdown Switcher */}
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-sm">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition md:hidden">
+                  <Menu size={24} />
+              </button>
+              
+              {/* Premium Company Selector Dropdown Switcher layout */}
+              {companies.length > 0 && (
+                <div className="relative flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                  <Building2 size={16} className="text-indigo-600" />
+                  <select 
+                    value={activeCompanyId} 
+                    onChange={(e) => {
+                      const comp = companies.find(c => c.id === e.target.value);
+                      if (comp) {
+                        setActiveCompanyId(comp.id);
+                        setCompanyName(comp.name);
+                      }
+                    }}
+                    className="bg-transparent text-xs font-black text-slate-700 focus:outline-none cursor-pointer pr-2 border-none"
+                  >
+                    {companies.map((comp) => (
+                      <option key={comp.id} value={comp.id} className="font-sans font-medium text-slate-800">
+                        {comp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
-            <div className="w-10"></div>
+
+            <div className="flex items-center gap-2 text-indigo-700 font-bold hidden md:flex">
+                <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center text-white text-[10px]">Z</div>
+                <span className="text-sm font-black text-slate-800 tracking-tight">{companyName}</span>
+            </div>
+            <div className="w-10 md:hidden"></div>
         </header>
 
         <div className="flex-1 overflow-auto p-4 md:p-6">
