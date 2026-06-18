@@ -12,7 +12,6 @@ interface GeneralLedgerViewProps {
 const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers, initialLedgerId }) => {
   const [selectedLedgerId, setSelectedLedgerId] = useState<string>(initialLedgerId || ledgers[0]?.id || '');
   
-  // ⭐ Segment Tracking Filter State Hooks
   const [filterDept, setFilterDept] = useState('');
   const [filterDiv, setFilterDiv] = useState('');
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -22,7 +21,6 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
     if (initialLedgerId) setSelectedLedgerId(initialLedgerId);
   }, [initialLedgerId]);
 
-  // Dynamic fetcher function to hook accurate list data dynamically
   const loadDimensions = async () => {
     const { data: d } = await supabase.from('departments').select('*').order('name');
     const { data: v } = await supabase.from('divisions').select('*').order('name');
@@ -32,7 +30,7 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
 
   useEffect(() => {
     loadDimensions();
-  }, [vouchers]); // Real-time updates sync on dynamic voucher array array shifts
+  }, [vouchers]);
 
   const [startDate, setStartDate] = useState(() => {
       const date = new Date();
@@ -47,7 +45,6 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
 
     let historicalDr = 0;
     let historicalCr = 0;
-
     const isDrNature = [AccountType.ASSET, AccountType.EXPENSE].includes(selectedLedger.type);
     
     if (isDrNature) historicalDr += selectedLedger.openingBalance;
@@ -84,31 +81,15 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
         const entry = v.entries.find(e => e.ledgerId === selectedLedgerId);
         if (entry) {
           running += (entry.debit - entry.credit);
-          list.push({
-            date: v.date,
-            voucherNo: v.number,
-            type: v.type,
-            narration: v.narration,
-            debit: entry.debit,
-            credit: entry.credit,
-            runningBalance: running
-          });
+          list.push({ date: v.date, voucherNo: v.number, type: v.type, narration: v.narration, debit: entry.debit, credit: entry.credit, runningBalance: running });
           pDr += entry.debit;
           pCr += entry.credit;
         }
       }
     });
     
-    return { 
-        transactionsWithRunningBalance: list, 
-        periodTotalDr: pDr, 
-        periodTotalCr: pCr,
-        openingBalForPeriod: historicalNet
-    };
+    return { transactionsWithRunningBalance: list, periodTotalDr: pDr, periodTotalCr: pCr, openingBalForPeriod: historicalNet };
   }, [selectedLedgerId, selectedLedger, vouchers, startDate, endDate, filterDept, filterDiv]);
-
-  const netClosing = openingBalForPeriod + (periodTotalDr - periodTotalCr);
-  const closingType = netClosing >= 0 ? 'Dr' : 'Cr';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -117,128 +98,71 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
            <h2 className="text-3xl font-black text-gray-900 tracking-tight">Ledger Analysis</h2>
            <p className="text-gray-500 font-medium text-xs uppercase tracking-widest mt-1">Integrated Chart of Account Balances</p>
         </div>
-        <div className="flex gap-4 items-end flex-wrap flex-1 lg:justify-end">
+        <div className="flex gap-4 items-end flex-wrap flex-1 lg:justify-end text-xs font-bold text-gray-800">
              <div className="w-64">
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Target Account</label>
-                <select className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold focus:ring-4 ring-indigo-50 outline-none appearance-none cursor-pointer" value={selectedLedgerId} onChange={e => setSelectedLedgerId(e.target.value)}>
+                <select className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" value={selectedLedgerId} onChange={e => setSelectedLedgerId(e.target.value)}>
                     {ledgers.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                 </select>
              </div>
              <div className="w-44">
                 <label className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Layers size={12}/> Department</label>
-                <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none cursor-pointer">
+                <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs outline-none">
                   <option value="">All Cost Centers</option>
                   {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
              </div>
              <div className="w-44">
                 <label className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Compass size={12}/> Division</label>
-                <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none cursor-pointer">
+                <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs outline-none">
                   <option value="">All Divisions</option>
                   {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
              </div>
              <div className="flex items-center gap-2 bg-white p-2.5 rounded-xl border border-gray-200 shadow-sm">
                  <Calendar size={16} className="text-indigo-500 ml-1"/>
-                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="text-xs font-bold outline-none bg-white text-gray-700" />
-                 <span className="text-gray-300 font-bold px-1">-</span>
-                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="text-xs font-bold outline-none bg-white text-gray-700" />
+                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="text-xs outline-none bg-white text-gray-700" />
+                 <span className="text-gray-300 px-1">-</span>
+                 <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="text-xs outline-none bg-white text-gray-700" />
              </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/40 flex justify-between items-center">
-              <div>
-                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">COA Opening Balance</div>
-                  <div className="text-xl font-mono font-black text-gray-900">
-                    {Math.abs(openingBalForPeriod).toLocaleString()} {openingBalForPeriod >= 0 ? 'Dr' : 'Cr'}
-                  </div>
-              </div>
+          <div className="bg-white p-6 rounded-[2rem] border flex justify-between items-center">
+              <div><div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">COA Opening Balance</div><div className="text-xl font-mono font-black text-gray-900">{Math.abs(openingBalForPeriod).toLocaleString()} {openingBalForPeriod >= 0 ? 'Dr' : 'Cr'}</div></div>
               <div className="p-3 bg-gray-50 rounded-2xl text-gray-400"><Info size={20}/></div>
           </div>
-          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/40 flex justify-between items-center">
-              <div>
-                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Period Movement</div>
-                  <div className={`text-xl font-mono font-black ${(periodTotalDr - periodTotalCr) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {(periodTotalDr - periodTotalCr) >= 0 ? '+' : ''}{(periodTotalDr - periodTotalCr).toLocaleString()}
-                  </div>
-              </div>
-              <div className={`p-3 rounded-2xl ${(periodTotalDr - periodTotalCr) >= 0 ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
-                {(periodTotalDr - periodTotalCr) >= 0 ? <TrendingUp size={20}/> : <TrendingDown size={20}/>}
-              </div>
+          <div className="bg-white p-6 rounded-[2rem] border flex justify-between items-center">
+              <div><div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Period Movement</div><div className={`text-xl font-mono font-black ${(periodTotalDr - periodTotalCr) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{(periodTotalDr - periodTotalCr) >= 0 ? '+' : ''}{(periodTotalDr - periodTotalCr).toLocaleString()}</div></div>
+              <div className={`p-3 rounded-2xl ${(periodTotalDr - periodTotalCr) >= 0 ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}><TrendingUp size={20}/></div>
           </div>
-          <div className="bg-indigo-600 p-6 rounded-[2rem] shadow-2xl shadow-indigo-200 flex justify-between items-center text-white">
-              <div>
-                  <div className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">Closing Ledger Balance</div>
-                  <div className="text-2xl font-mono font-black">
-                    {Math.abs(netClosing).toLocaleString()} {closingType}
-                  </div>
-              </div>
+          <div className="bg-indigo-600 p-6 rounded-[2rem] shadow-2xl text-white flex justify-between items-center">
+              <div><div className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-70">Closing Ledger Balance</div><div className="text-2xl font-mono font-black">{Math.abs(openingBalForPeriod + (periodTotalDr - periodTotalCr)).toLocaleString()} { (openingBalForPeriod + (periodTotalDr - periodTotalCr)) >= 0 ? 'Dr' : 'Cr'}</div></div>
               <div className="p-3 bg-white/20 rounded-2xl text-white"><Clock size={24}/></div>
           </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
-        <div className="p-8 bg-gray-50/50 border-b flex justify-between items-center">
-           <div>
-               <span className="font-black text-gray-900 block text-2xl tracking-tight">{selectedLedger?.name}</span>
-               <span className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em]">{selectedLedger?.group}</span>
-           </div>
-        </div>
+      <div className="bg-white rounded-[2.5rem] shadow-2xl border overflow-hidden">
+        <div className="p-8 bg-gray-50/50 border-b flex justify-between items-center"><div><span className="font-black text-gray-900 block text-2xl tracking-tight">{selectedLedger?.name}</span><span className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em]">{selectedLedger?.group}</span></div></div>
         <table className="w-full text-left text-sm">
-            <thead className="bg-white text-gray-400 border-b">
-                <tr>
-                    <th className="p-6 font-black uppercase text-[10px] tracking-widest">Date</th>
-                    <th className="p-6 font-black uppercase text-[10px] tracking-widest">Voucher #</th>
-                    <th className="p-6 font-black uppercase text-[10px] tracking-widest">Particulars</th>
-                    <th className="p-6 text-right font-black uppercase text-[10px] tracking-widest">Debit</th>
-                    <th className="p-6 text-right font-black uppercase text-[10px] tracking-widest">Credit</th>
-                    <th className="p-6 text-right font-black uppercase text-[10px] tracking-widest bg-gray-50/50">Running Balance</th>
-                </tr>
+            <thead className="bg-white text-gray-400 border-b font-black uppercase text-[10px] tracking-widest">
+                <tr><th className="p-6">Date</th><th className="p-6">Voucher #</th><th className="p-6">Particulars</th><th className="p-6 text-right">Debit</th><th className="p-6 text-right">Credit</th><th className="p-6 text-right bg-gray-50/50">Running Balance</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
                 <tr className="bg-indigo-50/20">
-                    <td className="p-6 text-gray-400 font-mono italic">{startDate}</td>
-                    <td className="p-6 font-black text-indigo-700 uppercase tracking-tighter text-[10px]">OPENING</td>
-                    <td className="p-6 text-gray-500 font-bold italic">Balance brought forward from previous periods</td>
-                    <td className="p-6 text-right font-mono font-bold text-gray-900">{openingBalForPeriod >= 0 ? Math.abs(openingBalForPeriod).toLocaleString() : '-'}</td>
-                    <td className="p-6 text-right font-mono font-bold text-gray-900">{openingBalForPeriod < 0 ? Math.abs(openingBalForPeriod).toLocaleString() : '-'}</td>
-                    <td className="p-6 text-right font-mono font-black text-indigo-800 bg-indigo-50/50">
-                        {Math.abs(openingBalForPeriod).toLocaleString()} {openingBalForPeriod >= 0 ? 'Dr' : 'Cr'}
-                    </td>
+                    <td className="p-6 text-gray-400 font-mono italic">{startDate}</td><td className="p-6 font-black text-indigo-700 text-[10px]">OPENING</td><td className="p-6 text-gray-500 italic">Balance brought forward</td>
+                    <td className="p-6 text-right font-mono font-bold text-gray-900">{openingBalForPeriod >= 0 ? Math.abs(openingBalForPeriod).toLocaleString() : '-'}</td><td className="p-6 text-right font-mono font-bold text-gray-900">{openingBalForPeriod < 0 ? Math.abs(openingBalForPeriod).toLocaleString() : '-'}</td>
+                    <td className="p-6 text-right font-mono font-black text-indigo-800 bg-indigo-50/50">{Math.abs(openingBalForPeriod).toLocaleString()} {openingBalForPeriod >= 0 ? 'Dr' : 'Cr'}</td>
                 </tr>
-
                 {transactionsWithRunningBalance.map((tx, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50 group transition-colors">
-                        <td className="p-6 text-gray-600 font-mono">{tx.date}</td>
-                        <td className="p-6 font-black text-indigo-600 tracking-tighter uppercase text-xs">{tx.voucherNo}</td>
-                        <td className="p-6 text-gray-700 font-medium">{tx.narration}</td>
-                        <td className="p-6 text-right font-mono font-bold text-gray-900">{tx.debit > 0 ? tx.debit.toLocaleString() : '-'}</td>
-                        <td className="p-6 text-right font-mono font-bold text-gray-900">{tx.credit > 0 ? tx.credit.toLocaleString() : '-'}</td>
-                        <td className="p-6 text-right font-mono font-black text-indigo-900 bg-gray-50/30">
-                            {Math.abs(tx.runningBalance).toLocaleString()} {tx.runningBalance >= 0 ? 'Dr' : 'Cr'}
-                        </td>
+                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                        <td className="p-6 text-gray-600 font-mono">{tx.date}</td><td className="p-6 font-black text-indigo-600 text-xs">{tx.voucherNo}</td><td className="p-6 text-gray-700">{tx.narration}</td>
+                        <td className="p-6 text-right font-mono font-bold text-gray-900">{tx.debit > 0 ? tx.debit.toLocaleString() : '-'}</td><td className="p-6 text-right font-mono font-bold text-gray-900">{tx.credit > 0 ? tx.credit.toLocaleString() : '-'}</td>
+                        <td className="p-6 text-right font-mono font-black text-indigo-900 bg-gray-50/30">{Math.abs(tx.runningBalance).toLocaleString()} {tx.runningBalance >= 0 ? 'Dr' : 'Cr'}</td>
                     </tr>
                 ))}
-                {transactionsWithRunningBalance.length === 0 && (
-                    <tr>
-                        <td colSpan={6} className="p-20 text-center text-gray-300 font-black uppercase tracking-widest text-xs">
-                           No transactions found in selected period.
-                        </td>
-                    </tr>
-                )}
             </tbody>
-            <tfoot className="bg-gray-900 text-white font-bold border-t">
-                <tr>
-                    <td colSpan={3} className="p-8 text-right text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Period Totals</td>
-                    <td className="p-8 text-right font-mono text-xl">{periodTotalDr.toLocaleString()}</td>
-                    <td className="p-8 text-right font-mono text-xl">{periodTotalCr.toLocaleString()}</td>
-                    <td className="p-8 text-right font-mono text-xl bg-black/20">
-                        {Math.abs(netClosing).toLocaleString()} {closingType}
-                    </td>
-                </tr>
-            </tfoot>
         </table>
       </div>
     </div>
