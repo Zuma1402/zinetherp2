@@ -61,7 +61,8 @@ Cr [Account] [Amount]
       `,
     });
 
-    return response.text || "I couldn't generate a response.";
+    return response.text() || "I couldn't generate a response.";
+
   } catch (error) {
     console.error("Gemini API Error:", error);
     return "Sorry, I encountered an error analyzing your data.";
