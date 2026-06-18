@@ -78,6 +78,10 @@ const ReportView: React.FC<ReportViewProps> = ({ trialBalance, summary }) => {
     { name: 'Equity', amount: summary.totalEquity, color: '#8b5cf6' },
   ];
 
+  // Helper labels for Segment text
+  const selectedDeptLabel = departments.find(d => d.id === activeDept)?.name || 'All Departments';
+  const selectedDivLabel = divisions.find(v => v.id === activeDiv)?.name || 'All Divisions';
+
   return (
     <div className="space-y-6">
       {/* Dimensional Breakdown Management Segment Filters Bar */}
@@ -120,6 +124,35 @@ const ReportView: React.FC<ReportViewProps> = ({ trialBalance, summary }) => {
                 {computedSummary.totalExpenses.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}
             </h3>
          </div>
+      </div>
+
+      {/* ⭐ NEW ADDITION: Dynamic Segment P&L Statement Grid */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="border-b pb-4 mb-4 flex justify-between items-center">
+          <div>
+            <h3 className="text-base font-black text-gray-900 uppercase tracking-wider">Dimensional Profit & Loss Breakdown</h3>
+            <p className="text-xs text-gray-400 font-medium">Segment View: <span className="text-indigo-600 font-bold">{selectedDeptLabel}</span> / <span className="text-indigo-600 font-bold">{selectedDivLabel}</span></p>
+          </div>
+          <span className="text-[10px] bg-slate-100 text-slate-700 px-3 py-1 rounded-full font-mono font-bold uppercase tracking-wider">Accounting Standard</span>
+        </div>
+        
+        <div className="space-y-3 text-xs">
+          <div className="flex justify-between p-2.5 bg-gray-50 rounded-lg font-black text-gray-700">
+            <span>Operating Revenue (Sales Invoices / Income)</span>
+            <span className="font-mono text-green-600">+{computedSummary.totalIncome.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}</span>
+          </div>
+          <div className="flex justify-between p-2.5 bg-gray-50/50 rounded-lg font-bold text-gray-600 pl-6">
+            <span>Less: Cost of Goods Sold & Direct Procurement Bills</span>
+            <span className="font-mono text-amber-600">-{computedSummary.totalExpenses.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}</span>
+          </div>
+          <div className="border-t border-dashed my-2"></div>
+          <div className="flex justify-between p-3 bg-indigo-50/50 text-indigo-900 rounded-xl font-black text-sm">
+            <span>Net Segment Profit / (Loss)</span>
+            <span className={`font-mono ${computedSummary.netProfit >= 0 ? 'text-green-600' : 'text-rose-600'}`}>
+              {computedSummary.netProfit.toLocaleString('en-PK', { style: 'currency', currency: 'PKR' })}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
