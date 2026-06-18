@@ -56,7 +56,7 @@ import { calculateTrialBalance, calculateFinancialSummary } from './services/acc
 import { getCurrentUser, logout } from './services/authService';
 import { getCompanySettings, activateSubscription, getDaysRemaining } from './services/settingsService';
 import { CloudService } from './services/cloudService';
-import { supabase } from './services/supabaseClient'; // Real-time mapping logic ke liye connection
+import { supabase } from './services/supabaseService'; // Real-time mapping logic ke liye connection
 
 type View = 
   | 'DASHBOARD'
