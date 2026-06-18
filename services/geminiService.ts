@@ -43,8 +43,8 @@ export const askFinancialAssistant = async (
     const context = formatFinancialContext(summary, tb);
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
-    // ⭐ HELPER: Auto-retry logic block for handling 503 server overloads
-    const fetchWithRetry = async (retriesLeft = 2, delay = 1500): Promise<Response> => {
+    // ⭐ UPGRADED HELPER: Auto-retry block for handling BOTH 503 and 429 Rate Limits
+    const fetchWithRetry = async (retriesLeft = 2, delay = 2000): Promise<Response> => {
       const res = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -71,25 +71,28 @@ Cr [Account] [Amount]
         })
       });
 
-      // If server is unavailable (503) and we have retries left, wait and try again
-      if (res.status === 503 && retriesLeft > 0) {
-        console.warn(`Gemini API 503 hit. Retrying in ${delay}ms... (${retriesLeft} retries left)`);
+      // ⭐ Handle 503 (Overload) OR 429 (Rate Limit) with exponential backoff delay
+      if ((res.status === 503 || res.status === 429) && retriesLeft > 0) {
+        console.warn(`Gemini API ${res.status} hit. Rate limiting triggered. Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchWithRetry(retriesLeft - 1, delay * 1.5); // Exponential backoff
+        return fetchWithRetry(retriesLeft - 1, delay * 2); // Wait longer next time
       }
 
       return res;
     };
 
-    // 2. Direct HTTP REST Fetch Call with Auto-Retry Protection
+    // 2. Direct HTTP REST Fetch Call with Rate Limit Protection
     const response = await fetchWithRetry();
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("Gemini API HTTP Error status:", response.status, errorData);
       
+      if (response.status === 429) {
+        return "Bhai, free plan ki rate limits exceed ho gayi hain (Too Many Requests). Bas 10-15 seconds ruk kar dobara message bhejiye, Google allow kar dega!";
+      }
       if (response.status === 503) {
-        return "Bhai, Gemini AI servers abhi thode busy hain/overloaded hain. Ek baar dobara send ka button dabayein, chal jayega!";
+        return "AI servers abhi thode busy hain. Ek baar dobara send ka button dabayein!";
       }
       return `Error: Gemini API responded with status ${response.status}`;
     }
