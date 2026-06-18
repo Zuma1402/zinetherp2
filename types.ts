@@ -29,6 +29,8 @@ export interface VoucherEntry {
   ledgerId: string;
   debit: number;
   credit: number;
+  departmentId?: string; // ⭐ New Field for Cost Center / Department tracking
+  divisionId?: string;   // ⭐ New Field for Regional / Division tracking
 }
 
 export interface Voucher {
@@ -94,3 +96,14 @@ export interface Unit {
 }
 
 export type ValuationMethod = 'FIFO' | 'LIFO' | 'AVCO';
+
+// ⭐ Lookup models for Department & Division Dropdowns
+export interface Department {
+  id: string;
+  name: string;
+}
+
+export interface Division {
+  id: string;
+  name: string;
+}

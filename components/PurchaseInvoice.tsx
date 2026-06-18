@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingBag, UserPlus, Factory, Link as LinkIcon, Check, Layers, Compass } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingBag, UserPlus, Factory, Link as LinkIcon, Check, Layers, Compass, X } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { supabase } from '../services/supabaseService';
 import ItemAutocomplete from './ItemAutocomplete';
@@ -26,17 +26,89 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
 
+  // ⭐ Quick Add Popups States
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [isDivModalOpen, setIsDivModalOpen] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDivName, setNewDivName] = useState('');
+  const [modalLoading, setModalLoading] = useState(false);
+
   const [lineItems, setLineItems] = useState([{ itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0 }]);
 
-  useEffect(() => {
-    const fetchStructures = async () => {
-      const { data: d } = await supabase.from('departments').select('*');
-      const { data: v } = await supabase.from('divisions').select('*');
+  const fetchStructures = async () => {
+    try {
+      const { data: d } = await supabase.from('departments').select('*').order('name');
+      const { data: v } = await supabase.from('divisions').select('*').order('name');
       if (d) setDepartments(d);
       if (v) setDivisions(v);
-    };
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
     fetchStructures();
   }, []);
+
+  const handleDeptSelectChange = (val: string) => {
+    if (val === 'QUICK_ADD_DEPT') {
+      setIsDeptModalOpen(true);
+      setSelectedDept('');
+    } else {
+      setSelectedDept(val);
+    }
+  };
+
+  const handleDivSelectChange = (val: string) => {
+    if (val === 'QUICK_ADD_DIV') {
+      setIsDivModalOpen(true);
+      setSelectedDiv('');
+    } else {
+      setSelectedDiv(val);
+    }
+  };
+
+  const handleAddDepartment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeptName.trim()) return;
+    setModalLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .insert([{ id: newDeptName.trim().toLowerCase().replace(/\s+/g, '_'), name: newDeptName.trim() }])
+        .select();
+      if (error) throw error;
+      await fetchStructures();
+      if (data && data[0]) setSelectedDept(data[0].id);
+      setIsDeptModalOpen(false);
+      setNewDeptName('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const handleAddDivision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDivName.trim()) return;
+    setModalLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('divisions')
+        .insert([{ id: newDivName.trim().toLowerCase().replace(/\s+/g, '_'), name: newDivName.trim() }])
+        .select();
+      if (error) throw error;
+      await fetchStructures();
+      if (data && data[0]) setSelectedDiv(data[0].id);
+      setIsDivModalOpen(false);
+      setNewDivName('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setModalLoading(false);
+    }
+  };
 
   const suppliers = ledgers.filter(l => l.group.includes('Creditors') || l.type === AccountType.LIABILITY);
   
@@ -115,7 +187,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
   };
 
   return (
-    <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-6xl mx-auto border border-gray-100 animate-in fade-in zoom-in-95 duration-500">
+    <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-6xl mx-auto border border-gray-100 animate-in fade-in zoom-in-95 duration-500 relative">
       <div className="flex justify-between items-center mb-12">
         <div>
             <h2 className="text-3xl font-black text-gray-900 flex items-center gap-4">
@@ -175,28 +247,31 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
         </div>
       </div>
 
-      {/* ⭐ Dynamic Procurement Cost Segment Fields */}
+      {/* ⭐ Dynamic Procurement Cost Segment Fields with Quick add injection */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 p-5 bg-slate-50 border border-gray-200/60 rounded-2xl">
         <div>
           <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] mb-2">
             <Layers size={14} className="text-blue-600"/> Charge Cost Center (Department)
           </label>
-          <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-blue-500">
+          <select value={selectedDept} onChange={e => handleDeptSelectChange(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-blue-500 cursor-pointer">
             <option value="">Global / Unallocated Corporate</option>
             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            <option value="QUICK_ADD_DEPT" className="text-blue-600 font-bold bg-blue-50">➕ Add New Department</option>
           </select>
         </div>
         <div>
           <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] mb-2">
             <Compass size={14} className="text-blue-600"/> Target Segment Division (Dimension)
           </label>
-          <select value={selectedDiv} onChange={e => setSelectedDiv(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-blue-500">
+          <select value={selectedDiv} onChange={e => handleDivSelectChange(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-blue-500 cursor-pointer">
             <option value="">Whole Enterprise Base</option>
             {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            <option value="QUICK_ADD_DIV" className="text-blue-600 font-bold bg-blue-50">➕ Add New Division</option>
           </select>
         </div>
       </div>
 
+      {/* Line items table */}
       <div className="border border-blue-50 rounded-[2.5rem] overflow-hidden mb-12 shadow-2xl shadow-blue-900/5 bg-white">
         <div className="overflow-x-auto">
             <table className="w-full text-left min-w-[900px]">
@@ -254,16 +329,3 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, trial
               </div>
               <span className="text-4xl font-black font-mono tracking-tighter">{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
-      </div>
-
-      <div className="flex justify-end gap-6 mt-16 border-t border-gray-50 pt-10">
-          <button onClick={onCancel} className="px-10 py-4 text-gray-400 font-black text-sm uppercase tracking-widest hover:text-gray-700 transition-colors">Abort Post</button>
-          <button onClick={handleSubmit} className="px-16 py-5 bg-blue-600 text-white rounded-[2rem] hover:bg-blue-700 transition-all font-black shadow-2xl shadow-blue-600/30 flex items-center gap-4 uppercase tracking-widest text-sm transform active:scale-95">
-            <Save size={24} /> Record & Sync Inventory
-          </button>
-      </div>
-    </div>
-  );
-};
-
-export default PurchaseInvoice;

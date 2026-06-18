@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { Ledger, Voucher, AccountType } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Ledger, Voucher, AccountType, Department, Division } from '../types';
 import { calculateTrialBalance } from '../services/accountingService';
-import { Download, ArrowRight, Calendar as CalendarIcon } from 'lucide-react';
+import { Download, ArrowRight, Calendar as CalendarIcon, Layers, Compass } from 'lucide-react';
+import { supabase } from '../services/supabaseService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -19,10 +20,40 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
   });
   const [endDate, setEndDate] = useState(() => new Date().toLocaleDateString('en-CA'));
 
-  // Calculate Data based on filters
+  // ⭐ Dynamic Structural Segment Filters States
+  const [filterDept, setFilterDept] = useState('');
+  const [filterDiv, setFilterDiv] = useState('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+
+  // Lookup data groups fetch kar rahe hain
+  useEffect(() => {
+    const fetchStructures = async () => {
+      const { data: d } = await supabase.from('departments').select('*');
+      const { data: v } = await supabase.from('divisions').select('*');
+      if (d) setDepartments(d);
+      if (v) setDivisions(v);
+    };
+    fetchStructures();
+  }, []);
+
+  // Filter vouchers locally based on dimensional criteria before computing metrics
+  const filteredVouchers = useMemo(() => {
+    if (!filterDept && !filterDiv) return vouchers;
+    return vouchers.map(v => ({
+      ...v,
+      entries: v.entries.filter(e => {
+        const matchesDept = !filterDept || e.departmentId === filterDept;
+        const matchesDiv = !filterDiv || e.divisionId === filterDiv;
+        return matchesDept && matchesDiv;
+      })
+    })).filter(v => v.entries.length > 0);
+  }, [vouchers, filterDept, filterDiv]);
+
+  // Calculate Data based on multi-dimensional filters context
   const trialBalance = useMemo(() => 
-    calculateTrialBalance(ledgers, vouchers, startDate, endDate), 
-  [ledgers, vouchers, startDate, endDate]);
+    calculateTrialBalance(ledgers, filteredVouchers, startDate, endDate), 
+  [ledgers, filteredVouchers, startDate, endDate]);
 
   // Filter Rows - Only show accounts with activity (balance > 0)
   const incomeRows = trialBalance.filter(row => {
@@ -58,9 +89,14 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
     doc.setFont("helvetica", "normal");
     doc.text("Profit & Loss Statement", 14, 28);
     
-    doc.setFontSize(10);
+    // Meta Data stamp containing dimensions labels
+    const deptLabel = filterDept ? departments.find(d => d.id === filterDept)?.name : 'All';
+    const divLabel = filterDiv ? divisions.find(d => d.id === filterDiv)?.name : 'All';
+    
+    doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(`Period: ${formatDate(startDate)} - ${formatDate(endDate)}`, 14, 34);
+    doc.text(`Department: ${deptLabel} | Division: ${divLabel}`, 14, 39);
     
     doc.setTextColor(0);
     
@@ -113,8 +149,25 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
             <p className="text-gray-500 text-sm mt-1">Detailed Profit & Loss Statement</p>
          </div>
          
-         <div className="flex gap-4 items-end flex-wrap">
-             {/* Standard Date Filter (Matching Ledger/Journal Style) */}
+         <div className="flex gap-4 items-end flex-wrap w-full md:w-auto justify-end">
+             {/* ⭐ Dynamic Department & Division Layout Selection Controls */}
+             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm text-xs font-bold">
+               <Layers size={14} className="text-indigo-600"/>
+               <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="bg-transparent outline-none cursor-pointer text-gray-700">
+                 <option value="">All Departments</option>
+                 {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+               </select>
+             </div>
+
+             <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm text-xs font-bold">
+               <Compass size={14} className="text-indigo-600"/>
+               <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)} className="bg-transparent outline-none cursor-pointer text-gray-700">
+                 <option value="">All Divisions</option>
+                 {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+               </select>
+             </div>
+
+             {/* Standard Date Filter */}
              <div className="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-300 shadow-sm">
                  <CalendarIcon size={18} className="text-gray-500 ml-1"/>
                  <input 
@@ -150,7 +203,14 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
         <div className="p-8 border-b border-gray-100 bg-gray-50/50 flex flex-col md:flex-row justify-between items-start gap-4">
              <div>
                 <h1 className="text-2xl font-bold text-gray-900 mb-1">{companyName}</h1>
-                <div className="text-sm font-medium text-gray-500 uppercase tracking-wide">Statement of Profit & Loss</div>
+                <div className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+                  Statement of Profit & Loss 
+                  {(filterDept || filterDiv) && (
+                    <span className="text-xs bg-indigo-100 text-indigo-700 normal-case px-2 py-0.5 rounded-md font-bold">
+                      Segmented Active
+                    </span>
+                  )}
+                </div>
              </div>
              
              <div className="bg-white border border-gray-200 rounded-lg px-5 py-3 shadow-sm flex items-center gap-3">
@@ -188,7 +248,7 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
                     ))}
                     {incomeRows.length === 0 && (
                         <div className="text-gray-400 italic text-sm py-4 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                            No revenue recorded in this period
+                            No revenue recorded in this period for selected segment
                         </div>
                     )}
                 </div>
@@ -218,7 +278,7 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
                     ))}
                     {expenseRows.length === 0 && (
                         <div className="text-gray-400 italic text-sm py-4 text-center bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                            No expenses recorded in this period
+                            No expenses recorded in this period for selected segment
                         </div>
                     )}
                 </div>

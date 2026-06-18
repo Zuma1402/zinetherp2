@@ -22,15 +22,17 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
     if (initialLedgerId) setSelectedLedgerId(initialLedgerId);
   }, [initialLedgerId]);
 
+  // Dynamic fetcher function to hook accurate list data dynamically
+  const loadDimensions = async () => {
+    const { data: d } = await supabase.from('departments').select('*').order('name');
+    const { data: v } = await supabase.from('divisions').select('*').order('name');
+    if (d) setDepartments(d);
+    if (v) setDivisions(v);
+  };
+
   useEffect(() => {
-    const loadDimensions = async () => {
-      const { data: d } = await supabase.from('departments').select('*');
-      const { data: v } = await supabase.from('divisions').select('*');
-      if (d) setDepartments(d);
-      if (v) setDivisions(v);
-    };
     loadDimensions();
-  }, []);
+  }, [vouchers]); // Real-time updates sync on dynamic voucher array array shifts
 
   const [startDate, setStartDate] = useState(() => {
       const date = new Date();
@@ -54,7 +56,6 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
     let pDr = 0;
     let pCr = 0;
 
-    // Filter and sort all vouchers for this ledger taking dimensional tags into analysis context
     const allRelevantVouchers = vouchers
       .filter(v => v.entries.some(e => {
         const matchesLedger = e.ledgerId === selectedLedgerId;
@@ -64,7 +65,6 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
       }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Calculate Opening Balance for the period
     allRelevantVouchers.forEach(v => {
       if (v.date < startDate) {
         const entry = v.entries.find(e => e.ledgerId === selectedLedgerId);
@@ -79,7 +79,6 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
     let running = historicalNet;
     const list: any[] = [];
 
-    // Process current period vouchers
     allRelevantVouchers.forEach(v => {
       if (v.date >= startDate && v.date <= endDate) {
         const entry = v.entries.find(e => e.ledgerId === selectedLedgerId);
@@ -127,14 +126,14 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
              </div>
              <div className="w-44">
                 <label className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Layers size={12}/> Department</label>
-                <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none">
+                <select value={filterDept} onChange={e => setFilterDept(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none cursor-pointer">
                   <option value="">All Cost Centers</option>
                   {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
              </div>
              <div className="w-44">
                 <label className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Compass size={12}/> Division</label>
-                <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none">
+                <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none cursor-pointer">
                   <option value="">All Divisions</option>
                   {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>

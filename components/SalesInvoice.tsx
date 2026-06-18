@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingCart, User, Link as LinkIcon, UserPlus, Layers, Compass } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingCart, User, Link as LinkIcon, UserPlus, Layers, Compass, X } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
@@ -27,7 +27,25 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
 
+  // ⭐ Quick Add Modals States
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [isDivModalOpen, setIsDivModalOpen] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDivName, setNewDivName] = useState('');
+  const [modalLoading, setModalLoading] = useState(false);
+
   const [lineItems, setLineItems] = useState([{ itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0 }]);
+
+  const fetchDimensions = async () => {
+    try {
+      const { data: depts } = await supabase.from('departments').select('*').order('name');
+      const { data: divs } = await supabase.from('divisions').select('*').order('name');
+      if (depts) setDepartments(depts);
+      if (divs) setDivisions(divs);
+    } catch (err) {
+      console.error('Error fetching structural dimensions:', err);
+    }
+  };
 
   useEffect(() => {
     const initializeInvoice = async () => {
@@ -42,20 +60,76 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       }
     };
 
-    const fetchDimensions = async () => {
-      try {
-        const { data: depts } = await supabase.from('departments').select('*');
-        const { data: divs } = await supabase.from('divisions').select('*');
-        if (depts) setDepartments(depts);
-        if (divs) setDivisions(divs);
-      } catch (err) {
-        console.error('Error fetching structural dimensions:', err);
-      }
-    };
-
     initializeInvoice();
     fetchDimensions();
   }, []);
+
+  // ⭐ Handle Quick Add Selection Dropdowns
+  const handleDeptSelectChange = (val: string) => {
+    if (val === 'QUICK_ADD_DEPT') {
+      setIsDeptModalOpen(true);
+      setSelectedDept('');
+    } else {
+      setSelectedDept(val);
+    }
+  };
+
+  const handleDivSelectChange = (val: string) => {
+    if (val === 'QUICK_ADD_DIV') {
+      setIsDivModalOpen(true);
+      setSelectedDiv('');
+    } else {
+      setSelectedDiv(val);
+    }
+  };
+
+  // ⭐ Insert New Department to Supabase
+  const handleAddDepartment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeptName.trim()) return;
+    setModalLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .insert([{ id: newDeptName.trim().toLowerCase().replace(/\s+/g, '_'), name: newDeptName.trim() }])
+        .select();
+
+      if (error) throw error;
+      await fetchDimensions();
+      if (data && data[0]) setSelectedDept(data[0].id);
+      setIsDeptModalOpen(false);
+      setNewDeptName('');
+    } catch (err) {
+      alert('Error saving department');
+      console.error(err);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  // ⭐ Insert New Division to Supabase
+  const handleAddDivision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDivName.trim()) return;
+    setModalLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('divisions')
+        .insert([{ id: newDivName.trim().toLowerCase().replace(/\s+/g, '_'), name: newDivName.trim() }])
+        .select();
+
+      if (error) throw error;
+      await fetchDimensions();
+      if (data && data[0]) setSelectedDiv(data[0].id);
+      setIsDivModalOpen(false);
+      setNewDivName('');
+    } catch (err) {
+      alert('Error saving division');
+      console.error(err);
+    } finally {
+      setModalLoading(false);
+    }
+  };
 
   const customers = ledgers.filter(l => l.group.includes('Debtors') || l.type === AccountType.ASSET);
   
@@ -160,7 +234,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-8 max-w-6xl mx-auto border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300">
+    <div className="bg-white rounded-2xl shadow-2xl p-4 md:p-8 max-w-6xl mx-auto border border-gray-100 animate-in fade-in slide-in-from-bottom-4 duration-300 relative">
       <div className="flex flex-col md:flex-row justify-between md:items-center mb-8 md:mb-10 gap-6">
         <div>
             <h2 className="text-2xl md:text-3xl font-black text-gray-900 flex items-center gap-4">
@@ -222,24 +296,26 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* ⭐ Structural Dimension Mapping Filters Panels */}
+      {/* ⭐ Dropdowns with inline Quick Add action triggers */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 p-5 bg-slate-50 border border-gray-200/60 rounded-2xl">
         <div>
           <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] mb-2">
             <Layers size={14} className="text-indigo-600"/> Allocation Cost Center (Department)
           </label>
-          <select value={selectedDept} onChange={e => setSelectedDept(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-indigo-500">
+          <select value={selectedDept} onChange={e => handleDeptSelectChange(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-indigo-500 cursor-pointer">
             <option value="">Global / Unallocated (HQ)</option>
             {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            <option value="QUICK_ADD_DEPT" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Department</option>
           </select>
         </div>
         <div>
           <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.15em] mb-2">
             <Compass size={14} className="text-indigo-600"/> Profit Center / Segment (Division)
           </label>
-          <select value={selectedDiv} onChange={e => setSelectedDiv(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-indigo-500">
+          <select value={selectedDiv} onChange={e => handleDivSelectChange(e.target.value)} className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none focus:border-indigo-500 cursor-pointer">
             <option value="">Whole Enterprise Strategy</option>
             {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            <option value="QUICK_ADD_DIV" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Division</option>
           </select>
         </div>
       </div>
@@ -320,6 +396,50 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             <Save size={20} /> Save & Finalize
           </button>
       </div>
+
+      {/* 🟢 QUICK ADD DEPARTMENT MODAL POPUP */}
+      {isDeptModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2"><Plus size={18} className="text-indigo-600"/> Add New Department</h3>
+              <button onClick={() => setIsDeptModalOpen(false)} className="p-1 hover:bg-gray-200 rounded-full text-gray-400"><X size={18}/></button>
+            </div>
+            <form onSubmit={handleAddDepartment} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Department Name</label>
+                <input autoFocus type="text" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} placeholder="e.g., Marketing, Logistics" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500" required />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 border rounded-lg text-xs font-semibold text-gray-700" disabled={modalLoading}>Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold" disabled={modalLoading}>{modalLoading ? 'Saving...' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 QUICK ADD DIVISION MODAL POPUP */}
+      {isDivModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-100 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2"><Plus size={18} className="text-indigo-600"/> Add New Division</h3>
+              <button onClick={() => setIsDivModalOpen(false)} className="p-1 hover:bg-gray-200 rounded-full text-gray-400"><X size={18}/></button>
+            </div>
+            <form onSubmit={handleAddDivision} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Division Name</label>
+                <input autoFocus type="text" value={newDivName} onChange={e => setNewDivName(e.target.value)} placeholder="e.g., International Division, Local Retail" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:border-indigo-500" required />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 border rounded-lg text-xs font-semibold text-gray-700" disabled={modalLoading}>Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold" disabled={modalLoading}>{modalLoading ? 'Saving...' : 'Save'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
