@@ -45,6 +45,9 @@ const Settings: React.FC<SettingsProps> = ({
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<Role>('VIEWER');
 
+  // ⚡️ NAYI CHEEZ (SAFE ISOLATED STATE): Form dropdown ke liye explicit select holder state
+  const [formSelectedCompanyId, setFormSelectedCompanyId] = useState('');
+
   // New Corporate Company Creation States
   const [newCorpCompanyName, setNewCorpCompanyName] = useState('');
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
@@ -261,7 +264,8 @@ const Settings: React.FC<SettingsProps> = ({
   const handleAddOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let effectiveCompanyId = activeCompanyId;
+    // ⚡️ NAYI CHEEZ (DYNAMIC ROUTE LINK): Pehle explicit form select check karega, nahi to purana strategy layout chalayega
+    let effectiveCompanyId = formSelectedCompanyId || activeCompanyId;
     
     if (!effectiveCompanyId || effectiveCompanyId === 'default' || effectiveCompanyId === '') {
       effectiveCompanyId = liveResolvedCompanyId;
@@ -291,7 +295,6 @@ const Settings: React.FC<SettingsProps> = ({
           return; 
       }
 
-      // ⚡️ STRICTOR NORMALIZATION OVERRIDE: Clean lowercase optimization for database engine compatibility
       const sanitizedUsername = newUsername.trim().toLowerCase();
 
       const userToSave: any = {
@@ -319,7 +322,6 @@ const Settings: React.FC<SettingsProps> = ({
       alert(`User registered and successfully bound to this specific workspace!`);
     } catch (error: any) {
       console.error('Error saving user dynamic payload:', error);
-      // Detailed logging output feedback
       alert(`Failed to save user: ${error?.message || 'Please check for duplicate usernames or missing system properties.'}`);
     }
   };
@@ -331,6 +333,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewUsername('');
     setNewPassword('');
     setNewRole('VIEWER');
+    setFormSelectedCompanyId(''); // Reset naya drop-down control state
   };
 
   const handleEditUser = (user: User) => {
@@ -339,6 +342,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewUsername(user.username);
     setNewPassword(''); 
     setNewRole(user.role);
+    setFormSelectedCompanyId(user.company_id || ''); // Bind edit mode values safely
     setIsAddingUser(true);
   };
 
@@ -575,7 +579,9 @@ const Settings: React.FC<SettingsProps> = ({
                  <h3 className="text-sm font-bold text-gray-800 uppercase mb-4">
                    {editingUserId ? 'Edit Staff Profile' : `Add Staff Member specifically into current Dropdown Company`}
                  </h3>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                 
+                 {/* Changed layout from lg:grid-cols-4 to lg:grid-cols-5 to accommodate the new dropdown perfectly */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                     <div>
                         <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Display Name</label>
                         <input required placeholder="e.g. John Doe" className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none" value={newName} onChange={e => setNewName(e.target.value)} />
@@ -593,6 +599,23 @@ const Settings: React.FC<SettingsProps> = ({
                         <select className="w-full p-2 border rounded focus:ring-2 focus:ring-indigo-500 outline-none bg-white" value={newRole} onChange={e => setNewRole(e.target.value as Role)}>
                             <option value="ACCOUNTANT">Editor (Workspace Bound)</option>
                             <option value="VIEWER">Viewer (Workspace Bound)</option>
+                        </select>
+                    </div>
+
+                    {/* ⚡️ NAYI CHEEZ (SAFE ADDITION): Isolated Dropdown explicitly for target selection */}
+                    <div>
+                        <label className="block text-xs font-bold text-indigo-600 uppercase mb-1">Target Workspace Dropdown</label>
+                        <select 
+                          className="w-full p-2 border-2 border-indigo-200 rounded focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-medium text-gray-700"
+                          value={formSelectedCompanyId}
+                          onChange={e => setFormSelectedCompanyId(e.target.value)}
+                        >
+                            <option value="">-- Auto Use Sidebar --</option>
+                            {allDbCompanies.map((comp) => (
+                              <option key={comp.id} value={comp.id}>
+                                🏢 {comp.name}
+                              </option>
+                            ))}
                         </select>
                     </div>
                  </div>
