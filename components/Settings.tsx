@@ -10,9 +10,18 @@ interface SettingsProps {
   onUpdateUser: (user: User) => void;
   onUpdateCompany?: (name: string) => void;
   onCompanyCreated?: () => void; 
+  // REACTIVE LINK FIX: Passing the current selected company ID directly from layout context
+  activeCompanyId?: string; 
 }
 
-const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdateCompany, onCompanyCreated }) => {
+const Settings: React.FC<SettingsProps> = ({ 
+  currentUser, 
+  onUpdateUser, 
+  onUpdateCompany, 
+  onCompanyCreated,
+  // Fallback to local storage if not passed directly via props
+  activeCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
+}) => {
   // Profile State
   const [name, setName] = useState(currentUser.name);
   const [password, setPassword] = useState(currentUser.password);
@@ -43,9 +52,6 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
 
-  // Get active company token directly
-  const activeCompanyId = localStorage.getItem('supabase_active_company_id') || '';
-
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -57,7 +63,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
         setInvoicePrefix(settings.invoicePrefix || 'INV-');
         setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-        // Load users that belong to the active company dropdown selection
+        // Load users that belong to the active company selection
         const allUsers = await getUsers();
         if (currentUser.role === 'ADMIN') {
           const filteredUsers = allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN');
@@ -153,16 +159,20 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
     }
   };
 
-  // 👑 NEW CRITICAL FEATURE: CASCADE DELETE COMPANY WORKSPACE
+  // 👑 CASCADE DELETE COMPANY WORKSPACE WITH RECOVERY SAFEGUARDS
   const handleDeleteActiveCompany = async () => {
     if (currentUser.role !== 'ADMIN') return;
-    if (!activeCompanyId) {
-      alert("No active workspace selected.");
+    
+    // Direct operational verification anchor
+    const targetCompanyId = activeCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id');
+    
+    if (!targetCompanyId) {
+      alert("No active workspace token resolved in memory. Please select a company from the sidebar drop-down first.");
       return;
     }
 
     const firstConfirm = confirm(
-      `⚠️ WARNING: Are you absolutely sure you want to delete "${companyName}"?\n\nThis will permanently erase all Ledgers, Invoices, Stock Data, and Staff permissions inside this company!`
+      `⚠️ WARNING: Are you absolutely sure you want to delete this active workspace?\n\nThis will permanently erase all Ledgers, Vouchers, Invoices, Stock Data, and Staff permissions inside this entity!`
     );
 
     if (!firstConfirm) return;
@@ -179,24 +189,26 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
     setIsDeletingCompany(true);
     try {
       // 1. Clean transactions & vouchers
-      await supabase.from('stock_transactions').delete().eq('company_id', activeCompanyId);
-      await supabase.from('vouchers').delete().eq('company_id', activeCompanyId);
+      await supabase.from('stock_transactions').delete().eq('company_id', targetCompanyId);
+      await supabase.from('vouchers').delete().eq('company_id', targetCompanyId);
       
       // 2. Clean ledgers & inventory items
-      await supabase.from('ledgers').delete().eq('company_id', activeCompanyId);
-      await supabase.from('inventory_items').delete().eq('company_id', activeCompanyId);
+      await supabase.from('ledgers').delete().eq('company_id', targetCompanyId);
+      await supabase.from('inventory_items').delete().eq('company_id', targetCompanyId);
       
       // 3. Clean user-company mapping links
-      await supabase.from('user_companies').delete().eq('company_id', activeCompanyId);
+      await supabase.from('user_companies').delete().eq('company_id', targetCompanyId);
       
-      // 4. Finally, remove the company core master row
-      const { error: companyErr } = await supabase.from('companies').delete().eq('id', activeCompanyId);
+      // 4. Remove the core company entity row
+      const { error: companyErr } = await supabase.from('companies').delete().eq('id', targetCompanyId);
       if (companyErr) throw companyErr;
 
-      alert("🏢 Company and all associated data cleared successfully! System will refresh.");
+      alert("🏢 Company and all associated records cleared successfully!");
       
-      // Reset localStorage anchor and force structural re-sync
+      // Wipe storage targets completely to reset state
       localStorage.removeItem('supabase_active_company_id');
+      localStorage.removeItem('active_company_id');
+      
       if (onCompanyCreated) {
         await onCompanyCreated();
       }
@@ -590,7 +602,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
           </div>
         )}
 
-        {/* 🔥 NEW ZONE: THE DANGER ZONE CONTROL FOR MASTER CLEANUP */}
+        {/* 🔥 DANGER ZONE CONTROL WITH BOTH STORAGE + PROP RECOVERY FALLBACKS */}
         {currentUser.role === 'ADMIN' && (
           <div className="md:col-span-2 bg-rose-50 rounded-xl border-2 border-rose-100 p-6 mt-4">
             <div className="flex items-center gap-3 mb-4">
@@ -607,7 +619,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
               <div>
                 <h4 className="text-sm font-bold text-gray-800">Delete Current Active Workspace Entity</h4>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  This will completely destroy <span className="font-bold text-rose-600">"{companyName || 'Selected Company'}"</span> along with all its financial accounts, transactions and history from the server.
+                  This will completely destroy the currently active sidebar workspace along with all its financial accounts, transactions and history from the server.
                 </p>
               </div>
               <button
