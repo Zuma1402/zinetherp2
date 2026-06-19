@@ -137,10 +137,12 @@ const App: React.FC = () => {
         .select('company_id, companies(id, name)');
       
       if (mapping && mapping.length > 0) {
-        const formattedCompanies = mapping.map((m: any) => m.companies);
+        const formattedCompanies = mapping.map((m: any) => m.companies).filter(Boolean);
         setCompanies(formattedCompanies);
-        setActiveCompanyId(formattedCompanies[0].id);
-        setCompanyName(formattedCompanies[0].name);
+        if (formattedCompanies.length > 0) {
+          setActiveCompanyId(formattedCompanies[0].id);
+          setCompanyName(formattedCompanies[0].name);
+        }
       }
     } catch (err) {
       console.error("Error fetching multi-companies", err);
@@ -405,40 +407,47 @@ const App: React.FC = () => {
         <SidebarContent />
       </aside>
 
-      {/* Main Structural Frame holding Header and Pages layout safely */}
+      {/* Main Structural Frame holding Header and Pages safely */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Main Header Panel with FIXED Company Dropdown Switcher */}
+        {/* Main Header Panel with ENFORCED Company Dropdown Switcher */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-sm">
             <div className="flex items-center gap-4">
               <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition md:hidden">
                   <Menu size={24} />
               </button>
               
-              {/* Premium Company Selector Dropdown Switcher layout */}
-              {companies.length > 0 && (
-                <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5 shadow-sm">
-                  <Building2 size={16} className="text-indigo-600 shrink-0" />
-                  <select 
-                    value={activeCompanyId} 
-                    onChange={(e) => {
-                      const comp = companies.find(c => c.id === e.target.value);
+              {/* Force Render Dropdown Framework without checking mapping array length */}
+              <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5 shadow-sm">
+                <Building2 size={16} className="text-indigo-600 shrink-0" />
+                <select 
+                  value={activeCompanyId || 'default'} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val !== 'default' && companies.length > 0) {
+                      const comp = companies.find(c => c.id === val);
                       if (comp) {
                         setActiveCompanyId(comp.id);
                         setCompanyName(comp.name);
                       }
-                    }}
-                    className="bg-transparent text-xs font-bold text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
-                    style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
-                  >
-                    {companies.map((comp) => (
+                    }
+                  }}
+                  className="bg-transparent text-xs font-bold text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
+                  style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+                >
+                  {companies.length > 0 ? (
+                    companies.map((comp) => (
                       <option key={comp.id} value={comp.id} className="bg-white text-gray-800 font-sans font-medium">
                         {comp.name}
                       </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="text-indigo-500 absolute right-2 pointer-events-none" />
-                </div>
-              )}
+                    ))
+                  ) : (
+                    <option value="default" className="bg-white text-gray-800 font-sans font-medium">
+                      {companyName || 'Achevers account'}
+                    </option>
+                  )}
+                </select>
+                <ChevronDown size={14} className="text-indigo-500 absolute right-2 pointer-events-none" />
+              </div>
             </div>
 
             <div className="flex items-center gap-2 text-indigo-700 font-bold hidden md:flex">
