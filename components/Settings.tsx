@@ -60,8 +60,8 @@ const Settings: React.FC<SettingsProps> = ({
   // Strict Runtime Scope Resolution Keys
   const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
   
-  // 👑 DETERMINING SCOPE ARCHITECTURE: Is the user inside the global master Zenith system node?
-  const isMasterZenithScope = companyName.toLowerCase().replace(/\s+/g, '') === 'zinetherp';
+  // 👑 SAFE MASTER CHECKER: Agar role ADMIN hai, toh aap ko master command center dikhega! No hardcoded name tracking issue anymore.
+  const isMasterZenithScope = currentUser.role === 'ADMIN';
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -102,8 +102,8 @@ const Settings: React.FC<SettingsProps> = ({
         const allUsers = await getUsers();
         const currentEffectiveId = activeCompanyId || settings.id || settings.company_id || '';
         
-        // 👑 Strict Global View Matrix logic allocation boundaries
-        if (currentUser.role === 'ADMIN' && (settings.companyName?.toLowerCase().replace(/\s+/g, '') === 'zinetherp')) {
+        // Strict Global View Matrix logic allocation boundaries
+        if (currentUser.role === 'ADMIN') {
           setUsers(allUsers); // Master Zenith views everyone globally across all tenant nodes
         } else {
           setUsers(allUsers.filter(u => u.company_id === currentEffectiveId)); // Tenant Isolation Node mapping boundary lock
@@ -113,7 +113,7 @@ const Settings: React.FC<SettingsProps> = ({
       }
     };
     loadSettings();
-  }, [currentUser, activeCompanyId, onCompanyCreated, companyName]);
+  }, [currentUser, activeCompanyId, onCompanyCreated]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,7 +148,6 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 👑 MEGA CORPORATE INTEGRATED DEPLOYER ENGINE
   const handleDeployFullCorporateEnterprise = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
@@ -157,7 +156,6 @@ const Settings: React.FC<SettingsProps> = ({
     try {
       const companyId = crypto.randomUUID();
 
-      // 1. Instantly spin up core company entity with settings embedded inside deployment block
       const { error: companyError } = await supabase
         .from('companies')
         .insert([{ 
@@ -171,7 +169,6 @@ const Settings: React.FC<SettingsProps> = ({
 
       if (companyError) throw companyError;
 
-      // 2. Automatically link logged-in corporate admin token pointer to this new profile branch
       await supabase
         .from('user_companies')
         .insert([{ 
@@ -203,7 +200,6 @@ const Settings: React.FC<SettingsProps> = ({
   const handleAddOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Explicit targeting strategy allocation
     const targetCompanyUuid = formSelectedCompanyId || activeCompanyId;
     
     if (!newUsername || !newName || !targetCompanyUuid || targetCompanyUuid === 'default') {
@@ -267,6 +263,22 @@ const Settings: React.FC<SettingsProps> = ({
     setIsAddingUser(true);
   };
 
+  const handleDeleteUser = async (id: string) => {
+    if (id === currentUser.id) {
+      alert("You cannot delete yourself.");
+      return;
+    }
+    if (confirm('Are you sure you want to delete this user?')) {
+      try {
+        await deleteUser(id);
+        const allUsers = await getUsers();
+        setUsers(isMasterZenithScope ? allUsers : allUsers.filter(u => u.company_id === activeCompanyId));
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  };
+
   const handleDeleteActiveCompany = async () => {
     if (currentUser.role !== 'ADMIN' || !selectedCompanyToDelete) return;
     const target = allDbCompanies.find(c => c.id === selectedCompanyToDelete);
@@ -307,7 +319,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         
-        {/* PROFILE SECTION: Shared Across All Isolated Company Scopes */}
+        {/* PROFILE SECTION */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
           <div className="flex items-center gap-3 mb-6">
              <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
@@ -337,63 +349,63 @@ const Settings: React.FC<SettingsProps> = ({
           </form>
         </div>
 
-        {/* 🏢 CONDITIONAL SCOPE ROUTING LOGIC BLOCK */}
-        {!isMasterZenithScope ? (
-          /* TENANT ISOLATION VIEW LAYER: Displayed ONLY when outside the master scope */
-          <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
-            <div className="flex items-center gap-3 mb-5">
-               <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                 <Building size={22} />
-               </div>
-               <div>
-                 <h2 className="text-md font-bold text-gray-800">Tenant Environment Configurations</h2>
-                 <p className="text-xs text-gray-400">Manage financial bound metrics explicitly for {companyName}</p>
-               </div>
+        {/* 🏢 TENANT ENVIRONMENT CONFIGURATIONS (With onChange inputs attached!) */}
+        <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
+          <div className="flex items-center gap-3 mb-5">
+             <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+               <Building size={22} />
+             </div>
+             <div>
+               <h2 className="text-md font-bold text-gray-800">Tenant Environment Configurations</h2>
+               <p className="text-xs text-gray-400">Manage financial bound metrics explicitly for current scope</p>
+             </div>
+          </div>
+
+          <form onSubmit={handleSaveIsolatedCompany} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Company Workspace Name</label>
+                <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Billing Email Anchor</label>
+                <input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Corporate Tax ID / GST</label>
+                <input type="text" value={taxId} onChange={e => setTaxId(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
             </div>
 
-            <form onSubmit={handleSaveIsolatedCompany} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Company Workspace Name</label>
-                  <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Billing Email Anchor</label>
-                  <input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Corporate Tax ID / GST</label>
-                  <input type="text" value={taxId} onChange={e => setTaxId(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
-                </div>
+            <div className="bg-slate-50 border p-4 rounded-lg grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Invoice Code Prefix</label>
+                <input type="text" value={invoicePrefix} onChange={e => setInvoicePrefix(e.target.value)} className="w-full p-2 border rounded text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none bg-white" />
               </div>
-
-              <div className="bg-slate-50 border p-4 rounded-lg grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Invoice Code Prefix</label>
-                  <input type="text" value={invoicePrefix} onChange={e => setInvoicePrefix(e.target.value)} className="w-full p-2 border rounded text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none bg-white" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Next Sequence Index Number</label>
-                  <input type="number" value={nextInvoiceNumber} onChange={e => setNextInvoiceNumber(Number(e.target.value))} className="w-full p-2 border rounded text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none bg-white" />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Next Sequence Index Number</label>
+                <input type="number" value={nextInvoiceNumber} onChange={e => setNextInvoiceNumber(Number(e.target.value))} className="w-full p-2 border rounded text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none bg-white" />
               </div>
+            </div>
 
-              {message && message.includes('Tenant') && <div className="text-emerald-600 text-xs font-bold">{message}</div>}
-              <button type="submit" className="bg-blue-600 text-white font-bold text-xs py-2 px-4 rounded hover:bg-blue-700 transition flex items-center gap-1.5 shadow-sm">
-                <Save size={14} /> Commit Changes
-              </button>
-            </form>
-          </div>
-        ) : (
-          /* ZENITH MASTER SCOPE LAYER: Injected Corporate Multi-Company Deployment Terminal Module */
-          <div className="md:col-span-2 bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-xl shadow-lg p-6 border border-indigo-950 flex flex-col justify-between">
-            <div>
+            {message && message.includes('Tenant') && <div className="text-emerald-600 text-xs font-bold">{message}</div>}
+            <button type="submit" className="bg-blue-600 text-white font-bold text-xs py-2 px-4 rounded hover:bg-blue-700 transition flex items-center gap-1.5 shadow-sm">
+              <Save size={14} /> Commit Changes
+            </button>
+          </form>
+        </div>
+
+        {/* 👑 ADMIn WORKSPACE MANAGEMENT CENTRAL COMMAND LAYER */}
+        {isMasterZenithScope && (
+          <>
+            {/* ZENITH MASTER SCOPE LAYER: Integrated Corporate Multi-Company Deployment Terminal Module */}
+            <div className="md:col-span-3 bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-xl shadow-lg p-6 border border-indigo-950">
               <div className="flex items-center gap-3 mb-4">
                  <div className="p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-indigo-400">
                    <Landmark size={22} />
                  </div>
                  <div>
-                   <h2 className="text-md font-bold tracking-tight">Enterprise Multi-Company Control</h2>
+                   <h2 className="text-md font-bold tracking-tight">Enterprise Multi-Company Control Centre</h2>
                    <p className="text-xs text-indigo-200/70 font-medium">Instantly initialize fully functional isolated business profiles</p>
                  </div>
               </div>
@@ -429,14 +441,14 @@ const Settings: React.FC<SettingsProps> = ({
                   {isCreatingCorp ? 'Deploying Core Ecosystem...' : <><Plus size={14} /> Initialize & Deploy Corporate Node</>}
                 </button>
               </form>
+              {message && message.includes('Enterprise') && (
+                <div className="text-emerald-400 text-xs font-bold mt-2 bg-emerald-950/30 border border-emerald-900/50 p-2 rounded w-fit">✓ {message}</div>
+              )}
             </div>
-            {message && message.includes('Enterprise') && (
-              <div className="text-emerald-400 text-xs font-bold mt-2 bg-emerald-950/30 border border-emerald-900/50 p-2 rounded w-fit">✓ {message}</div>
-            )}
-          </div>
+          </>
         )}
 
-        {/* 👑 USER WORKSPACE MANAGEMENT CLUSTER COMPONENT MATRIX LAYER */}
+        {/* USER WORKSPACE MANAGEMENT TERMINAL */}
         <div className="md:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
@@ -447,12 +459,10 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="flex items-center gap-2">
                   <h2 className="text-md font-bold text-gray-800">User Workspace Management Terminal</h2>
                   <span className="text-[9px] font-black bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded uppercase tracking-wider">
-                    {isMasterZenithScope ? 'GLOBAL MANAGEMENT MATRIX (ZENITH MASTER VIEW)' : `TENANT PROFILE ISOLATION ENFORCED LOCK`}
+                    ADMIN SCOPE MANAGEMENT MATRIX
                   </span>
                 </div>
-                <p className="text-xs text-gray-400 font-medium">
-                  {isMasterZenithScope ? 'Displaying every registered employee user bound across the infrastructure ecosystem' : `Displaying users explicitly mapped inside ${companyName}`}
-                </p>
+                <p className="text-xs text-gray-400 font-medium">Displaying employees and their corporate workspace locking nodes</p>
               </div>
             </div>
             <button onClick={() => isAddingUser ? resetUserForm() : setIsAddingUser(true)} className="bg-indigo-600 text-white text-xs font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition shadow-sm">
@@ -484,24 +494,16 @@ const Settings: React.FC<SettingsProps> = ({
                       </select>
                   </div>
 
-                  {/* ⚡️ DROPBOX CONTEXT TARGET SELECTION */}
                   <div>
                       <label className="block text-xs font-bold text-indigo-700 uppercase mb-1">Target Cluster Destination</label>
                       <select 
-                        required={isMasterZenithScope}
-                        disabled={!isMasterZenithScope}
-                        className="w-full p-2 border-2 border-indigo-200 rounded text-sm font-bold outline-none bg-white text-indigo-900 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400"
+                        required
+                        className="w-full p-2 border-2 border-indigo-200 rounded text-sm font-bold outline-none bg-white text-indigo-900"
                         value={formSelectedCompanyId}
                         onChange={e => setFormSelectedCompanyId(e.target.value)}
                       >
-                          {!isMasterZenithScope ? (
-                            <option value="">🏢 Boundary Mapped: {companyName}</option>
-                          ) : (
-                            <>
-                              <option value="">-- Select Destination Company --</option>
-                              {allDbCompanies.map((comp) => <option key={comp.id} value={comp.id}>🏢 {comp.name}</option>)}
-                            </>
-                          )}
+                          <option value="">-- Select Destination --</option>
+                          {allDbCompanies.map((comp) => <option key={comp.id} value={comp.id}>🏢 {comp.name}</option>)}
                       </select>
                   </div>
                </div>
@@ -567,8 +569,8 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         </div>
 
-        {/* 👑 MASTER ZENITH CONTROLLED DANGER ZONE SECTION */}
-        {currentUser.role === 'ADMIN' && isMasterZenithScope && (
+        {/* INFRASTRUCTURE DANGER ZONE SECTION */}
+        {isMasterZenithScope && (
           <div className="md:col-span-3 bg-rose-50 rounded-xl border-2 border-rose-100 p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-rose-100 rounded-lg text-rose-600">
@@ -580,19 +582,21 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
             </div>
             
-            <div className="bg-white border border-rose-200 p-4 rounded-xl flex flex-col md:flex-row items-end gap-4">
-              <div className="flex-1 w-full">
-                <label className="block text-xs font-bold text-rose-900 uppercase mb-1.5 tracking-wider">Select Corporate Target To Erase From Infrastructure Cloud</label>
-                <select value={selectedCompanyToDelete} onChange={e => setSelectedCompanyToDelete(e.target.value)} className="w-full p-2.5 text-xs bg-white border border-rose-200 rounded-lg text-gray-800 font-bold focus:ring-2 focus:ring-rose-500 outline-none">
-                  <option value="">-- Click To Select Profile Node Target --</option>
-                  {allDbCompanies.map(comp => (
-                    <option key={comp.id} value={comp.id}>🏢 {comp.name} ({comp.id.substring(0,8)}...)</option>
-                  ))}
-                </select>
+            <div className="bg-white border border-rose-200 p-4 rounded-xl space-y-4 shadow-sm">
+              <div className="flex flex-col md:flex-row items-end gap-4 bg-rose-50/50 p-4 rounded-xl border border-rose-100">
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-bold text-rose-900 uppercase mb-1.5 tracking-wider">Select Corporate Target To Erase From Infrastructure Cloud</label>
+                  <select value={selectedCompanyToDelete} onChange={e => setSelectedCompanyToDelete(e.target.value)} className="w-full p-2.5 text-xs bg-white border border-rose-200 rounded-lg text-gray-800 font-bold focus:ring-2 focus:ring-rose-500 outline-none">
+                    <option value="">-- Click To Select Profile Node Target --</option>
+                    {allDbCompanies.map(comp => (
+                      <option key={comp.id} value={comp.id}>🏢 {comp.name} ({comp.id.substring(0,8)}...)</option>
+                    ))}
+                  </select>
+                </div>
+                <button type="button" disabled={isDeletingCompany || !selectedCompanyToDelete} onClick={handleDeleteActiveCompany} className="w-full md:w-auto bg-rose-600 hover:bg-rose-700 disabled:bg-gray-100 disabled:text-gray-400 text-white font-bold text-xs py-3 px-5 rounded-lg flex items-center justify-center gap-1.5 transition shrink-0 shadow-sm shadow-rose-100">
+                  <Trash2 size={14} /> {isDeletingCompany ? 'Wiping Node...' : 'Erase Selected Company Profile'}
+                </button>
               </div>
-              <button type="button" disabled={isDeletingCompany || !selectedCompanyToDelete} onClick={handleDeleteActiveCompany} className="w-full md:w-auto bg-rose-600 hover:bg-rose-700 disabled:bg-gray-100 disabled:text-gray-400 text-white font-bold text-xs py-3 px-5 rounded-lg flex items-center justify-center gap-1.5 transition shrink-0 shadow-sm shadow-rose-100">
-                <Trash2 size={14} /> {isDeletingCompany ? 'Wiping Node...' : 'Erase Selected Company Profile'}
-              </button>
             </div>
           </div>
         )}
