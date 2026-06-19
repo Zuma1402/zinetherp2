@@ -112,7 +112,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
     }
   };
 
-const handleCreateNewCorporateCompany = async (e: React.FormEvent) => {
+  const handleCreateNewCorporateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
 
