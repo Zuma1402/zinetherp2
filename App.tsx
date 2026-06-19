@@ -140,8 +140,11 @@ const App: React.FC = () => {
         const formattedCompanies = mapping.map((m: any) => m.companies).filter(Boolean);
         setCompanies(formattedCompanies);
         if (formattedCompanies.length > 0) {
-          setActiveCompanyId(formattedCompanies[0].id);
-          setCompanyName(formattedCompanies[0].name);
+          // If activeCompanyId isn't set yet, pick the first one
+          if (!activeCompanyId) {
+            setActiveCompanyId(formattedCompanies[0].id);
+            setCompanyName(formattedCompanies[0].name);
+          }
         }
       }
     } catch (err) {
@@ -156,7 +159,7 @@ const App: React.FC = () => {
         if (session) setUser(session);
         
         const settings = getCompanySettings();
-        if (settings.companyName) setCompanyName(settings.companyName);
+        if (settings.companyName && !activeCompanyId) setCompanyName(settings.companyName);
         setSubscriptionStatus(settings.subscriptionStatus);
 
         await fetchUserCompanies(); 
@@ -306,15 +309,44 @@ const App: React.FC = () => {
 
   const SidebarContent = () => (
     <>
-        <div className="p-6">
-            <div className="flex items-center gap-2 text-indigo-700 font-bold text-xl mb-1">
-              <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white text-xs">Z</div>
-              {companyName}
+        {/* Dropdown Integrated Perfectly into Sidebar Top Frame */}
+        <div className="p-6 border-b border-gray-100 bg-slate-50/50">
+            <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 shadow-sm mb-2">
+              <Building2 size={18} className="text-indigo-600 shrink-0" />
+              <select 
+                value={activeCompanyId || 'default'} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val !== 'default' && companies.length > 0) {
+                    const comp = companies.find(c => c.id === val);
+                    if (comp) {
+                      setActiveCompanyId(comp.id);
+                      setCompanyName(comp.name);
+                    }
+                  }
+                }}
+                className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
+                style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+              >
+                {companies.length > 0 ? (
+                  companies.map((comp) => (
+                    <option key={comp.id} value={comp.id} className="bg-white text-gray-800 font-sans font-medium">
+                      {comp.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="default" className="bg-white text-gray-800 font-sans font-medium">
+                    {companyName || 'Achevers account'}
+                  </option>
+                )}
+              </select>
+              <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />
             </div>
-            <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded w-fit mb-4 uppercase tracking-widest">
+
+            <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white border border-gray-200 px-2 py-1 rounded w-fit uppercase tracking-widest shadow-sm">
                 {syncStatus === 'synced' && <><CheckCircle2 size={10} className="text-green-500"/> DB Connected</>}
-                {syncStatus === 'syncing' && <><Loader2 size={10} className="animate-spin text-blue-500"/> Syncing Cloud...</>}
-                {syncStatus === 'error' && <span className="text-rose-500">❌ Error Linking DB</span>}
+                {syncStatus === 'syncing' && <><Loader2 size={10} className="animate-spin text-blue-500"/> Syncing...</>}
+                {syncStatus === 'error' && <span className="text-rose-500">❌ DB Error</span>}
             </div>
         </div>
         
@@ -409,52 +441,22 @@ const App: React.FC = () => {
 
       {/* Main Structural Frame holding Header and Pages safely */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Main Header Panel with ENFORCED Company Dropdown Switcher */}
+        {/* Main Header Panel with elegant Clean UI Overhaul */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-sm">
             <div className="flex items-center gap-4">
               <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition md:hidden">
                   <Menu size={24} />
               </button>
-              
-              {/* Force Render Dropdown Framework without checking mapping array length */}
-              <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5 shadow-sm">
-                <Building2 size={16} className="text-indigo-600 shrink-0" />
-                <select 
-                  value={activeCompanyId || 'default'} 
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val !== 'default' && companies.length > 0) {
-                      const comp = companies.find(c => c.id === val);
-                      if (comp) {
-                        setActiveCompanyId(comp.id);
-                        setCompanyName(comp.name);
-                      }
-                    }
-                  }}
-                  className="bg-transparent text-xs font-bold text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
-                  style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
-                >
-                  {companies.length > 0 ? (
-                    companies.map((comp) => (
-                      <option key={comp.id} value={comp.id} className="bg-white text-gray-800 font-sans font-medium">
-                        {comp.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="default" className="bg-white text-gray-800 font-sans font-medium">
-                      {companyName || 'Achevers account'}
-                    </option>
-                  )}
-                </select>
-                <ChevronDown size={14} className="text-indigo-500 absolute right-2 pointer-events-none" />
-              </div>
+              <h1 className="text-md font-bold text-slate-800 tracking-tight hidden md:block uppercase tracking-wider text-xs bg-slate-100 px-3 py-1 rounded-md text-slate-600">
+                Accounting Hub Panel
+              </h1>
             </div>
 
-            <div className="flex items-center gap-2 text-indigo-700 font-bold hidden md:flex">
-                <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center text-white text-[10px]">Z</div>
-                <span className="text-sm font-black text-slate-800 tracking-tight">{companyName}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-full border border-indigo-100 shadow-sm">
+                Logged user: <span className="font-black text-indigo-900">{user?.username}</span>
+              </span>
             </div>
-            <div className="w-10 md:hidden"></div>
         </header>
 
         {/* Inner Content Area holding view routing wrappers */}
@@ -530,7 +532,15 @@ const App: React.FC = () => {
                     <BalanceSheet vouchers={vouchers} ledgers={ledgers} companyName={companyName} />
                 )}
                 {currentView === 'SETTINGS' && (
-                  <Settings currentUser={user} onUpdateUser={setUser} onUpdateCompany={setCompanyName} />
+                  <Settings 
+                    currentUser={user} 
+                    onUpdateUser={setUser} 
+                    onUpdateCompany={setCompanyName} 
+                    onCompanyCreated={async () => {
+                      // Trigger callback to re-pull user corporate mapped profiles
+                      await fetchUserCompanies();
+                    }}
+                  />
                 )}
             </div>
         </div>
