@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { User, Role } from '../types';
 import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
-import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Pencil } from 'lucide-react';
+import { supabase } from '../services/supabaseService';
+import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Pencil, Landmark } from 'lucide-react';
 
 interface SettingsProps {
   currentUser: User;
   onUpdateUser: (user: User) => void;
   onUpdateCompany?: (name: string) => void;
+  onCompanyCreated?: () => void; // Intercept parent multi-company dropdown reload hook
 }
 
-const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdateCompany }) => {
+const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdateCompany, onCompanyCreated }) => {
   // Profile State
   const [name, setName] = useState(currentUser.name);
   const [password, setPassword] = useState(currentUser.password);
@@ -35,6 +37,10 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<Role>('VIEWER');
+
+  // New Corporate Company Creation States
+  const [newCorpCompanyName, setNewCorpCompanyName] = useState('');
+  const [isCreatingCorp, setIsCreatingCorp] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -96,6 +102,51 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
     } catch (error) {
       console.error('Error saving company settings:', error);
       setMessage('Failed to save company settings');
+    }
+  };
+
+  // Corporate Multi-Company Registration Handler Flow Secure
+  const handleCreateNewCorporateCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCorpCompanyName.trim() || isCreatingCorp) return;
+
+    setIsCreatingCorp(true);
+    try {
+      const companyId = crypto.randomUUID();
+
+      // 1. Insert new core node data entry row into 'companies' table
+      const { error: companyError } = await supabase
+        .from('companies')
+        .insert([{ id: companyId, name: newCorpCompanyName.trim() }]);
+
+      if (companyError) throw companyError;
+
+      // 2. Insert secure matrix access mapping rule layer inside 'user_companies' relational graph
+      const { error: mappingError } = await supabase
+        .from('user_companies')
+        .insert([
+          { 
+            id: crypto.randomUUID(), 
+            user_id: currentUser.id, 
+            company_id: companyId 
+          }
+        ]);
+
+      if (mappingError) throw mappingError;
+
+      setNewCorpCompanyName('');
+      setMessage('New Enterprise Company Profile Mapped Successfully!');
+      setTimeout(() => setMessage(''), 4000);
+
+      // Trigger hot reload framework up inside parent multi-company tracker matrix array
+      if (onCompanyCreated) {
+        onCompanyCreated();
+      }
+    } catch (error) {
+      console.error('Error registering multi-tenant corporate matrix profile:', error);
+      alert('Failed to construct new corporate company schema nodes.');
+    } finally {
+      setIsCreatingCorp(false);
     }
   };
 
@@ -210,7 +261,9 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
               />
             </div>
             
-            {message && !message.includes('Company') && <div className="text-green-600 text-sm font-medium">{message}</div>}
+            {message && !message.includes('Company') && !message.includes('Enterprise') && (
+              <div className="text-green-600 text-sm font-medium">{message}</div>
+            )}
 
             <div className="pt-2">
                <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 flex items-center gap-2">
@@ -301,6 +354,54 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
                  </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* Brand New Dedicated Multi-Company Generator Control Panel Center Component - Admin Only */}
+        {currentUser.role === 'ADMIN' && (
+          <div className="md:col-span-2 bg-gradient-to-br from-indigo-900 via-indigo-950 to-slate-950 text-white rounded-xl shadow-lg p-6 border border-indigo-800">
+            <div className="flex items-center gap-3 mb-4">
+               <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400 border border-indigo-500/30">
+                 <Landmark size={24} />
+               </div>
+               <div>
+                 <h2 className="text-lg font-bold tracking-tight">Enterprise Multi-Company Control</h2>
+                 <p className="text-xs text-indigo-300 font-medium">Instantly launch and spin up infinite decoupled multi-tenant corporate business records</p>
+               </div>
+            </div>
+
+            <form onSubmit={handleCreateNewCorporateCompany} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-black/30 p-4 border border-indigo-900/50 rounded-xl">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-indigo-300 uppercase mb-1.5 tracking-wider">New Branch or Corporation Corporate Name</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Apex Trading Corp LLC"
+                  value={newCorpCompanyName}
+                  onChange={(e) => setNewCorpCompanyName(e.target.value)}
+                  className="w-full p-2.5 text-sm bg-indigo-950/80 border border-indigo-800 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-white font-medium placeholder-indigo-700/60"
+                />
+              </div>
+              <div>
+                <button 
+                  type="submit" 
+                  disabled={isCreatingCorp}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition disabled:opacity-50 border border-indigo-400/20 shadow-md"
+                >
+                  {isCreatingCorp ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <><Plus size={16} /> Deploy Profile</>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {message && message.includes('Enterprise') && (
+              <div className="text-emerald-400 text-xs font-black mt-3 animate-pulse bg-emerald-950/40 border border-emerald-900/50 p-2 rounded-lg w-fit">
+                ✓ {message}
+              </div>
+            )}
           </div>
         )}
 
