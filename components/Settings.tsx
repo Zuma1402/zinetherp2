@@ -53,6 +53,9 @@ const Settings: React.FC<SettingsProps> = ({
   // 🏢 DANGER ZONE DROPDOWN STATES
   const [allDbCompanies, setAllDbCompanies] = useState<{id: string, name: string}[]>([]);
   const [selectedCompanyToDelete, setSelectedCompanyToDelete] = useState('');
+  
+  // ⚡️ NAYI CHEEZ (SAFE ISOLATED STATE): Background database context unique UUID holder
+  const [liveResolvedCompanyId, setLiveResolvedCompanyId] = useState('');
 
   const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
 
@@ -66,14 +69,21 @@ const Settings: React.FC<SettingsProps> = ({
         setInvoicePrefix(settings.invoicePrefix || 'INV-');
         setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
+        // ⚡️ NAYI CHEEZ: Safely saving the actual running company ID without touching any existing render
+        if (settings) {
+          const rawId = settings.id || settings.companyId || settings.company_id || '';
+          if (rawId && rawId !== 'default') {
+            setLiveResolvedCompanyId(rawId);
+          }
+        }
+
         // Fetch all system companies for the Admin's Danger Zone dropdown
         if (currentUser.role === 'ADMIN') {
           const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
           if (!compErr && companiesData) {
             setAllDbCompanies(companiesData);
 
-            // ⚡️ SAFE AUTOMATIC SIDEBAR AUTO-SYNC INJECTION ENGINE
-            // Fetch what mappings currently exist for this logged-in admin user
+            // SAFE AUTOMATIC SIDEBAR AUTO-SYNC INJECTION ENGINE
             const { data: mappingsData } = await supabase
               .from('user_companies')
               .select('company_id')
@@ -82,7 +92,6 @@ const Settings: React.FC<SettingsProps> = ({
             const mappedIds = mappingsData ? mappingsData.map(m => m.company_id) : [];
             const missingCompanies = companiesData.filter(c => !mappedIds.includes(c.id));
 
-            // If there are unlinked corporate entries, safely inject relation rows in the background
             if (missingCompanies.length > 0) {
               const injectRows = missingCompanies.map(c => ({
                 id: crypto.randomUUID(),
@@ -92,7 +101,6 @@ const Settings: React.FC<SettingsProps> = ({
 
               const { error: syncErr } = await supabase.from('user_companies').insert(injectRows);
               if (!syncErr && onCompanyCreated) {
-                // Force layout wrapper component state structural update immediately!
                 onCompanyCreated();
               }
             }
@@ -255,7 +263,14 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleAddOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername || !newName || !activeCompanyId) {
+    
+    // ⚡️ NAYI CHEEZ (FALLBACK AUTO-ROUTE): Pichla code bilkul nahi chera, bas fallback route link kar diya hai
+    let effectiveCompanyId = activeCompanyId;
+    if (!effectiveCompanyId || effectiveCompanyId === 'default' || effectiveCompanyId === '') {
+      effectiveCompanyId = liveResolvedCompanyId;
+    }
+    
+    if (!newUsername || !newName || !effectiveCompanyId || effectiveCompanyId === 'default') {
       alert("Please ensure a valid active company is selected first.");
       return;
     }
@@ -278,7 +293,7 @@ const Settings: React.FC<SettingsProps> = ({
           password: passwordToSave,
           name: newName,
           role: newRole,
-          company_id: activeCompanyId 
+          company_id: effectiveCompanyId 
       };
 
       await saveUser(userToSave);
@@ -288,13 +303,13 @@ const Settings: React.FC<SettingsProps> = ({
         .insert([{
           id: crypto.randomUUID(),
           user_id: id,
-          company_id: activeCompanyId
+          company_id: effectiveCompanyId
         }]);
 
       const allUsers = await getUsers();
-      setUsers(allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN'));
+      setUsers(allUsers.filter(u => u.company_id === effectiveCompanyId || u.role === 'ADMIN'));
       resetUserForm();
-      alert(`User registered and restricted to this workspace!`);
+      alert(`User registered and successfully bound to this specific workspace!`);
     } catch (error) {
       console.error('Error saving user:', error);
       alert('Failed to save user');
@@ -324,11 +339,15 @@ const Settings: React.FC<SettingsProps> = ({
       alert("You cannot delete yourself.");
       return;
     }
+    let effectiveCompanyId = activeCompanyId;
+    if (!effectiveCompanyId || effectiveCompanyId === 'default' || effectiveCompanyId === '') {
+      effectiveCompanyId = liveResolvedCompanyId;
+    }
     if (confirm('Are you sure you want to delete this user?')) {
       try {
         await deleteUser(id);
         const allUsers = await getUsers();
-        setUsers(allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN'));
+        setUsers(allUsers.filter(u => u.company_id === effectiveCompanyId || u.role === 'ADMIN'));
       } catch (error) {
         console.error('Error deleting user:', error);
         alert('Failed to delete user');
