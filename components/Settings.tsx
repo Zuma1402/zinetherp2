@@ -3,7 +3,7 @@ import { User, Role } from '../types';
 import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
-import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Pencil, Landmark } from 'lucide-react';
+import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Pencil, Landmark, AlertTriangle } from 'lucide-react';
 
 interface SettingsProps {
   currentUser: User;
@@ -41,6 +41,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
   // New Corporate Company Creation States
   const [newCorpCompanyName, setNewCorpCompanyName] = useState('');
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
+  const [isDeletingCompany, setIsDeletingCompany] = useState(false);
 
   // Get active company token directly
   const activeCompanyId = localStorage.getItem('supabase_active_company_id') || '';
@@ -56,10 +57,9 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
         setInvoicePrefix(settings.invoicePrefix || 'INV-');
         setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-        // CRITICAL FIX: Only load users that belong to the active company dropdown selection!
+        // Load users that belong to the active company dropdown selection
         const allUsers = await getUsers();
         if (currentUser.role === 'ADMIN') {
-          // Filter out users to display ONLY those who match the currently active workspace company
           const filteredUsers = allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN');
           setUsers(filteredUsers);
         } else {
@@ -133,7 +133,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
         .insert([{ 
           id: crypto.randomUUID(), 
           company_id: companyId,
-          user_id: currentUser?.id || null // Safe fallback if native auth is bypassed
+          user_id: currentUser?.id || null
         }]);
 
       if (mappingError) throw mappingError;
@@ -150,6 +150,63 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
       alert(`Error: ${error?.message || 'Database rejected entry.'}`);
     } finally {
       setIsCreatingCorp(false);
+    }
+  };
+
+  // 👑 NEW CRITICAL FEATURE: CASCADE DELETE COMPANY WORKSPACE
+  const handleDeleteActiveCompany = async () => {
+    if (currentUser.role !== 'ADMIN') return;
+    if (!activeCompanyId) {
+      alert("No active workspace selected.");
+      return;
+    }
+
+    const firstConfirm = confirm(
+      `⚠️ WARNING: Are you absolutely sure you want to delete "${companyName}"?\n\nThis will permanently erase all Ledgers, Invoices, Stock Data, and Staff permissions inside this company!`
+    );
+
+    if (!firstConfirm) return;
+
+    const finalConfirm = prompt(
+      `🔒 SECURITY CHECK:\nTo confirm deletion, please type the word "DELETE" in capital letters below:`
+    );
+
+    if (finalConfirm !== 'DELETE') {
+      alert("Verification failed. Deletion canceled.");
+      return;
+    }
+
+    setIsDeletingCompany(true);
+    try {
+      // 1. Clean transactions & vouchers
+      await supabase.from('stock_transactions').delete().eq('company_id', activeCompanyId);
+      await supabase.from('vouchers').delete().eq('company_id', activeCompanyId);
+      
+      // 2. Clean ledgers & inventory items
+      await supabase.from('ledgers').delete().eq('company_id', activeCompanyId);
+      await supabase.from('inventory_items').delete().eq('company_id', activeCompanyId);
+      
+      // 3. Clean user-company mapping links
+      await supabase.from('user_companies').delete().eq('company_id', activeCompanyId);
+      
+      // 4. Finally, remove the company core master row
+      const { error: companyErr } = await supabase.from('companies').delete().eq('id', activeCompanyId);
+      if (companyErr) throw companyErr;
+
+      alert("🏢 Company and all associated data cleared successfully! System will refresh.");
+      
+      // Reset localStorage anchor and force structural re-sync
+      localStorage.removeItem('supabase_active_company_id');
+      if (onCompanyCreated) {
+        await onCompanyCreated();
+      }
+      window.location.reload();
+
+    } catch (error: any) {
+      console.error("Cascade deletion failed:", error);
+      alert(`Database Error: ${error?.message || 'Request rejected.'}`);
+    } finally {
+      setIsDeletingCompany(false);
     }
   };
 
@@ -172,7 +229,6 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
           return; 
       }
 
-      // Explicitly stamping the user record with the active company id dropdown anchor
       const userToSave: any = {
           id,
           username: newUsername,
@@ -184,7 +240,6 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
 
       await saveUser(userToSave);
 
-      // Map connection row record inside mapping system
       await supabase
         .from('user_companies')
         .insert([{
@@ -193,7 +248,6 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
           company_id: activeCompanyId
         }]);
 
-      // Refresh list matching current workspace criteria
       const allUsers = await getUsers();
       setUsers(allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN'));
       resetUserForm();
@@ -535,6 +589,40 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
             </div>
           </div>
         )}
+
+        {/* 🔥 NEW ZONE: THE DANGER ZONE CONTROL FOR MASTER CLEANUP */}
+        {currentUser.role === 'ADMIN' && (
+          <div className="md:col-span-2 bg-rose-50 rounded-xl border-2 border-rose-100 p-6 mt-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-rose-100 rounded-lg text-rose-600">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-rose-900">Danger Zone</h2>
+                <p className="text-xs text-rose-600 font-medium">Irreversible system level cleanup operations</p>
+              </div>
+            </div>
+            
+            <div className="bg-white border border-rose-200 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+              <div>
+                <h4 className="text-sm font-bold text-gray-800">Delete Current Active Workspace Entity</h4>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  This will completely destroy <span className="font-bold text-rose-600">"{companyName || 'Selected Company'}"</span> along with all its financial accounts, transactions and history from the server.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isDeletingCompany}
+                onClick={handleDeleteActiveCompany}
+                className="w-full md:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition whitespace-nowrap shrink-0 shadow-sm shadow-rose-100"
+              >
+                <Trash2 size={14} />
+                {isDeletingCompany ? 'Destroying Entity...' : 'Destroy Workspace Profile'}
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
