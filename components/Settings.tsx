@@ -50,28 +50,11 @@ const Settings: React.FC<SettingsProps> = ({
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   
-  // 🔥 THE CRITICAL KEY: Storing the raw current DB context row UUID directly on state load
-  const [currentLoadedUUID, setCurrentLoadedUUID] = useState('');
+  // 🏢 DANGER ZONE DROPDOWN STATES
+  const [allDbCompanies, setAllDbCompanies] = useState<{id: string, name: string}[]>([]);
+  const [selectedCompanyToDelete, setSelectedCompanyToDelete] = useState('');
 
-  const getActiveCompanyToken = (): string => {
-    if (propCompanyId && propCompanyId !== 'default') return propCompanyId;
-    
-    const commonKeys = [
-      'supabase_active_company_id', 
-      'active_company_id', 
-      'selected_company_id', 
-      'current_company_id', 
-      'company_id'
-    ];
-    
-    for (const key of commonKeys) {
-      const val = localStorage.getItem(key);
-      if (val && val.trim() !== '' && val !== 'default') return val;
-    }
-    return '';
-  };
-
-  const activeCompanyId = getActiveCompanyToken();
+  const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -83,11 +66,11 @@ const Settings: React.FC<SettingsProps> = ({
         setInvoicePrefix(settings.invoicePrefix || 'INV-');
         setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-        // EXTRACTION TRIUMPH: Direct matching from service data row context payload!
-        if (settings) {
-          const rawId = settings.id || settings.companyId || settings.company_id || '';
-          if (rawId && rawId !== 'default') {
-            setCurrentLoadedUUID(rawId);
+        // Fetch all system companies for the Admin's Danger Zone dropdown
+        if (currentUser.role === 'ADMIN') {
+          const { data, error } = await supabase.from('companies').select('id, name');
+          if (!error && data) {
+            setAllDbCompanies(data);
           }
         }
 
@@ -173,6 +156,11 @@ const Settings: React.FC<SettingsProps> = ({
 
       setNewCorpCompanyName('');
       setMessage('Enterprise Company Profile Successfully Deployed and Mapped!');
+      
+      // Refresh local list
+      const { data } = await supabase.from('companies').select('id, name');
+      if (data) setAllDbCompanies(data);
+
       setTimeout(() => setMessage(''), 4000);
 
       if (onCompanyCreated) {
@@ -186,62 +174,53 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 👑 FINAL BULLETPROOF DESTROY CORE PIPELINE
+  // 👑 BULLETPROOF CASCADE DELETE: Uses Explicit Dropdown Selection State
   const handleDeleteActiveCompany = async () => {
     if (currentUser.role !== 'ADMIN') return;
     
-    // Ultimate reactive fallback hook cascade
-    let targetCompanyId = currentLoadedUUID || activeCompanyId;
-    
-    // Absolute scanner fallback loop array
-    if (!targetCompanyId || targetCompanyId === 'default') {
-      const commonKeys = ['supabase_active_company_id', 'active_company_id', 'selected_company_id', 'current_company_id', 'company_id'];
-      for (const k of commonKeys) {
-        const localVal = localStorage.getItem(k);
-        if (localVal && localVal !== 'default' && localVal.trim() !== '') {
-          targetCompanyId = localVal;
-          break;
-        }
-      }
-    }
-
-    if (!targetCompanyId || targetCompanyId === 'default' || targetCompanyId.length < 10) {
-      alert(`⚠️ Operation Halted: Could not identify a secure server tracking hash for "${companyName || 'Selected Workspace'}". Please hard refresh (Ctrl+F5), click another option on the sidebar, and try again.`);
+    if (!selectedCompanyToDelete) {
+      alert("Please select a target company from the Danger Zone dropdown list first.");
       return;
     }
 
+    const targetCompanyObj = allDbCompanies.find(c => c.id === selectedCompanyToDelete);
+    const targetName = targetCompanyObj ? targetCompanyObj.name : "this entity";
+
     const firstConfirm = confirm(
-      `⚠️ CRITICAL WARNING: Are you 100% certain you want to destroy "${companyName || 'this company'}"?\n\nThis will completely wipe all ledger entries, charts, vouchers, and staff permissions from the cloud forever!`
+      `⚠️ CRITICAL WARNING: Are you 100% certain you want to destroy "${targetName}"?\n\nThis will permanently erase all Ledgers, Vouchers, Invoices, Stock Data, and Staff permissions inside this entity from cloud servers forever!`
     );
 
     if (!firstConfirm) return;
 
     const finalConfirm = prompt(
-      `🔒 SECURITY PROTOCOL:\nPlease type the word "DELETE" in capital letters to authorize the server destruction:`
+      `🔒 SECURITY CHECK:\nTo authorize server-level destruction, type the word "DELETE" in capital letters below:`
     );
 
     if (finalConfirm !== 'DELETE') {
-      alert("Verification failed. Request aborted.");
+      alert("Verification failed. Deletion canceled.");
       return;
     }
 
     setIsDeletingCompany(true);
     try {
-      // 1. Wipe financial ledgers & item codes matching UUID
-      await supabase.from('stock_transactions').delete().eq('company_id', targetCompanyId);
-      await supabase.from('vouchers').delete().eq('company_id', targetCompanyId);
-      await supabase.from('ledgers').delete().eq('company_id', targetCompanyId);
-      await supabase.from('inventory_items').delete().eq('company_id', targetCompanyId);
+      // 1. Clean transactions & vouchers matching explicit target ID
+      await supabase.from('stock_transactions').delete().eq('company_id', selectedCompanyToDelete);
+      await supabase.from('vouchers').delete().eq('company_id', selectedCompanyToDelete);
       
-      // 2. Wipe identity relations mapping rows
-      await supabase.from('user_companies').delete().eq('company_id', targetCompanyId);
+      // 2. Clean ledgers & inventory items
+      await supabase.from('ledgers').delete().eq('company_id', selectedCompanyToDelete);
+      await supabase.from('inventory_items').delete().eq('company_id', selectedCompanyToDelete);
       
-      // 3. Vaporize the structural company master row
-      const { error: companyErr } = await supabase.from('companies').delete().eq('id', targetCompanyId);
+      // 3. Clean user-company mapping links
+      await supabase.from('user_companies').delete().eq('company_id', selectedCompanyToDelete);
+      
+      // 4. Remove the core company entry row matching exact UUID
+      const { error: companyErr } = await supabase.from('companies').delete().eq('id', selectedCompanyToDelete);
       if (companyErr) throw companyErr;
 
-      alert("🏢 Dynamic Workspace and all cloud history wiped successfully!");
+      alert(`🏢 "${targetName}" and all associated records wiped successfully!`);
       
+      // Clear possible local cache anchors
       const keysToWipe = ['supabase_active_company_id', 'active_company_id', 'selected_company_id', 'current_company_id', 'company_id'];
       keysToWipe.forEach(k => localStorage.removeItem(k));
       
@@ -251,8 +230,8 @@ const Settings: React.FC<SettingsProps> = ({
       window.location.reload();
 
     } catch (error: any) {
-      console.error("Cascade deletion failure payload:", error);
-      alert(`Server Response: ${error?.message || 'Database rejected entity wipe request.'}`);
+      console.error("Cascade deletion failed:", error);
+      alert(`Database Error: ${error?.message || 'Request rejected.'}`);
     } finally {
       setIsDeletingCompany(false);
     }
@@ -260,8 +239,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleAddOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const effectiveCompanyId = activeCompanyId || currentLoadedUUID;
-    if (!newUsername || !newName || !effectiveCompanyId || effectiveCompanyId === 'default') {
+    if (!newUsername || !newName || !activeCompanyId) {
       alert("Please ensure a valid active company is selected first.");
       return;
     }
@@ -284,7 +262,7 @@ const Settings: React.FC<SettingsProps> = ({
           password: passwordToSave,
           name: newName,
           role: newRole,
-          company_id: effectiveCompanyId 
+          company_id: activeCompanyId 
       };
 
       await saveUser(userToSave);
@@ -294,11 +272,11 @@ const Settings: React.FC<SettingsProps> = ({
         .insert([{
           id: crypto.randomUUID(),
           user_id: id,
-          company_id: effectiveCompanyId
+          company_id: activeCompanyId
         }]);
 
       const allUsers = await getUsers();
-      setUsers(allUsers.filter(u => u.company_id === effectiveCompanyId || u.role === 'ADMIN'));
+      setUsers(allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN'));
       resetUserForm();
       alert(`User registered and restricted to this workspace!`);
     } catch (error) {
@@ -330,12 +308,11 @@ const Settings: React.FC<SettingsProps> = ({
       alert("You cannot delete yourself.");
       return;
     }
-    const effectiveCompanyId = activeCompanyId || currentLoadedUUID;
     if (confirm('Are you sure you want to delete this user?')) {
       try {
         await deleteUser(id);
         const allUsers = await getUsers();
-        setUsers(allUsers.filter(u => u.company_id === effectiveCompanyId || u.role === 'ADMIN'));
+        setUsers(allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN'));
       } catch (error) {
         console.error('Error deleting user:', error);
         alert('Failed to delete user');
@@ -640,7 +617,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* Danger Zone Section */}
+        {/* 🔥 DANGER ZONE CONTROL WITH INDEPENDENT DATABASE DROPDOWN SELECTOR */}
         {currentUser.role === 'ADMIN' && (
           <div className="md:col-span-2 bg-rose-50 rounded-xl border-2 border-rose-100 p-6 mt-4">
             <div className="flex items-center gap-3 mb-4">
@@ -653,22 +630,41 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
             </div>
             
-            <div className="bg-white border border-rose-200 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+            <div className="bg-white border border-rose-200 p-4 rounded-xl space-y-4 shadow-sm">
               <div>
-                <h4 className="text-sm font-bold text-gray-800">Delete Current Active Workspace Entity</h4>
+                <h4 className="text-sm font-bold text-gray-800">Select & Destroy Any Corporate Workspace Profile</h4>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  This will completely destroy the currently active sidebar workspace along with all its financial accounts, transactions and history from the server.
+                  Direct database destroyer. Select the exact workspace name below to permanently erase its charts, ledgers, vouchers, and metadata from the cloud servers.
                 </p>
               </div>
-              <button
-                type="button"
-                disabled={isDeletingCompany}
-                onClick={handleDeleteActiveCompany}
-                className="w-full md:w-auto bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition whitespace-nowrap shrink-0 shadow-sm shadow-rose-100"
-              >
-                <Trash2 size={14} />
-                {isDeletingCompany ? 'Destroying Entity...' : 'Destroy Workspace Profile'}
-              </button>
+
+              <div className="flex flex-col md:flex-row items-end gap-4 bg-rose-50/50 p-4 rounded-xl border border-rose-100">
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-bold text-rose-900 uppercase mb-1.5 tracking-wider">Select Target Company To Delete</label>
+                  <select
+                    value={selectedCompanyToDelete}
+                    onChange={(e) => setSelectedCompanyToDelete(e.target.value)}
+                    className="w-full p-2.5 text-sm bg-white border border-rose-200 rounded-lg text-gray-800 font-medium focus:ring-2 focus:ring-rose-500 outline-none"
+                  >
+                    <option value="">-- Click To Select Company Profile --</option>
+                    {allDbCompanies.map((comp) => (
+                      <option key={comp.id} value={comp.id}>
+                        🏢 {comp.name} ({comp.id.substring(0, 8)}...)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isDeletingCompany || !selectedCompanyToDelete}
+                  onClick={handleDeleteActiveCompany}
+                  className="w-full md:w-auto bg-rose-600 hover:bg-rose-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold text-xs py-3 px-5 rounded-lg flex items-center justify-center gap-2 transition whitespace-nowrap shrink-0 shadow-sm shadow-rose-100"
+                >
+                  <Trash2 size={14} />
+                  {isDeletingCompany ? 'Destroying Entity...' : 'Destroy Selected Profile'}
+                </button>
+              </div>
             </div>
           </div>
         )}
