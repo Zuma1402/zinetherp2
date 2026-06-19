@@ -309,39 +309,56 @@ const App: React.FC = () => {
 
   const SidebarContent = () => (
     <>
-        {/* Dropdown Integrated Perfectly into Sidebar Top Frame */}
+        {/* Dropdown Frame with Integrated ZinethERP Brand Identity */}
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 shadow-sm mb-2">
-              <Building2 size={18} className="text-indigo-600 shrink-0" />
-              <select 
-                value={activeCompanyId || 'default'} 
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val !== 'default' && companies.length > 0) {
-                    const comp = companies.find(c => c.id === val);
-                    if (comp) {
-                      setActiveCompanyId(comp.id);
-                      setCompanyName(comp.name);
-                    }
-                  }
-                }}
-                className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
-                style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
-              >
-                {companies.length > 0 ? (
-                  companies.map((comp) => (
-                    <option key={comp.id} value={comp.id} className="bg-white text-gray-800 font-sans font-medium">
-                      {comp.name}
-                    </option>
-                  ))
-                ) : (
-                  <option value="default" className="bg-white text-gray-800 font-sans font-medium">
-                    {companyName || 'Achevers account'}
-                  </option>
-                )}
-              </select>
-              <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />
+            {/* 👑 BRAND LOGO SECTION COMPLIANT WITH image_48aa27.png */}
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shadow-indigo-200">
+                z
+              </div>
+              <div>
+                <h2 className="font-extrabold text-gray-800 text-md tracking-tight leading-none">ZinethERP</h2>
+              </div>
             </div>
+
+            {/* DYNAMIC WORKSPACE SELECTOR BASED ON USER ROLE PROTECTION */}
+            {user?.role === 'ADMIN' ? (
+              <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 shadow-sm mb-2">
+                <Building2 size={18} className="text-indigo-600 shrink-0" />
+                <select 
+                  value={activeCompanyId || 'default'} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val !== 'default' && companies.length > 0) {
+                      const comp = companies.find(c => c.id === val);
+                      if (comp) {
+                        setActiveCompanyId(comp.id);
+                        setCompanyName(comp.name);
+                      }
+                    }
+                  }}
+                  className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
+                  style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+                >
+                  {companies.length > 0 ? (
+                    companies.map((comp) => (
+                      <option key={comp.id} value={comp.id} className="bg-white text-gray-800 font-sans font-medium">
+                        {comp.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="default" className="bg-white text-gray-800 font-sans font-medium">
+                      {companyName || 'Achievers account'}
+                    </option>
+                  )}
+                </select>
+                <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 shadow-inner mb-2">
+                🔒 {companies.find(c => c.id === activeCompanyId)?.name || companyName || 'Assigned Company'}
+              </div>
+            )}
 
             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white border border-gray-200 px-2 py-1 rounded w-fit uppercase tracking-widest shadow-sm">
                 {syncStatus === 'synced' && <><CheckCircle2 size={10} className="text-green-500"/> DB Connected</>}
