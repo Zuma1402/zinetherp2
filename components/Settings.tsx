@@ -112,7 +112,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
     }
   };
 
-  const handleCreateNewCorporateCompany = async (e: React.FormEvent) => {
+const handleCreateNewCorporateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
 
@@ -120,18 +120,20 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
     try {
       const companyId = crypto.randomUUID();
 
+      // 1. Insert the new company row
       const { error: companyError } = await supabase
         .from('companies')
         .insert([{ id: companyId, name: newCorpCompanyName.trim() }]);
 
       if (companyError) throw companyError;
 
+      // 2. Safe mapping injection
       const { error: mappingError } = await supabase
         .from('user_companies')
         .insert([{ 
           id: crypto.randomUUID(), 
           company_id: companyId,
-          user_id: currentUser.id
+          user_id: currentUser?.id || null // Safe fallback if native auth is bypassed
         }]);
 
       if (mappingError) throw mappingError;
