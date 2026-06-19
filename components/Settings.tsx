@@ -68,9 +68,34 @@ const Settings: React.FC<SettingsProps> = ({
 
         // Fetch all system companies for the Admin's Danger Zone dropdown
         if (currentUser.role === 'ADMIN') {
-          const { data, error } = await supabase.from('companies').select('id, name');
-          if (!error && data) {
-            setAllDbCompanies(data);
+          const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
+          if (!compErr && companiesData) {
+            setAllDbCompanies(companiesData);
+
+            // ⚡️ SAFE AUTOMATIC SIDEBAR AUTO-SYNC INJECTION ENGINE
+            // Fetch what mappings currently exist for this logged-in admin user
+            const { data: mappingsData } = await supabase
+              .from('user_companies')
+              .select('company_id')
+              .eq('user_id', currentUser.id);
+
+            const mappedIds = mappingsData ? mappingsData.map(m => m.company_id) : [];
+            const missingCompanies = companiesData.filter(c => !mappedIds.includes(c.id));
+
+            // If there are unlinked corporate entries, safely inject relation rows in the background
+            if (missingCompanies.length > 0) {
+              const injectRows = missingCompanies.map(c => ({
+                id: crypto.randomUUID(),
+                user_id: currentUser.id,
+                company_id: c.id
+              }));
+
+              const { error: syncErr } = await supabase.from('user_companies').insert(injectRows);
+              if (!syncErr && onCompanyCreated) {
+                // Force layout wrapper component state structural update immediately!
+                onCompanyCreated();
+              }
+            }
           }
         }
 
@@ -88,7 +113,7 @@ const Settings: React.FC<SettingsProps> = ({
       }
     };
     loadSettings();
-  }, [currentUser, activeCompanyId]);
+  }, [currentUser, activeCompanyId, onCompanyCreated]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +182,6 @@ const Settings: React.FC<SettingsProps> = ({
       setNewCorpCompanyName('');
       setMessage('Enterprise Company Profile Successfully Deployed and Mapped!');
       
-      // Refresh local list
       const { data } = await supabase.from('companies').select('id, name');
       if (data) setAllDbCompanies(data);
 
@@ -174,7 +198,6 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 👑 BULLETPROOF CASCADE DELETE: Uses Explicit Dropdown Selection State
   const handleDeleteActiveCompany = async () => {
     if (currentUser.role !== 'ADMIN') return;
     
@@ -203,24 +226,17 @@ const Settings: React.FC<SettingsProps> = ({
 
     setIsDeletingCompany(true);
     try {
-      // 1. Clean transactions & vouchers matching explicit target ID
       await supabase.from('stock_transactions').delete().eq('company_id', selectedCompanyToDelete);
       await supabase.from('vouchers').delete().eq('company_id', selectedCompanyToDelete);
-      
-      // 2. Clean ledgers & inventory items
       await supabase.from('ledgers').delete().eq('company_id', selectedCompanyToDelete);
       await supabase.from('inventory_items').delete().eq('company_id', selectedCompanyToDelete);
-      
-      // 3. Clean user-company mapping links
       await supabase.from('user_companies').delete().eq('company_id', selectedCompanyToDelete);
       
-      // 4. Remove the core company entry row matching exact UUID
       const { error: companyErr } = await supabase.from('companies').delete().eq('id', selectedCompanyToDelete);
       if (companyErr) throw companyErr;
 
       alert(`🏢 "${targetName}" and all associated records wiped successfully!`);
       
-      // Clear possible local cache anchors
       const keysToWipe = ['supabase_active_company_id', 'active_company_id', 'selected_company_id', 'current_company_id', 'company_id'];
       keysToWipe.forEach(k => localStorage.removeItem(k));
       
@@ -617,7 +633,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* 🔥 DANGER ZONE CONTROL WITH INDEPENDENT DATABASE DROPDOWN SELECTOR */}
+        {/* Danger Zone Section */}
         {currentUser.role === 'ADMIN' && (
           <div className="md:col-span-2 bg-rose-50 rounded-xl border-2 border-rose-100 p-6 mt-4">
             <div className="flex items-center gap-3 mb-4">
