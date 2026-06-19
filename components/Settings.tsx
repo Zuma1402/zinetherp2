@@ -54,7 +54,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [allDbCompanies, setAllDbCompanies] = useState<{id: string, name: string}[]>([]);
   const [selectedCompanyToDelete, setSelectedCompanyToDelete] = useState('');
   
-  // ⚡️ SAFE ISOLATED STATE HOLDER FOR LIVE RUNTIME CONTEXT
+  // SAFE ISOLATED STATE HOLDER FOR LIVE RUNTIME CONTEXT
   const [liveResolvedCompanyId, setLiveResolvedCompanyId] = useState('');
 
   const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
@@ -69,7 +69,6 @@ const Settings: React.FC<SettingsProps> = ({
         setInvoicePrefix(settings.invoicePrefix || 'INV-');
         setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-        // Safely capturing working runtime ID without modifying any rendering states
         if (settings) {
           const rawId = settings.id || settings.companyId || settings.company_id || '';
           if (rawId && rawId !== 'default') {
@@ -262,14 +261,12 @@ const Settings: React.FC<SettingsProps> = ({
   const handleAddOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // ⚡️ FIXED AUTO-FALLBACK RESOLVER: Puraani variables aur logs ko bina chere humne UUID fallback setup kiya hai
     let effectiveCompanyId = activeCompanyId;
     
     if (!effectiveCompanyId || effectiveCompanyId === 'default' || effectiveCompanyId === '') {
       effectiveCompanyId = liveResolvedCompanyId;
     }
 
-    // Dynamic verification parsing from DB backup arrays if memory pointer is still invalid
     if ((!effectiveCompanyId || effectiveCompanyId === 'default') && allDbCompanies.length > 0) {
       const backupMatch = allDbCompanies.find(c => c.id !== 'default');
       if (backupMatch) {
@@ -294,9 +291,12 @@ const Settings: React.FC<SettingsProps> = ({
           return; 
       }
 
+      // ⚡️ STRICTOR NORMALIZATION OVERRIDE: Clean lowercase optimization for database engine compatibility
+      const sanitizedUsername = newUsername.trim().toLowerCase();
+
       const userToSave: any = {
           id,
-          username: newUsername,
+          username: sanitizedUsername,
           password: passwordToSave,
           name: newName,
           role: newRole,
@@ -317,9 +317,10 @@ const Settings: React.FC<SettingsProps> = ({
       setUsers(allUsers.filter(u => u.company_id === effectiveCompanyId || u.role === 'ADMIN'));
       resetUserForm();
       alert(`User registered and successfully bound to this specific workspace!`);
-    } catch (error) {
-      console.error('Error saving user:', error);
-      alert('Failed to save user');
+    } catch (error: any) {
+      console.error('Error saving user dynamic payload:', error);
+      // Detailed logging output feedback
+      alert(`Failed to save user: ${error?.message || 'Please check for duplicate usernames or missing system properties.'}`);
     }
   };
 
