@@ -57,8 +57,9 @@ const Settings: React.FC<SettingsProps> = ({
 
   const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
   
-  // 👑 RESOLVING PURE MASTER SCOPE BY DETECTING SCREEN STATUS OR ACTIVE TENANT IDENTIFIER
-  const isMasterZenithScope = companyName.toLowerCase().replace(/\s+/g, '') === 'zinetherp' || activeCompanyId === 'default' || !activeCompanyId;
+  // 👑 FIXED GLOBAL MASTER BLUEPRINT ENFORCEMENT: 
+  // Admin is the system king. If currentUser is ADMIN, they always get the global blueprint dashboard view across all states.
+  const isMasterZenithScope = currentUser.role === 'ADMIN';
 
   const syncEngineData = async () => {
     try {
@@ -69,23 +70,24 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      const { data: companiesData } = await supabase.from('companies').select('id, name');
-      if (companiesData) {
+      // Fetch all real-time companies from DB without name-string matching limitations
+      const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
+      if (!compErr && companiesData) {
         setAllDbCompanies(companiesData);
       }
 
       const allUsers = await getUsers();
       const currentEffectiveId = activeCompanyId || settings.id || settings.company_id || '';
       
-      // If we are currently operating inside master ZinethERP core view, render everything
-      if (settings.companyName?.toLowerCase().replace(/\s+/g, '') === 'zinetherp') {
+      // Admin gets the supreme view matrix for all database nodes
+      if (currentUser.role === 'ADMIN') {
         setUsers(allUsers);
       } else {
-        // Enforce tight tenant data boundary protection
+        // Enforce boundary lock for non-admin normal tenant workers
         setUsers(allUsers.filter(u => u.company_id === currentEffectiveId));
       }
     } catch (e) {
-      console.error(e);
+      console.error("Scope synchronization cluster failure:", e);
     }
   };
 
@@ -126,7 +128,6 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 👑 INTEGRATED CENTRAL CONTROL NODE DEPLOYER (Creates Company + Staff Member instantly in 1 Form)
   const handleMasterClusterDeployment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
@@ -135,7 +136,6 @@ const Settings: React.FC<SettingsProps> = ({
     try {
       const companyId = crypto.randomUUID();
 
-      // 1. Deploy independent corporate profile entry row
       const { error: companyError } = await supabase
         .from('companies')
         .insert([{ 
@@ -149,10 +149,8 @@ const Settings: React.FC<SettingsProps> = ({
 
       if (companyError) throw companyError;
 
-      // 2. Automatically grant structural system supervisor mapping link rights
       await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: currentUser.id }]);
 
-      // 3. If staff input details were provided, initialize member locked right into this ecosystem boundary
       if (staffUsername && staffName) {
         const staffId = crypto.randomUUID();
         await saveUser({
@@ -167,7 +165,6 @@ const Settings: React.FC<SettingsProps> = ({
         await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: staffId }]);
       }
 
-      // Reset deployer inputs
       setNewCorpCompanyName('');
       setNewCorpEmail('');
       setNewCorpTaxId('');
@@ -177,11 +174,11 @@ const Settings: React.FC<SettingsProps> = ({
       setStaffUsername('');
       setStaffPassword('');
       
-      alert(" Ecosytem launched! Corporate profile and specified workspace staff locked successfully.");
+      alert("Ecosystem node initialized successfully! Corporate node deployed.");
       await syncEngineData();
       if (onCompanyCreated) onCompanyCreated();
     } catch (err: any) {
-      alert(`Server rejected payload node deployment: ${err?.message}`);
+      alert(`Server rejected deployment setup: ${err?.message}`);
     } finally {
       setIsCreatingCorp(false);
     }
@@ -225,8 +222,8 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteActiveCompany = async () => {
     if (!selectedCompanyToDelete) return;
-    if (!confirm("Are you sure you want to completely wipe this corporate entity profile from cloud servers?")) return;
-    if (prompt('Type "DELETE" to verify cascading destruction:') !== 'DELETE') return;
+    if (!confirm("Are you sure you want to completely wipe this corporate entity profile?")) return;
+    if (prompt('Type "DELETE" to verify destruction:') !== 'DELETE') return;
 
     setIsDeletingCompany(true);
     try {
@@ -292,7 +289,7 @@ const Settings: React.FC<SettingsProps> = ({
           </form>
         </div>
 
-        {/* 🏢 ISOLATED PROFILE CONFIGURATIONS LAYER (Visible ONLY inside sub-tenants like Khaochey NW/Testing) */}
+        {/* 🏢 ISOLATED PROFILE CONFIGURATIONS LAYER */}
         {!isMasterZenithScope && (
           <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
             <div className="flex items-center gap-3 mb-5">
@@ -333,14 +330,16 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
 
               {message && message.includes('Configurations') && <div className="text-emerald-600 text-xs font-bold">{message}</div>}
-              <button type="submit" className="bg-blue-600 text-white font-bold text-xs py-2 px-5 rounded-lg hover:bg-blue-700 transition flex items-center gap-1.5 shadow-sm">
-                <Save size={13} /> Save Workspace Changes
-              </button>
+              <div className="flex gap-2">
+                <button type="submit" className="bg-blue-600 text-white font-bold text-xs py-2 px-5 rounded-lg hover:bg-blue-700 transition flex items-center gap-1.5 shadow-sm">
+                  <Save size={13} /> Save Workspace Changes
+                </button>
+              </div>
             </form>
           </div>
         )}
 
-        {/* 👑 THE OMNIPOTENT MASTER LAYER: Visible EXCLUSIVELY inside 'ZinethERP' Command Center */}
+        {/* 👑 THE OMNIPOTENT MASTER LAYER: Visible EXCLUSIVELY inside Admin Core View */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-2xl shadow-xl p-6 border border-indigo-900/40">
             <div className="flex items-center gap-3 mb-5 border-b border-indigo-900/60 pb-3">
@@ -354,7 +353,6 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             <form onSubmit={handleMasterClusterDeployment} className="space-y-6">
-              {/* PART A: Corporate Infrastructure Node Input fields */}
               <div className="bg-black/30 border border-indigo-950/60 p-4 rounded-xl space-y-4 shadow-inner">
                 <h4 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase">Step 1: Corporate Domain Infrastructure Metadata</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -384,7 +382,6 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* PART B: Integrated User/Staff Boundary Matrix Member Deployment */}
               <div className="bg-indigo-950/20 border border-indigo-950/40 p-4 rounded-xl space-y-4">
                 <h4 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase">Step 2: Bind Initial Workspace Staff Member Identity (Optional)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -437,7 +434,6 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
             </div>
             
-            {/* If inside sub-tenant layer, let them add staff directly into this specific node */}
             {!isMasterZenithScope && (
               <button onClick={() => setIsAddingTenantStaff(!isAddingTenantStaff)} className="bg-indigo-600 text-white text-xs font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition">
                 {isAddingTenantStaff ? 'Cancel Configuration' : <><Plus size={13}/> Add Staff to {companyName}</>}
@@ -447,7 +443,7 @@ const Settings: React.FC<SettingsProps> = ({
 
           {/* Inline Tenant Staff Add Trigger Form Block */}
           {isAddingTenantStaff && !isMasterZenithScope && (
-            <form onSubmit={handleTenantAddStaffOnly} className="bg-slate-50 p-5 border border-slate-200 rounded-xl mb-6 space-y-4 shadow-inner animate-fadeIn">
+            <form onSubmit={handleTenantAddStaffOnly} className="bg-slate-50 p-5 border border-slate-200 rounded-xl mb-6 space-y-4 shadow-inner">
               <h4 className="text-xs font-bold text-gray-700 uppercase">Lock New Employee Account into "{companyName}" Workspace</h4>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
@@ -456,7 +452,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
                 <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Username Key Handle</label>
-                    <input required placeholder="jane_staff" className="w-full p-2 border rounded text-sm bg-white font-medium outline-none" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} />
+                    <input required placeholder="jane_staff" className="w-full p-2 border rounded text-sm bg-white font-medium outline-none" value={staffUsername} onChange={e => setNewUsername(e.target.value)} />
                 </div>
                 <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Password Credentials</label>
@@ -495,7 +491,7 @@ const Settings: React.FC<SettingsProps> = ({
                     <tr key={u.id} className="hover:bg-gray-50 transition group">
                       <td className="p-3 pl-4">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-slate-100 border border-gray-200/60 flex items-center justify-center text-gray-500 font-bold group-hover:bg-indigo-50 transition">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 border flex items-center justify-center text-gray-500 font-bold">
                                 <UserIcon size={13} />
                             </div>
                             <div>
@@ -506,7 +502,7 @@ const Settings: React.FC<SettingsProps> = ({
                       </td>
                       <td className="p-3">
                         <span className="font-mono text-xs font-bold text-indigo-900 bg-indigo-50 border border-indigo-100/60 px-2 py-1 rounded-md shadow-sm">
-                          🏢 {compMatch ? compMatch.name : `Master Root Cluster Configuration`}
+                          🏢 {compMatch ? compMatch.name : `Master Root Cluster (ZinethERP)`}
                         </span>
                       </td>
                       <td className="p-3">
@@ -531,7 +527,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         </div>
 
-        {/* 👑 INFRASTRUCTURE CASCADING DANGER OPERATION PROTOCOLS (Only on ZinethERP Master view) */}
+        {/* 👑 INFRASTRUCTURE CASCADING DANGER ZONE SECTION (Displays ALL sub-tenant systems for deletion) */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 bg-rose-50 rounded-2xl border-2 border-rose-100 p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -549,7 +545,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <label className="block text-[10px] font-bold text-rose-900 uppercase mb-1.5 tracking-wider">Select Corporate Target To Erase From Infrastructure Cloud</label>
                 <select value={selectedCompanyToDelete} onChange={e => setSelectedCompanyToDelete(e.target.value)} className="w-full p-2.5 text-xs bg-white border border-rose-200 rounded-lg text-gray-800 font-bold focus:ring-2 focus:ring-rose-500 outline-none shadow-inner">
                   <option value="">-- Click To Select Profile Node Target --</option>
-                  {allDbCompanies.filter(c => c.name.toLowerCase().replace(/\s+/g,'') !== 'zinetherp').map(comp => (
+                  {allDbCompanies.map(comp => (
                     <option key={comp.id} value={comp.id}>🏢 {comp.name} ({comp.id.substring(0,8)}...)</option>
                   ))}
                 </select>
