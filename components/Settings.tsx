@@ -112,7 +112,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
     }
   };
 
-  // Permanent Safe Fallback Architecture for Company Creation
+  // Safe Architecture for Company Creation
   const handleCreateNewCorporateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
@@ -123,16 +123,9 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
 
       const { data: newCompany, error: companyError } = await supabase
         .from('companies')
-        .insert([{ id: companyId, name: newCorpCompanyName.trim() }])
-        .select();
+        .insert([{ id: companyId, name: newCorpCompanyName.trim() }]);
 
-      if (companyError) {
-        console.warn("Table injection error, attempting dynamic upsert:", companyError);
-        const { error: upsertError } = await supabase
-          .from('companies')
-          .upsert([{ name: newCorpCompanyName.trim() }]);
-        if (upsertError) throw upsertError;
-      }
+      if (companyError) throw companyError;
 
       const mappingPayload: any = { id: crypto.randomUUID(), company_id: companyId };
       if (currentUser?.id) {
@@ -143,13 +136,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
         .from('user_companies')
         .insert([mappingPayload]);
 
-      if (mappingError) {
-        console.warn("Relational link failed. Attempting structural query routing...", mappingError);
-        const { error: secondaryError } = await supabase
-          .from('user_companies')
-          .upsert([{ company_id: companyId }]);
-        if (secondaryError) throw secondaryError;
-      }
+      if (mappingError) throw mappingError;
 
       setNewCorpCompanyName('');
       setMessage('Enterprise Company Profile Successfully Deployed and Mapped!');
@@ -160,7 +147,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
       }
     } catch (error: any) {
       console.error('Supabase Core Schema Error Context:', error);
-      alert(`Database Action Blocked: ${error?.message || 'Please check Supabase Database RLS Policies.'}`);
+      alert(`Database Action Blocked: ${error?.message || 'RLS rule constraint.'}`);
     } finally {
       setIsCreatingCorp(false);
     }
@@ -176,7 +163,6 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
     setNewRole('VIEWER');
   };
 
-  // 100% Airtight Company Isolation User Creation Logic
   const handleAddOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUsername || !newName) return;
@@ -199,19 +185,17 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
           return; 
       }
 
-      // Injecting target company_id directly into core user payload block
       const userToSave: any = {
           id,
           username: newUsername,
           password: passwordToSave,
           name: newName,
           role: newRole,
-          company_id: newRole === 'ADMIN' ? null : targetCompanyId // Admins look globally, staff is locked
+          company_id: newRole === 'ADMIN' ? null : targetCompanyId 
       };
 
       await saveUser(userToSave);
 
-      // Relational database map row injector to seal user companies bridge table
       if (newRole !== 'ADMIN' && targetCompanyId) {
         await supabase
           .from('user_companies')
@@ -425,11 +409,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
                   disabled={isCreatingCorp}
                   className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2.5 px-4 rounded-lg flex items-center justify-center gap-2 transition disabled:opacity-50 border border-indigo-400/20 shadow-md"
                 >
-                  {isCreatingCorp ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <><Plus size={16} /> Deploy Profile</>
-                  )}
+                  {isCreatingCorp ? 'Deploying...' : <><Plus size={16} /> Deploy Profile</>}
                 </button>
               </div>
             </form>
@@ -442,7 +422,7 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser, onUpdate
           </div>
         )}
 
-        {/* User Management Panel with Enforced Active-Company Isolation Badge */}
+        {/* User Management Panel */}
         {currentUser.role === 'ADMIN' && (
           <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-start mb-6">
