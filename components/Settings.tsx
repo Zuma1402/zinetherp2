@@ -10,7 +10,6 @@ interface SettingsProps {
   onUpdateUser: (user: User) => void;
   onUpdateCompany?: (name: string) => void;
   onCompanyCreated?: () => void; 
-  // REACTIVE LINK FIX: Passing the current selected company ID directly from layout context
   activeCompanyId?: string; 
 }
 
@@ -19,8 +18,7 @@ const Settings: React.FC<SettingsProps> = ({
   onUpdateUser, 
   onUpdateCompany, 
   onCompanyCreated,
-  // Fallback to local storage if not passed directly via props
-  activeCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
+  activeCompanyId: propCompanyId
 }) => {
   // Profile State
   const [name, setName] = useState(currentUser.name);
@@ -51,6 +49,40 @@ const Settings: React.FC<SettingsProps> = ({
   const [newCorpCompanyName, setNewCorpCompanyName] = useState('');
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
+  
+  // Internal state to hold the accurately auto-scanned company ID
+  const [resolvedCompanyId, setResolvedCompanyId] = useState('');
+
+  // 🕵️‍♂️ AUTO-SCANNER ENGINE: Scans all possible localStorage naming conventions to find the active token
+  const getActiveCompanyToken = (): string => {
+    if (propCompanyId) return propCompanyId;
+    
+    const commonKeys = [
+      'supabase_active_company_id', 
+      'active_company_id', 
+      'selected_company_id', 
+      'current_company_id', 
+      'company_id',
+      'supabase_company_id'
+    ];
+    
+    for (const key of commonKeys) {
+      const val = localStorage.getItem(key);
+      if (val && val.trim() !== '') return val;
+    }
+    
+    // Ultimate fallback scanner loop
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.toLowerCase().includes('company') || key.toLowerCase().includes('workspace'))) {
+        const val = localStorage.getItem(key);
+        if (val && val.length > 20) return val; 
+      }
+    }
+    return '';
+  };
+
+  const activeCompanyId = getActiveCompanyToken();
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -63,10 +95,17 @@ const Settings: React.FC<SettingsProps> = ({
         setInvoicePrefix(settings.invoicePrefix || 'INV-');
         setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
+        // Safe extraction from settings object payload directly
+        if (settings && (settings.id || settings.companyId || settings.company_id)) {
+          setResolvedCompanyId(settings.id || settings.companyId || settings.company_id);
+        }
+
         // Load users that belong to the active company selection
         const allUsers = await getUsers();
+        const currentEffectiveId = activeCompanyId || settings.id || settings.company_id || '';
+        
         if (currentUser.role === 'ADMIN') {
-          const filteredUsers = allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN');
+          const filteredUsers = allUsers.filter(u => u.company_id === currentEffectiveId || u.role === 'ADMIN');
           setUsers(filteredUsers);
         } else {
           setUsers(allUsers.filter(u => u.id === currentUser.id));
@@ -159,15 +198,15 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 👑 CASCADE DELETE COMPANY WORKSPACE WITH RECOVERY SAFEGUARDS
+  // 👑 FIXED BULLETPROOF CASCADE DELETE TARGETING ENGINE
   const handleDeleteActiveCompany = async () => {
     if (currentUser.role !== 'ADMIN') return;
     
-    // Direct operational verification anchor
-    const targetCompanyId = activeCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id');
+    // Absolute target fallback matrix
+    const targetCompanyId = activeCompanyId || resolvedCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id');
     
     if (!targetCompanyId) {
-      alert("No active workspace token resolved in memory. Please select a company from the sidebar drop-down first.");
+      alert("System could not resolve the workspace token ID automatically. Try switching companies on the sidebar and opening settings again.");
       return;
     }
 
@@ -205,9 +244,9 @@ const Settings: React.FC<SettingsProps> = ({
 
       alert("🏢 Company and all associated records cleared successfully!");
       
-      // Wipe storage targets completely to reset state
-      localStorage.removeItem('supabase_active_company_id');
-      localStorage.removeItem('active_company_id');
+      // Clear all possible local keys
+      const keysToWipe = ['supabase_active_company_id', 'active_company_id', 'selected_company_id', 'current_company_id', 'company_id'];
+      keysToWipe.forEach(k => localStorage.removeItem(k));
       
       if (onCompanyCreated) {
         await onCompanyCreated();
@@ -224,7 +263,8 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleAddOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername || !newName || !activeCompanyId) {
+    const effectiveCompanyId = activeCompanyId || resolvedCompanyId;
+    if (!newUsername || !newName || !effectiveCompanyId) {
       alert("Please ensure a valid active company is selected first.");
       return;
     }
@@ -247,7 +287,7 @@ const Settings: React.FC<SettingsProps> = ({
           password: passwordToSave,
           name: newName,
           role: newRole,
-          company_id: activeCompanyId 
+          company_id: effectiveCompanyId 
       };
 
       await saveUser(userToSave);
@@ -257,11 +297,11 @@ const Settings: React.FC<SettingsProps> = ({
         .insert([{
           id: crypto.randomUUID(),
           user_id: id,
-          company_id: activeCompanyId
+          company_id: effectiveCompanyId
         }]);
 
       const allUsers = await getUsers();
-      setUsers(allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN'));
+      setUsers(allUsers.filter(u => u.company_id === effectiveCompanyId || u.role === 'ADMIN'));
       resetUserForm();
       alert(`User registered and restricted to this workspace!`);
     } catch (error) {
@@ -293,11 +333,12 @@ const Settings: React.FC<SettingsProps> = ({
       alert("You cannot delete yourself.");
       return;
     }
+    const effectiveCompanyId = activeCompanyId || resolvedCompanyId;
     if (confirm('Are you sure you want to delete this user?')) {
       try {
         await deleteUser(id);
         const allUsers = await getUsers();
-        setUsers(allUsers.filter(u => u.company_id === activeCompanyId || u.role === 'ADMIN'));
+        setUsers(allUsers.filter(u => u.company_id === effectiveCompanyId || u.role === 'ADMIN'));
       } catch (error) {
         console.error('Error deleting user:', error);
         alert('Failed to delete user');
@@ -602,7 +643,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* 🔥 DANGER ZONE CONTROL WITH BOTH STORAGE + PROP RECOVERY FALLBACKS */}
+        {/* Danger Zone Section */}
         {currentUser.role === 'ADMIN' && (
           <div className="md:col-span-2 bg-rose-50 rounded-xl border-2 border-rose-100 p-6 mt-4">
             <div className="flex items-center gap-3 mb-4">
