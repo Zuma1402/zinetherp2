@@ -50,8 +50,8 @@ const Settings: React.FC<SettingsProps> = ({
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   
-  // Internal fallback state for loaded profile metadata
-  const [realDatabaseCompanyId, setRealDatabaseCompanyId] = useState('');
+  // 🔥 THE CRITICAL KEY: Storing the raw current DB context row UUID directly on state load
+  const [currentLoadedUUID, setCurrentLoadedUUID] = useState('');
 
   const getActiveCompanyToken = (): string => {
     if (propCompanyId && propCompanyId !== 'default') return propCompanyId;
@@ -83,11 +83,11 @@ const Settings: React.FC<SettingsProps> = ({
         setInvoicePrefix(settings.invoicePrefix || 'INV-');
         setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-        // Extracting actual valid UUID from DB payload mapping
-        if (settings && (settings.id || settings.companyId || settings.company_id)) {
-          const matchedId = settings.id || settings.companyId || settings.company_id;
-          if (matchedId !== 'default') {
-            setRealDatabaseCompanyId(matchedId);
+        // EXTRACTION TRIUMPH: Direct matching from service data row context payload!
+        if (settings) {
+          const rawId = settings.id || settings.companyId || settings.company_id || '';
+          if (rawId && rawId !== 'default') {
+            setCurrentLoadedUUID(rawId);
           }
         }
 
@@ -186,55 +186,61 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 👑 FIXED BULLETPROOF CASCADE DELETE TARGETING ENGINE WITHOUT "DEFAULT" SYNTAX INJECTION
+  // 👑 FINAL BULLETPROOF DESTROY CORE PIPELINE
   const handleDeleteActiveCompany = async () => {
     if (currentUser.role !== 'ADMIN') return;
     
-    // Safety check filter logic against string literals
-    let targetCompanyId = activeCompanyId || realDatabaseCompanyId;
+    // Ultimate reactive fallback hook cascade
+    let targetCompanyId = currentLoadedUUID || activeCompanyId;
     
+    // Absolute scanner fallback loop array
     if (!targetCompanyId || targetCompanyId === 'default') {
-      targetCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+      const commonKeys = ['supabase_active_company_id', 'active_company_id', 'selected_company_id', 'current_company_id', 'company_id'];
+      for (const k of commonKeys) {
+        const localVal = localStorage.getItem(k);
+        if (localVal && localVal !== 'default' && localVal.trim() !== '') {
+          targetCompanyId = localVal;
+          break;
+        }
+      }
     }
 
-    if (!targetCompanyId || targetCompanyId === 'default') {
-      alert("⚠️ Verification Error: System resolved a literal 'default' pointer instead of a valid database UUID. Please select another company from the sidebar dropdown first to initialize memory tokens.");
+    if (!targetCompanyId || targetCompanyId === 'default' || targetCompanyId.length < 10) {
+      alert(`⚠️ Operation Halted: Could not identify a secure server tracking hash for "${companyName || 'Selected Workspace'}". Please hard refresh (Ctrl+F5), click another option on the sidebar, and try again.`);
       return;
     }
 
     const firstConfirm = confirm(
-      `⚠️ WARNING: Are you absolutely sure you want to delete this active workspace?\n\nThis will permanently erase all Ledgers, Vouchers, Invoices, Stock Data, and Staff permissions inside this entity!`
+      `⚠️ CRITICAL WARNING: Are you 100% certain you want to destroy "${companyName || 'this company'}"?\n\nThis will completely wipe all ledger entries, charts, vouchers, and staff permissions from the cloud forever!`
     );
 
     if (!firstConfirm) return;
 
     const finalConfirm = prompt(
-      `🔒 SECURITY CHECK:\nTo confirm deletion, please type the word "DELETE" in capital letters below:`
+      `🔒 SECURITY PROTOCOL:\nPlease type the word "DELETE" in capital letters to authorize the server destruction:`
     );
 
     if (finalConfirm !== 'DELETE') {
-      alert("Verification failed. Deletion canceled.");
+      alert("Verification failed. Request aborted.");
       return;
     }
 
     setIsDeletingCompany(true);
     try {
-      // 1. Clean transactions & vouchers matching exact UUID
+      // 1. Wipe financial ledgers & item codes matching UUID
       await supabase.from('stock_transactions').delete().eq('company_id', targetCompanyId);
       await supabase.from('vouchers').delete().eq('company_id', targetCompanyId);
-      
-      // 2. Clean ledgers & inventory items matching exact UUID
       await supabase.from('ledgers').delete().eq('company_id', targetCompanyId);
       await supabase.from('inventory_items').delete().eq('company_id', targetCompanyId);
       
-      // 3. Clean user-company mapping links
+      // 2. Wipe identity relations mapping rows
       await supabase.from('user_companies').delete().eq('company_id', targetCompanyId);
       
-      // 4. Remove the core company entry row matching exact UUID
+      // 3. Vaporize the structural company master row
       const { error: companyErr } = await supabase.from('companies').delete().eq('id', targetCompanyId);
       if (companyErr) throw companyErr;
 
-      alert("🏢 Company and all associated records cleared successfully from cloud servers!");
+      alert("🏢 Dynamic Workspace and all cloud history wiped successfully!");
       
       const keysToWipe = ['supabase_active_company_id', 'active_company_id', 'selected_company_id', 'current_company_id', 'company_id'];
       keysToWipe.forEach(k => localStorage.removeItem(k));
@@ -245,8 +251,8 @@ const Settings: React.FC<SettingsProps> = ({
       window.location.reload();
 
     } catch (error: any) {
-      console.error("Cascade deletion failed:", error);
-      alert(`Database Error: ${error?.message || 'Request rejected. Invalid table permissions.'}`);
+      console.error("Cascade deletion failure payload:", error);
+      alert(`Server Response: ${error?.message || 'Database rejected entity wipe request.'}`);
     } finally {
       setIsDeletingCompany(false);
     }
@@ -254,7 +260,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleAddOrUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const effectiveCompanyId = activeCompanyId || realDatabaseCompanyId;
+    const effectiveCompanyId = activeCompanyId || currentLoadedUUID;
     if (!newUsername || !newName || !effectiveCompanyId || effectiveCompanyId === 'default') {
       alert("Please ensure a valid active company is selected first.");
       return;
@@ -324,7 +330,7 @@ const Settings: React.FC<SettingsProps> = ({
       alert("You cannot delete yourself.");
       return;
     }
-    const effectiveCompanyId = activeCompanyId || realDatabaseCompanyId;
+    const effectiveCompanyId = activeCompanyId || currentLoadedUUID;
     if (confirm('Are you sure you want to delete this user?')) {
       try {
         await deleteUser(id);
