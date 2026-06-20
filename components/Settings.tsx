@@ -37,7 +37,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [allDbCompanies, setAllDbCompanies] = useState<{id: string, name: string}[]>([]);
   const [selectedCompanyToDelete, setSelectedCompanyToDelete] = useState('');
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
-  const [isCreatingCorp, setIsCreatingCorp] = useState(false);
+  const [isCreatingCorp = false, setIsCreatingCorp] = useState(false);
 
   // Form Inputs
   const [newCorpCompanyName, setNewCorpCompanyName] = useState('');
@@ -63,14 +63,19 @@ const Settings: React.FC<SettingsProps> = ({
       if (currentId !== localActiveId) {
         setLocalActiveId(currentId);
       }
-    }, 500);
+    }, 200); // Poll faster to switch view instantly
     return () => clearInterval(interval);
   }, [localActiveId]);
 
   // 👑 AIRTIGHT STRUCTURE RESOLVER: Match strictly using fixed UUID check or clear master label name
   const masterCompanyRow = allDbCompanies.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
+  
+  // 🌟 FIXED LEAKAGE CONDITION WITHOUT CHANGING THE STRUCTURE:
+  const activeSelectionObj = allDbCompanies.find(c => c.id === localActiveId);
+  const activeSelectionNameClean = activeSelectionObj ? activeSelectionObj.name.toLowerCase().replace(/\s+/g, '') : '';
+  
   const isMasterZenithScope = currentUser.role === 'ADMIN' && 
-    (!localActiveId || localActiveId === '' || (masterCompanyRow && localActiveId === masterCompanyRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111');
+    (!localActiveId || localActiveId === '' || activeSelectionNameClean === 'zinetherp' || (masterCompanyRow && localActiveId === masterCompanyRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111');
 
   const syncEngineData = async () => {
     try {
@@ -83,7 +88,15 @@ const Settings: React.FC<SettingsProps> = ({
 
       const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
       if (!compErr && companiesData) {
-        setAllDbCompanies(companiesData);
+        // 🌟 DROP-DOWN DUPLICATION BLOCKER ADDED IN PLACE: Filters out any same name rows instantly at UI level
+        const uniqueCompaniesMap = new Map();
+        companiesData.forEach(c => {
+          const cleanName = c.name.trim().toLowerCase();
+          if (!uniqueCompaniesMap.has(cleanName)) {
+            uniqueCompaniesMap.set(cleanName, c);
+          }
+        });
+        setAllDbCompanies(Array.from(uniqueCompaniesMap.values()));
       }
 
       // Fetch fresh system snapshot records mapped with their active company mapping junction data
@@ -97,14 +110,16 @@ const Settings: React.FC<SettingsProps> = ({
       });
 
       const resolvedMasterRow = companiesData?.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
-      const finalEffectiveId = localActiveId || (resolvedMasterRow ? resolvedMasterRow.id : '');
+      const currentSelectionId = localActiveId || '';
+      const selectedCompObj = companiesData?.find(c => c.id === currentSelectionId);
+      const selectedNameClean = selectedCompObj ? selectedCompObj.name.toLowerCase().replace(/\s+/g, '') : '';
 
       // Strict dynamic rendering threshold check
-      if (currentUser.role === 'ADMIN' && (!localActiveId || localActiveId === '' || (resolvedMasterRow && localActiveId === resolvedMasterRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111')) {
+      if (currentUser.role === 'ADMIN' && (!currentSelectionId || selectedNameClean === 'zinetherp' || currentSelectionId === '11111111-1111-1111-1111-111111111111')) {
         setUsers(mappedUsers);
       } else {
         // Tight branch lockdown isolation module
-        setUsers(mappedUsers.filter(u => u.company_id === finalEffectiveId));
+        setUsers(mappedUsers.filter(u => u.company_id === currentSelectionId));
       }
     } catch (e) {
       console.error("Scope synchronization cluster failure:", e);
@@ -328,7 +343,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Billing Communications Anchor</label>
-                  <input type="email" value={companyEmail} onChange={e => setCompanyEmail(target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tax Registration ID / GST (Optional)</label>
