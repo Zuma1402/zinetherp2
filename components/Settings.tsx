@@ -55,14 +55,15 @@ const Settings: React.FC<SettingsProps> = ({
   // Tenant Only Direct Staff Injections
   const [isAddingTenantStaff, setIsAddingTenantStaff] = useState(false);
 
+  // Directly fallback to local Storage keys to prevent sync delay lag
   const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
   
-  // Find current active company name object from state array
-  const currentActiveCompanyObj = allDbCompanies.find(c => c.id === activeCompanyId);
-  const currentActiveCompanyNameStr = currentActiveCompanyObj ? currentActiveCompanyObj.name.toLowerCase().replace(/\s+/g, '') : '';
-
-  // 👑 AIRTIGHT ISOLATION KEY: Global view sirf tab khulega jab user ADMIN ho AUR dropdown mein 'ZinethERP' select ho!
-  const isMasterZenithScope = currentUser.role === 'ADMIN' && (currentActiveCompanyNameStr === 'zinetherp' || currentActiveCompanyNameStr === '');
+  // Find current master anchor row ID to ensure absolute strict safety matching
+  const masterCompanyRow = allDbCompanies.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
+  
+  // 👑 FIXED GLOBAL MASTER BLUEPRINT ENFORCEMENT: 
+  // Global dashboard controls are visible ONLY when active selection matches the master 'ZinethERP' row ID or if no selection exists yet.
+  const isMasterZenithScope = currentUser.role === 'ADMIN' && (!activeCompanyId || (masterCompanyRow && activeCompanyId === masterCompanyRow.id));
 
   const syncEngineData = async () => {
     try {
@@ -73,21 +74,22 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
+      // Fetch fresh system snapshot records
       const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
       if (!compErr && companiesData) {
         setAllDbCompanies(companiesData);
       }
 
       const allUsers = await getUsers();
-      // Resolve currently chosen active node ID context
-      const currentEffectiveId = activeCompanyId || settings.id || settings.company_id || '';
+      const resolvedMasterRow = companiesData?.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
       
-      // If we are structurally inside global blueprint scope, load everything
-      if (currentUser.role === 'ADMIN' && (currentActiveCompanyNameStr === 'zinetherp' || currentActiveCompanyNameStr === '')) {
+      // Determine strict context filter boundaries
+      if (currentUser.role === 'ADMIN' && (!activeCompanyId || (resolvedMasterRow && activeCompanyId === resolvedMasterRow.id))) {
         setUsers(allUsers);
       } else {
-        // Strict boundary lockdown: Show only users belonging explicitly to this sub-tenant node
-        setUsers(allUsers.filter(u => u.company_id === currentEffectiveId));
+        // Dynamic isolated branch lockdown logic
+        const targetedScopeId = activeCompanyId || settings.id || settings.company_id || '';
+        setUsers(allUsers.filter(u => u.company_id === targetedScopeId));
       }
     } catch (e) {
       console.error("Scope synchronization cluster failure:", e);
@@ -96,7 +98,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   useEffect(() => {
     syncEngineData();
-  }, [currentUser, activeCompanyId, allDbCompanies.length]);
+  }, [currentUser, activeCompanyId]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,7 +262,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         
-        {/* PROFILE SIGNATURE BLOCK */}
+        {/* PROFILE SIGNATURE MODULE */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
           <div className="flex items-center gap-3 mb-6">
              <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
@@ -290,7 +292,7 @@ const Settings: React.FC<SettingsProps> = ({
           </form>
         </div>
 
-        {/* 🏢 ISOLATED PROFILE CONFIGURATIONS LAYER */}
+        {/* 🏢 ISOLATED ENVIRONMENT CONFIGURATIONS LAYER */}
         {!isMasterZenithScope && (
           <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
             <div className="flex items-center gap-3 mb-5">
@@ -477,7 +479,6 @@ const Settings: React.FC<SettingsProps> = ({
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b">
                 <tr>
-                  {/* 🌟 NEW BRAND COLUMN INJECTIONS HEADER SEQUENCE */}
                   <th className="p-3 pl-4">Company Context Node</th>
                   <th className="p-3">Staff Member Identity</th>
                   <th className="p-3">Security Access Password</th>
@@ -491,14 +492,12 @@ const Settings: React.FC<SettingsProps> = ({
                   const compMatch = allDbCompanies.find(c => c.id === u.company_id);
                   return (
                     <tr key={u.id} className="hover:bg-gray-50 transition group">
-                      {/* 🌟 CELL 1: Real-time Company Name Node display badge */}
                       <td className="p-3 pl-4">
                         <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10 shadow-sm">
                           🏢 {compMatch ? compMatch.name : 'ZinethERP Master'}
                         </span>
                       </td>
 
-                      {/* CELL 2: User profile identity name */}
                       <td className="p-3">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-slate-100 border flex items-center justify-center text-gray-500 font-bold">
@@ -511,7 +510,6 @@ const Settings: React.FC<SettingsProps> = ({
                         </div>
                       </td>
 
-                      {/* 🌟 CELL 3: Clear-text Security Access Password column injector */}
                       <td className="p-3 font-mono text-xs font-bold text-emerald-700 bg-emerald-50/30 rounded px-2">
                         <div className="flex items-center gap-1.5">
                           <Key size={11} className="text-emerald-600" />
@@ -519,14 +517,12 @@ const Settings: React.FC<SettingsProps> = ({
                         </div>
                       </td>
 
-                      {/* CELL 4: Boundaries metadata mapping tracker */}
                       <td className="p-3">
                         <span className="font-mono text-xs font-bold text-indigo-900 bg-indigo-50 border border-indigo-100/60 px-2 py-1 rounded-md shadow-sm">
                           ⚙️ {compMatch ? compMatch.name : `Master Root Cluster (ZinethERP)`}
                         </span>
                       </td>
 
-                      {/* CELL 5: Permissive roles definitions control */}
                       <td className="p-3">
                         <span className={`text-[9px] px-2 py-0.5 rounded-full font-black border uppercase tracking-wider shadow-sm
                           ${u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'}
@@ -535,7 +531,6 @@ const Settings: React.FC<SettingsProps> = ({
                         </span>
                       </td>
 
-                      {/* CELL 6: Operational tools options */}
                       <td className="p-3 text-right pr-4">
                          <div className="flex justify-end gap-1">
                             {u.id !== currentUser.id && (
