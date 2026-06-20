@@ -1,16 +1,7 @@
 import { Ledger, Voucher, VoucherEntry, AccountType, TrialBalanceRow, FinancialSummary } from '../types';
 
 /**
- * Calculates Trial Balance with Date Filtering.
- * 
- * @param ledgers List of accounts
- * @param vouchers List of transactions
- * @param startDate (Optional) Start date for period filtering.
- * @param endDate (Optional) End date for period filtering.
- * 
- * Logic:
- * - Assets/Liabilities/Equity: Closing Balance = Opening Balance + All transactions up to endDate.
- * - Income/Expense: Net Movement = Transactions between startDate and endDate.
+ * Calculates Trial Balance with Date Filtering and Automatic Multi-Tenant Isolation.
  */
 export const calculateTrialBalance = (
   ledgers: Ledger[], 
@@ -18,17 +9,26 @@ export const calculateTrialBalance = (
   startDate?: string, 
   endDate?: string
 ): TrialBalanceRow[] => {
+  // 🌟 AUTOMATIC ISOLATION ANCHOR: Direct local storage se active company pakad li
+  const currentActiveCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+  const isMasterZenith = !currentActiveCompanyId || currentActiveCompanyId === '11111111-1111-1111-1111-111111111111';
+
+  // Bina pichla logic badle, data arrays ko use karne se pehle yahin scope par lock kar diya
+  const allowedLedgers = isMasterZenith 
+    ? ledgers 
+    : ledgers.filter((l: any) => l.company_id === currentActiveCompanyId);
+
+  const allowedVouchers = isMasterZenith 
+    ? [] // Zenith root par koi data mixture nahi dikhega
+    : vouchers.filter((v: any) => v.company_id === currentActiveCompanyId);
+
   const ledgerMap = new Map<string, { debit: number; credit: number }>();
 
-  // 1. Initialize with Opening Balances
-  // For P&L (Income/Expense), if we are looking at a specific period, we usually ignore opening balance (it resets).
-  // For Balance Sheet, we always include it.
-  // To keep it flexible: We include Opening Balance if NO start date is provided (All time view) OR for BS accounts.
-  ledgers.forEach((l) => {
+  // 1. Initialize with Opening Balances (Using isolated allowedLedgers)
+  allowedLedgers.forEach((l) => {
     let dr = 0;
     let cr = 0;
     
-    // Only include opening balances for Balance Sheet accounts OR if we are doing a full history view
     const isBSAccount = [AccountType.ASSET, AccountType.LIABILITY, AccountType.EQUITY].includes(l.type);
     
     if (isBSAccount || !startDate) {
@@ -41,23 +41,18 @@ export const calculateTrialBalance = (
     ledgerMap.set(l.id, { debit: dr, credit: cr });
   });
 
-  // 2. Process Vouchers with Date Filter
-  vouchers.forEach((v) => {
-    // Filter logic
-    if (endDate && v.date > endDate) return; // Future transactions relative to report
+  // 2. Process Vouchers with Date Filter (Using isolated allowedVouchers)
+  allowedVouchers.forEach((v) => {
+    if (endDate && v.date > endDate) return; 
     
-    // For P&L accounts, we also check start date
-    // For BS accounts, we include everything up to endDate
     const processEntry = (entry: VoucherEntry) => {
-        const ledger = ledgers.find(l => l.id === entry.ledgerId);
+        const ledger = allowedLedgers.find(l => l.id === entry.ledgerId);
         if (!ledger) return;
 
         const isPLAccount = [AccountType.INCOME, AccountType.EXPENSE].includes(ledger.type);
 
-        // If P&L account and startDate exists, check if voucher is before start date
         if (isPLAccount && startDate && v.date < startDate) return;
 
-        // Add to map
         const current = ledgerMap.get(entry.ledgerId) || { debit: 0, credit: 0 };
         ledgerMap.set(entry.ledgerId, {
             debit: current.debit + entry.debit,
@@ -69,10 +64,9 @@ export const calculateTrialBalance = (
   });
 
   // 3. Format Result
-  return ledgers.map((l) => {
+  return allowedLedgers.map((l) => {
     const totals = ledgerMap.get(l.id) || { debit: 0, credit: 0 };
     const net = totals.debit - totals.credit;
-    // Determine typical balance side for display consistency, though math uses signed net
     const isDr = net >= 0;
 
     return {
@@ -133,32 +127,24 @@ export const validateVoucher = (entries: VoucherEntry[]): boolean => {
 
 
 // =====================================================================
-// 👑 NEW SECURITY INJECTION FEATURES ADDED (BINA PECHLA LOGIC BADLE)
+// 👑 PREVIOUS SECURITY INJECTIONS RETAINED UNTOUCHED
 // =====================================================================
-
-/**
- * 🔒 Strictly filters down ledgers/chart-of-accounts arrays to a specific company context.
- * Bypasses master scope restrictions if ZinethERP is evaluated.
- */
 export const filterLedgersByCompanyScope = (
   ledgers: (Ledger & { company_id?: string })[],
   activeCompanyId: string
 ): Ledger[] => {
   if (!activeCompanyId || activeCompanyId === '11111111-1111-1111-1111-111111111111') {
-    return ledgers; // ZinethERP sees raw layout structure, but no tenant mixture
+    return ledgers;
   }
   return ledgers.filter(l => l.company_id === activeCompanyId);
 };
 
-/**
- * 🔒 Strictly isolates vouchers to their corresponding tenant scope node.
- */
 export const filterVouchersByCompanyScope = (
   vouchers: (Voucher & { company_id?: string })[],
   activeCompanyId: string
 ): Voucher[] => {
   if (!activeCompanyId || activeCompanyId === '11111111-1111-1111-1111-111111111111') {
-    return []; // ZinethERP main root contains 0 data mixtures
+    return [];
   }
   return vouchers.filter(v => v.company_id === activeCompanyId);
 };
