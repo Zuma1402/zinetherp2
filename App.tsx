@@ -58,8 +58,9 @@ import { getCompanySettings, saveCompanySettings, activateSubscription, getDaysR
 import { CloudService } from './services/cloudService';
 import { supabase } from './services/supabaseService'; 
 
-// 👑 VERCEL TELEMETRY ENGINE ADDITION
+// 👑 VERCEL TELEMETRY ENGINE ADDITIONS
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { Analytics } from "@vercel/analytics/react";
 
 type View = 
   | 'DASHBOARD'
@@ -615,6 +616,9 @@ const App: React.FC = () => {
       
       {/* 👑 LIVE SPEED INSIGHTS ENGINE CONTAINER */}
       <SpeedInsights />
+      
+      {/* 👑 LIVE WEB ANALYTICS TELEMETRY CONTAINER */}
+      <Analytics />
     </div>
   );
 };
