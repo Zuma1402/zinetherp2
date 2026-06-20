@@ -57,20 +57,16 @@ const Settings: React.FC<SettingsProps> = ({
   );
 
   useEffect(() => {
-    // Keep checking the sidebar mutations dynamically
     const interval = setInterval(() => {
       const currentId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
       if (currentId !== localActiveId) {
         setLocalActiveId(currentId);
       }
-    }, 200); // Poll faster to switch view instantly
+    }, 200);
     return () => clearInterval(interval);
   }, [localActiveId]);
 
-  // 👑 AIRTIGHT STRUCTURE RESOLVER: Match strictly using fixed UUID check or clear master label name
   const masterCompanyRow = allDbCompanies.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
-  
-  // 🌟 INJECTED DYNAMIC STATE CHECKERS (Bypasses lag without altering any previous layout dependencies)
   const activeSelectionObj = allDbCompanies.find(c => c.id === localActiveId);
   const activeSelectionNameClean = activeSelectionObj ? activeSelectionObj.name.toLowerCase().replace(/\s+/g, '') : '';
   
@@ -88,7 +84,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
       if (!compErr && companiesData) {
-        // 🌟 DROP-DOWN DUPLICATION BLOCKER ADDED IN PLACE: Filters out any same name rows instantly at UI level
+        // 🌟 DROP-DOWN DUPLICATION BLOCKER: UI level par strictly filter out karega
         const uniqueCompaniesMap = new Map();
         companiesData.forEach(c => {
           const cleanName = c.name.trim().toLowerCase();
@@ -99,30 +95,26 @@ const Settings: React.FC<SettingsProps> = ({
         setAllDbCompanies(Array.from(uniqueCompaniesMap.values()));
       }
 
-      // Fetch fresh system snapshot records mapped with their active company mapping junction data
-      const { data: junctionData, error: juncErr } = await supabase.from('user_companies').select('user_id, company_id');
+      const { data: junctionData } = await supabase.from('user_companies').select('user_id, company_id');
       const allUsers = await getUsers();
 
-      // Remap users dynamically with their corresponding company IDs directly from the target junction database table
       const mappedUsers = allUsers.map(u => {
         const match = junctionData?.find(j => j.user_id === u.id);
         return { ...u, company_id: match ? match.company_id : u.company_id };
       });
 
       const resolvedMasterRow = companiesData?.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
-      const finalEffectiveId = localActiveId || (resolvedMasterRow ? resolvedMasterRow.id : '');
-      const finalEffectiveCompObj = companiesData?.find(c => c.id === finalEffectiveId);
-      const finalEffectiveNameClean = finalEffectiveCompObj ? finalEffectiveCompObj.name.toLowerCase().replace(/\s+/g, '') : '';
+      const currentSelectionId = localActiveId || '';
+      const selectedCompObj = companiesData?.find(c => c.id === currentSelectionId);
+      const selectedNameClean = selectedCompObj ? selectedCompObj.name.toLowerCase().replace(/\s+/g, '') : '';
 
-      // Strict dynamic rendering threshold check
-      if (currentUser.role === 'ADMIN' && (!localActiveId || localActiveId === '' || finalEffectiveNameClean === 'zinetherp' || finalEffectiveId === '11111111-1111-1111-1111-111111111111')) {
+      if (currentUser.role === 'ADMIN' && (!currentSelectionId || selectedNameClean === 'zinetherp' || currentSelectionId === '11111111-1111-1111-1111-111111111111')) {
         setUsers(mappedUsers);
       } else {
-        // Tight branch lockdown isolation module
-        setUsers(mappedUsers.filter(u => u.company_id === finalEffectiveId));
+        setUsers(mappedUsers.filter(u => u.company_id === currentSelectionId));
       }
     } catch (e) {
-      console.error("Scope synchronization cluster failure:", e);
+      console.error("Scope synchronization failure:", e);
     }
   };
 
@@ -163,20 +155,36 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  // 🌟 FIX DROP-DOWN REDUNDANCY CREATOR FUNCTION: Ab kabhi duplicate insert nahi ho sakti!
   const handleMasterClusterDeployment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
 
     setIsCreatingCorp(true);
     try {
+      // Step A: Check if company with exact name already registered
+      const targetNameClean = newCorpCompanyName.trim();
+      const { data: existingComps } = await supabase
+        .from('companies')
+        .select('id, name');
+      
+      const isDuplicate = existingComps?.some(c => c.name.trim().toLowerCase() === targetNameClean.toLowerCase());
+      if (isDuplicate) {
+        alert("Ecosystem Boundary Alert: Company name already deployed on this cluster node!");
+        setIsCreatingCorp(false);
+        return;
+      }
+
       const companyId = crypto.randomUUID();
 
+      // Step B: Direct atomic insert block sequence
       const { error: companyError } = await supabase
         .from('companies')
-        .insert([{ id: companyId, name: newCorpCompanyName.trim() }]);
+        .insert([{ id: companyId, name: targetNameClean }]);
 
       if (companyError) throw companyError;
 
+      // Link creator profile
       await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: currentUser.id }]);
 
       if (staffUsername && staffName) {
@@ -202,11 +210,11 @@ const Settings: React.FC<SettingsProps> = ({
       setStaffUsername('');
       setStaffPassword('');
       
-      alert("Ecosystem node initialized successfully!");
+      alert("Independent Corporate Entity deployed successfully!");
       await syncEngineData();
       if (onCompanyCreated) onCompanyCreated();
     } catch (err: any) {
-      alert(`Server rejected deployment setup: ${err?.message}`);
+      alert(`Server cluster failure: ${err?.message}`);
     } finally {
       setIsCreatingCorp(false);
     }
@@ -472,7 +480,7 @@ const Settings: React.FC<SettingsProps> = ({
             )}
           </div>
 
-          {/* Inline Tenant Staff Add Form */}
+          {/* Inline Tenant Staff Form */}
           {isAddingTenantStaff && !isMasterZenithScope && (
             <form onSubmit={handleTenantAddStaffOnly} className="bg-slate-50 p-5 border border-slate-200 rounded-xl mb-6 space-y-4 shadow-inner">
               <h4 className="text-xs font-bold text-gray-700 uppercase">Lock New Employee Account into "{companyName}" Workspace</h4>
@@ -576,7 +584,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         </div>
 
-        {/* 👑 INFRASTRUCTURE CASCADING DANGER ZONE SECTION */}
+        {/* Danger Zone */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 bg-rose-50 rounded-2xl border-2 border-rose-100 p-6">
             <div className="flex items-center gap-3 mb-4">
