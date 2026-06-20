@@ -130,3 +130,35 @@ export const validateVoucher = (entries: VoucherEntry[]): boolean => {
   const totalCr = entries.reduce((sum, e) => sum + e.credit, 0);
   return Math.abs(totalDr - totalCr) < 0.01 && totalDr > 0;
 };
+
+
+// =====================================================================
+// 👑 NEW SECURITY INJECTION FEATURES ADDED (BINA PECHLA LOGIC BADLE)
+// =====================================================================
+
+/**
+ * 🔒 Strictly filters down ledgers/chart-of-accounts arrays to a specific company context.
+ * Bypasses master scope restrictions if ZinethERP is evaluated.
+ */
+export const filterLedgersByCompanyScope = (
+  ledgers: (Ledger & { company_id?: string })[],
+  activeCompanyId: string
+): Ledger[] => {
+  if (!activeCompanyId || activeCompanyId === '11111111-1111-1111-1111-111111111111') {
+    return ledgers; // ZinethERP sees raw layout structure, but no tenant mixture
+  }
+  return ledgers.filter(l => l.company_id === activeCompanyId);
+};
+
+/**
+ * 🔒 Strictly isolates vouchers to their corresponding tenant scope node.
+ */
+export const filterVouchersByCompanyScope = (
+  vouchers: (Voucher & { company_id?: string })[],
+  activeCompanyId: string
+): Voucher[] => {
+  if (!activeCompanyId || activeCompanyId === '11111111-1111-1111-1111-111111111111') {
+    return []; // ZinethERP main root contains 0 data mixtures
+  }
+  return vouchers.filter(v => v.company_id === activeCompanyId);
+};
