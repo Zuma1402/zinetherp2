@@ -114,9 +114,10 @@ const App: React.FC = () => {
   const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
 
   // Helper to completely reload fresh state from Cloud DB on any update
-  const reloadCloudData = async () => {
+  const reloadCloudData = async (targetCompanyId: string) => {
+    setSyncStatus('syncing');
     try {
-      const data = await CloudService.fetchAllData(activeCompanyId); 
+      const data = await CloudService.fetchAllData(targetCompanyId); 
       setLedgers(data.ledgers);
       setVouchers(data.vouchers);
       setInventoryItems(data.inventory);
@@ -127,71 +128,98 @@ const App: React.FC = () => {
       } else {
         setSelectedLedgerForView('');
       }
+      setSyncStatus('synced');
     } catch (error) {
       console.error("Cloud reload failed", error);
       setSyncStatus('error');
     }
   };
 
-  // New function to load companies mapped to user
-  const fetchUserCompanies = async () => {
+  // Load companies mapped to user or ALL if admin standard bypass
+  const fetchUserCompanies = async (currentUserSession: User) => {
     try {
-      const currentSession = getCurrentUser();
-      if (!currentSession) return;
-
-      const { data: mapping } = await supabase
-        .from('user_companies')
-        .select('company_id, companies(id, name)')
-        .eq('user_id', currentSession.id);
+      let finalUniqueList: any[] = [];
       
-      if (mapping && mapping.length > 0) {
-        const formattedCompanies = mapping.map((m: any) => m.companies).filter(Boolean);
+      if (currentUserSession.role === 'ADMIN') {
+        // Global blueprint context allocation
+        const { data: allComps } = await supabase.from('companies').select('id, name');
+        if (allComps) {
+          const uniqueCompaniesMap = new Map();
+          allComps.forEach((c: any) => uniqueCompaniesMap.set(c.name.trim().toLowerCase(), c));
+          finalUniqueList = Array.from(uniqueCompaniesMap.values());
+        }
+      } else {
+        const { data: mapping } = await supabase
+          .from('user_companies')
+          .select('company_id, companies(id, name)')
+          .eq('user_id', currentUserSession.id);
         
-        // Dropdown Duplication blocker rule injection at navbar layer
-        const uniqueCompaniesMap = new Map();
-        formattedCompanies.forEach((c: any) => {
-          uniqueCompaniesMap.set(c.name.trim().toLowerCase(), c);
-        });
-        const finalUniqueList = Array.from(uniqueCompaniesMap.values());
-        setCompanies(finalUniqueList);
-
-        if (finalUniqueList.length > 0) {
-          const storedId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
-          const matchedComp = finalUniqueList.find(c => c.id === storedId);
-          
-          if (matchedComp) {
-            setActiveCompanyId(matchedComp.id);
-            setCompanyName(matchedComp.name);
-          } else {
-            setActiveCompanyId(finalUniqueList[0].id);
-            setCompanyName(finalUniqueList[0].name);
-            localStorage.setItem('supabase_active_company_id', finalUniqueList[0].id);
-          }
+        if (mapping && mapping.length > 0) {
+          const formattedCompanies = mapping.map((m: any) => m.companies).filter(Boolean);
+          const uniqueCompaniesMap = new Map();
+          formattedCompanies.forEach((c: any) => uniqueCompaniesMap.set(c.name.trim().toLowerCase(), c));
+          finalUniqueList = Array.from(uniqueCompaniesMap.values());
         }
       }
+
+      setCompanies(finalUniqueList);
+
+      if (finalUniqueList.length > 0) {
+        const storedId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+        const matchedComp = finalUniqueList.find(c => c.id === storedId);
+        
+        if (matchedComp) {
+          setActiveCompanyId(matchedComp.id);
+          setCompanyName(matchedComp.name);
+          return matchedComp.id;
+        } else {
+          setActiveCompanyId(finalUniqueList[0].id);
+          setCompanyName(finalUniqueList[0].name);
+          localStorage.setItem('supabase_active_company_id', finalUniqueList[0].id);
+          localStorage.setItem('active_company_id', finalUniqueList[0].id);
+          return finalUniqueList[0].id;
+        }
+      }
+      return '';
     } catch (err) {
       console.error("Error fetching multi-companies", err);
+      return '';
     }
   };
 
-  // Initialize App
+  // Initialize App Configuration Matrix
   useEffect(() => {
     const init = async () => {
         const session = getCurrentUser();
-        if (session) setUser(session);
+        if (!session) {
+          setIsLoading(false);
+          return;
+        }
+        setUser(session);
         
         const settings = await getCompanySettings();
         setSubscriptionStatus(settings.subscriptionStatus);
 
-        await fetchUserCompanies(); 
-        await reloadCloudData();
+        const effectiveId = await fetchUserCompanies(session); 
+        await reloadCloudData(effectiveId);
         setIsLoading(false);
     };
     init();
-  }, [activeCompanyId]); 
+  }, []); 
 
-  const handleLogin = (loggedInUser: User) => {
+  // Watch for activeCompanyId mutations to explicitly trigger a re-fetch block pipeline
+  useEffect(() => {
+    if (activeCompanyId && !isLoading) {
+      reloadCloudData(activeCompanyId);
+    }
+  }, [activeCompanyId]);
+
+  const handleLogin = async (loggedInUser: User) => {
     setUser(loggedInUser);
+    setIsLoading(true);
+    const effectiveId = await fetchUserCompanies(loggedInUser);
+    await reloadCloudData(effectiveId);
+    setIsLoading(false);
     setCurrentView('DASHBOARD');
   };
 
@@ -200,18 +228,21 @@ const App: React.FC = () => {
     setUser(null);
     localStorage.removeItem('supabase_active_company_id');
     localStorage.removeItem('active_company_id');
+    setLedgers([]);
+    setVouchers([]);
+    setInventoryItems([]);
   };
 
   const handleCloudOperation = async (operation: () => Promise<any>) => {
     setSyncStatus('syncing');
     try {
         await operation();
-        await reloadCloudData(); 
+        await reloadCloudData(activeCompanyId); 
         setSyncStatus('synced');
     } catch (e) {
         console.error("Operation Sync Failed:", e);
         setSyncStatus('error');
-        alert("Database sync failed! Check matrix fields.");
+        alert("Database sync failed! Validation mismatch.");
     }
   };
 
@@ -298,7 +329,7 @@ const App: React.FC = () => {
       return (
           <div className="flex h-screen items-center justify-center bg-gray-50 flex-col gap-4">
               <Loader2 className="animate-spin text-indigo-600" size={48} />
-              <div className="text-gray-600 font-medium animate-pulse">Connecting to Cloud Database...</div>
+              <div className="text-gray-600 font-medium animate-pulse">Connecting to Partitioned Infrastructure Cloud Database...</div>
           </div>
       );
   }
@@ -322,7 +353,7 @@ const App: React.FC = () => {
           {label}
         </div>
         {badge !== undefined && badge > 0 && (
-          <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-sm">
+          <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
             {badge}
           </span>
         )}
@@ -342,45 +373,39 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {user?.role === 'ADMIN' ? (
-              <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 shadow-sm mb-2">
-                <Building2 size={18} className="text-indigo-600 shrink-0" />
-                <select 
-                  value={activeCompanyId || 'default'} 
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val && val !== 'default') {
-                      const comp = companies.find(c => c.id === val);
-                      if (comp) {
-                        setActiveCompanyId(comp.id);
-                        setCompanyName(comp.name);
-                        localStorage.setItem('supabase_active_company_id', comp.id);
-                        localStorage.setItem('active_company_id', comp.id);
-                      }
+            <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 shadow-sm mb-2">
+              <Building2 size={18} className="text-indigo-600 shrink-0" />
+              <select 
+                value={activeCompanyId || 'default'} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && val !== 'default') {
+                    const comp = companies.find(c => c.id === val);
+                    if (comp) {
+                      setActiveCompanyId(comp.id);
+                      setCompanyName(comp.name);
+                      localStorage.setItem('supabase_active_company_id', comp.id);
+                      localStorage.setItem('active_company_id', comp.id);
                     }
-                  }}
-                  className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
-                  style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
-                >
-                  {companies.length > 0 ? (
-                    companies.map((comp) => (
-                      <option key={comp.id} value={comp.id} className="bg-white text-gray-800 font-sans font-medium">
-                        {comp.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="default" className="bg-white text-gray-800 font-sans font-medium">
-                      {companyName}
+                  }
+                }}
+                className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
+                style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
+              >
+                {companies.length > 0 ? (
+                  companies.map((comp) => (
+                    <option key={comp.id} value={comp.id} className="bg-white text-gray-800 font-sans font-bold">
+                      {comp.name}
                     </option>
-                  )}
-                </select>
-                <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 shadow-inner mb-2">
-                🏢 {companies.find(c => c.id === activeCompanyId)?.name || companyName || 'Assigned Company'}
-              </div>
-            )}
+                  ))
+                ) : (
+                  <option value="default" className="bg-white text-gray-800 font-sans font-medium">
+                    {companyName}
+                  </option>
+                )}
+              </select>
+              <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />
+            </div>
 
             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white border border-gray-200 px-2 py-1 rounded w-fit uppercase tracking-widest shadow-sm">
                 {syncStatus === 'synced' && <><CheckCircle2 size={10} className="text-green-500"/> DB Connected</>}
@@ -484,7 +509,7 @@ const App: React.FC = () => {
               <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition md:hidden">
                   <Menu size={24} />
               </button>
-              <h1 className="text-md font-bold text-slate-800 tracking-tight hidden md:block uppercase tracking-wider text-xs bg-slate-100 px-3 py-1 rounded-md text-slate-600">
+              <h1 className="text-md font-bold text-slate-800 tracking-tight hidden md:block uppercase text-xs bg-slate-100 px-3 py-1 rounded-md text-slate-600 tracking-wider">
                 Accounting Hub Panel
               </h1>
             </div>
@@ -573,7 +598,7 @@ const App: React.FC = () => {
                     onUpdateUser={setUser} 
                     onUpdateCompany={setCompanyName} 
                     onCompanyCreated={async () => {
-                      await fetchUserCompanies();
+                      await fetchUserCompanies(user!);
                     }}
                   />
                 )}
