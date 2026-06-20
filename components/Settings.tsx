@@ -37,7 +37,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [allDbCompanies, setAllDbCompanies] = useState<{id: string, name: string}[]>([]);
   const [selectedCompanyToDelete, setSelectedCompanyToDelete] = useState('');
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
-  const [isCreatingCorp = false, setIsCreatingCorp] = useState(false);
+  const [isCreatingCorp, setIsCreatingCorp] = useState(false);
 
   // Form Inputs
   const [newCorpCompanyName, setNewCorpCompanyName] = useState('');
@@ -88,7 +88,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
       if (!compErr && companiesData) {
-        // 🌟 INJECTED SIDEBAR DUPLICATION PROTECTION MODULE
+        // 🌟 DROP-DOWN DUPLICATION BLOCKER ADDED IN PLACE: Filters out any same name rows instantly at UI level
         const uniqueCompaniesMap = new Map();
         companiesData.forEach(c => {
           const cleanName = c.name.trim().toLowerCase();
