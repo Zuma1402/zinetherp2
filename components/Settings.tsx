@@ -70,7 +70,7 @@ const Settings: React.FC<SettingsProps> = ({
   // 👑 AIRTIGHT STRUCTURE RESOLVER: Match strictly using fixed UUID check or clear master label name
   const masterCompanyRow = allDbCompanies.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
   
-  // 🌟 FIXED LEAKAGE CONDITION WITHOUT CHANGING THE STRUCTURE:
+  // 🌟 INJECTED DYNAMIC STATE CHECKERS (Bypasses lag without altering any previous layout dependencies)
   const activeSelectionObj = allDbCompanies.find(c => c.id === localActiveId);
   const activeSelectionNameClean = activeSelectionObj ? activeSelectionObj.name.toLowerCase().replace(/\s+/g, '') : '';
   
@@ -88,7 +88,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
       if (!compErr && companiesData) {
-        // 🌟 DROP-DOWN DUPLICATION BLOCKER ADDED IN PLACE: Filters out any same name rows instantly at UI level
+        // 🌟 INJECTED SIDEBAR DUPLICATION PROTECTION MODULE
         const uniqueCompaniesMap = new Map();
         companiesData.forEach(c => {
           const cleanName = c.name.trim().toLowerCase();
@@ -110,16 +110,16 @@ const Settings: React.FC<SettingsProps> = ({
       });
 
       const resolvedMasterRow = companiesData?.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
-      const currentSelectionId = localActiveId || '';
-      const selectedCompObj = companiesData?.find(c => c.id === currentSelectionId);
-      const selectedNameClean = selectedCompObj ? selectedCompObj.name.toLowerCase().replace(/\s+/g, '') : '';
+      const finalEffectiveId = localActiveId || (resolvedMasterRow ? resolvedMasterRow.id : '');
+      const finalEffectiveCompObj = companiesData?.find(c => c.id === finalEffectiveId);
+      const finalEffectiveNameClean = finalEffectiveCompObj ? finalEffectiveCompObj.name.toLowerCase().replace(/\s+/g, '') : '';
 
       // Strict dynamic rendering threshold check
-      if (currentUser.role === 'ADMIN' && (!currentSelectionId || selectedNameClean === 'zinetherp' || currentSelectionId === '11111111-1111-1111-1111-111111111111')) {
+      if (currentUser.role === 'ADMIN' && (!localActiveId || localActiveId === '' || finalEffectiveNameClean === 'zinetherp' || finalEffectiveId === '11111111-1111-1111-1111-111111111111')) {
         setUsers(mappedUsers);
       } else {
         // Tight branch lockdown isolation module
-        setUsers(mappedUsers.filter(u => u.company_id === currentSelectionId));
+        setUsers(mappedUsers.filter(u => u.company_id === finalEffectiveId));
       }
     } catch (e) {
       console.error("Scope synchronization cluster failure:", e);
