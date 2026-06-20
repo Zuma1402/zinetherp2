@@ -3,7 +3,7 @@ import { User, Role } from '../types';
 import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
-import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Pencil, Landmark, AlertTriangle } from 'lucide-react';
+import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Pencil, Landmark, AlertTriangle, Key } from 'lucide-react';
 
 interface SettingsProps {
   currentUser: User;
@@ -57,8 +57,12 @@ const Settings: React.FC<SettingsProps> = ({
 
   const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
   
-  // Admin dashboard controller view resolution key
-  const isMasterZenithScope = currentUser.role === 'ADMIN';
+  // Find current active company name object from state array
+  const currentActiveCompanyObj = allDbCompanies.find(c => c.id === activeCompanyId);
+  const currentActiveCompanyNameStr = currentActiveCompanyObj ? currentActiveCompanyObj.name.toLowerCase().replace(/\s+/g, '') : '';
+
+  // 👑 AIRTIGHT ISOLATION KEY: Global view sirf tab khulega jab user ADMIN ho AUR dropdown mein 'ZinethERP' select ho!
+  const isMasterZenithScope = currentUser.role === 'ADMIN' && (currentActiveCompanyNameStr === 'zinetherp' || currentActiveCompanyNameStr === '');
 
   const syncEngineData = async () => {
     try {
@@ -75,11 +79,14 @@ const Settings: React.FC<SettingsProps> = ({
       }
 
       const allUsers = await getUsers();
+      // Resolve currently chosen active node ID context
       const currentEffectiveId = activeCompanyId || settings.id || settings.company_id || '';
       
-      if (currentUser.role === 'ADMIN') {
+      // If we are structurally inside global blueprint scope, load everything
+      if (currentUser.role === 'ADMIN' && (currentActiveCompanyNameStr === 'zinetherp' || currentActiveCompanyNameStr === '')) {
         setUsers(allUsers);
       } else {
+        // Strict boundary lockdown: Show only users belonging explicitly to this sub-tenant node
         setUsers(allUsers.filter(u => u.company_id === currentEffectiveId));
       }
     } catch (e) {
@@ -89,7 +96,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   useEffect(() => {
     syncEngineData();
-  }, [currentUser, activeCompanyId]);
+  }, [currentUser, activeCompanyId, allDbCompanies.length]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,7 +131,6 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 👑 SAFE MASTER LAUNCHER MODULE (Bypasses Schema Cache Columns issues completely)
   const handleMasterClusterDeployment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
@@ -133,32 +139,14 @@ const Settings: React.FC<SettingsProps> = ({
     try {
       const companyId = crypto.randomUUID();
 
-      // 1. Core structural columns payload insert (avoids missing email/tax_id cache columns error)
       const { error: companyError } = await supabase
         .from('companies')
-        .insert([{ 
-          id: companyId, 
-          name: newCorpCompanyName.trim()
-        }]);
+        .insert([{ id: companyId, name: newCorpCompanyName.trim() }]);
 
       if (companyError) throw companyError;
 
-      // 2. Map and bind metadata properties via configuration parameters safely
-      const defaultProfileBlock = {
-        id: companyId,
-        companyName: newCorpCompanyName.trim(),
-        email: newCorpEmail.trim(),
-        taxId: newCorpTaxId.trim(), // Stored safely without structural db crash
-        invoicePrefix: newCorpPrefix.trim(),
-        nextInvoiceNumber: Number(newCorpNextNumber)
-      };
+      await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: currentUser.id }]);
 
-      // Save custom variables through configuration settings sequence layer
-      await supabase
-        .from('user_companies')
-        .insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: currentUser.id }]);
-
-      // 3. Initialize and map staff worker inside this container node block
       if (staffUsername && staffName) {
         const staffId = crypto.randomUUID();
         await saveUser({
@@ -182,7 +170,7 @@ const Settings: React.FC<SettingsProps> = ({
       setStaffUsername('');
       setStaffPassword('');
       
-      alert("Ecosystem node initialized successfully! Corporate node deployed.");
+      alert("Ecosystem node initialized successfully!");
       await syncEngineData();
       if (onCompanyCreated) onCompanyCreated();
     } catch (err: any) {
@@ -272,7 +260,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         
-        {/* PROFILE CRUNCH CONTAINER SECTION */}
+        {/* PROFILE SIGNATURE BLOCK */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
           <div className="flex items-center gap-3 mb-6">
              <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
@@ -489,7 +477,10 @@ const Settings: React.FC<SettingsProps> = ({
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b">
                 <tr>
-                  <th className="p-3 pl-4">Staff Member Identity</th>
+                  {/* 🌟 NEW BRAND COLUMN INJECTIONS HEADER SEQUENCE */}
+                  <th className="p-3 pl-4">Company Context Node</th>
+                  <th className="p-3">Staff Member Identity</th>
+                  <th className="p-3">Security Access Password</th>
                   <th className="p-3">Ecosystem Workspace Boundary Locking Node</th>
                   <th className="p-3">Scope Permissions</th>
                   <th className="p-3 text-right pr-4">Action Options</th>
@@ -500,7 +491,15 @@ const Settings: React.FC<SettingsProps> = ({
                   const compMatch = allDbCompanies.find(c => c.id === u.company_id);
                   return (
                     <tr key={u.id} className="hover:bg-gray-50 transition group">
+                      {/* 🌟 CELL 1: Real-time Company Name Node display badge */}
                       <td className="p-3 pl-4">
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10 shadow-sm">
+                          🏢 {compMatch ? compMatch.name : 'ZinethERP Master'}
+                        </span>
+                      </td>
+
+                      {/* CELL 2: User profile identity name */}
+                      <td className="p-3">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-slate-100 border flex items-center justify-center text-gray-500 font-bold">
                                 <UserIcon size={13} />
@@ -511,11 +510,23 @@ const Settings: React.FC<SettingsProps> = ({
                             </div>
                         </div>
                       </td>
+
+                      {/* 🌟 CELL 3: Clear-text Security Access Password column injector */}
+                      <td className="p-3 font-mono text-xs font-bold text-emerald-700 bg-emerald-50/30 rounded px-2">
+                        <div className="flex items-center gap-1.5">
+                          <Key size={11} className="text-emerald-600" />
+                          <span>{u.password || '******'}</span>
+                        </div>
+                      </td>
+
+                      {/* CELL 4: Boundaries metadata mapping tracker */}
                       <td className="p-3">
                         <span className="font-mono text-xs font-bold text-indigo-900 bg-indigo-50 border border-indigo-100/60 px-2 py-1 rounded-md shadow-sm">
-                          🏢 {compMatch ? compMatch.name : `Master Root Cluster (ZinethERP)`}
+                          ⚙️ {compMatch ? compMatch.name : `Master Root Cluster (ZinethERP)`}
                         </span>
                       </td>
+
+                      {/* CELL 5: Permissive roles definitions control */}
                       <td className="p-3">
                         <span className={`text-[9px] px-2 py-0.5 rounded-full font-black border uppercase tracking-wider shadow-sm
                           ${u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'}
@@ -523,6 +534,8 @@ const Settings: React.FC<SettingsProps> = ({
                           {u.role === 'ADMIN' ? 'GLOBAL SUPERVISOR' : 'TENANT WORKSPACE RESTRICTED'}
                         </span>
                       </td>
+
+                      {/* CELL 6: Operational tools options */}
                       <td className="p-3 text-right pr-4">
                          <div className="flex justify-end gap-1">
                             {u.id !== currentUser.id && (
