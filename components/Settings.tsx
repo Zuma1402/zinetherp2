@@ -39,31 +39,38 @@ const Settings: React.FC<SettingsProps> = ({
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
 
-  // Integrated Deployer + User Creation State Form Inputs
+  // Form Inputs
   const [newCorpCompanyName, setNewCorpCompanyName] = useState('');
   const [newCorpEmail, setNewCorpEmail] = useState('');
   const [newCorpTaxId, setNewCorpTaxId] = useState('');
   const [newCorpPrefix, setNewCorpPrefix] = useState('INV-');
   const [newCorpNextNumber, setNewCorpNextNumber] = useState(1);
-  
-  // Integrated Staff Generation inputs inside same section
   const [staffName, setStaffName] = useState('');
   const [staffUsername, setStaffUsername] = useState('');
   const [staffPassword, setStaffPassword] = useState('');
   const [staffRole, setStaffRole] = useState<Role>('ACCOUNTANT');
-
-  // Tenant Only Direct Staff Injections
   const [isAddingTenantStaff, setIsAddingTenantStaff] = useState(false);
 
-  // Directly fallback to local Storage keys to prevent sync delay lag
-  const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
-  
-  // Find current master anchor row ID to ensure absolute strict safety matching
+  // 🌟 LOCAL ENGINE STATE SYNCHRONIZER (Bypasses prop delay lag completely)
+  const [localActiveId, setLocalActiveId] = useState(
+    propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
+  );
+
+  useEffect(() => {
+    // Keep checking the sidebar mutations dynamically
+    const interval = setInterval(() => {
+      const currentId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+      if (currentId !== localActiveId) {
+        setLocalActiveId(currentId);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [localActiveId]);
+
+  // 👑 AIRTIGHT STRUCTURE RESOLVER: Match strictly using fixed UUID check or clear master label name
   const masterCompanyRow = allDbCompanies.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
-  
-  // 👑 FIXED GLOBAL MASTER BLUEPRINT ENFORCEMENT: 
-  // Global dashboard controls are visible ONLY when active selection matches the master 'ZinethERP' row ID or if no selection exists yet.
-  const isMasterZenithScope = currentUser.role === 'ADMIN' && (!activeCompanyId || (masterCompanyRow && activeCompanyId === masterCompanyRow.id));
+  const isMasterZenithScope = currentUser.role === 'ADMIN' && 
+    (!localActiveId || localActiveId === '' || (masterCompanyRow && localActiveId === masterCompanyRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111');
 
   const syncEngineData = async () => {
     try {
@@ -74,22 +81,30 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      // Fetch fresh system snapshot records
       const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
       if (!compErr && companiesData) {
         setAllDbCompanies(companiesData);
       }
 
+      // Fetch fresh system snapshot records mapped with their active company mapping junction data
+      const { data: junctionData, error: juncErr } = await supabase.from('user_companies').select('user_id, company_id');
       const allUsers = await getUsers();
+
+      // Remap users dynamically with their corresponding company IDs directly from the target junction database table
+      const mappedUsers = allUsers.map(u => {
+        const match = junctionData?.find(j => j.user_id === u.id);
+        return { ...u, company_id: match ? match.company_id : u.company_id };
+      });
+
       const resolvedMasterRow = companiesData?.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
-      
-      // Determine strict context filter boundaries
-      if (currentUser.role === 'ADMIN' && (!activeCompanyId || (resolvedMasterRow && activeCompanyId === resolvedMasterRow.id))) {
-        setUsers(allUsers);
+      const finalEffectiveId = localActiveId || (resolvedMasterRow ? resolvedMasterRow.id : '');
+
+      // Strict dynamic rendering threshold check
+      if (currentUser.role === 'ADMIN' && (!localActiveId || localActiveId === '' || (resolvedMasterRow && localActiveId === resolvedMasterRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111')) {
+        setUsers(mappedUsers);
       } else {
-        // Dynamic isolated branch lockdown logic
-        const targetedScopeId = activeCompanyId || settings.id || settings.company_id || '';
-        setUsers(allUsers.filter(u => u.company_id === targetedScopeId));
+        // Tight branch lockdown isolation module
+        setUsers(mappedUsers.filter(u => u.company_id === finalEffectiveId));
       }
     } catch (e) {
       console.error("Scope synchronization cluster failure:", e);
@@ -98,7 +113,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   useEffect(() => {
     syncEngineData();
-  }, [currentUser, activeCompanyId]);
+  }, [currentUser, localActiveId, allDbCompanies.length]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,10 +209,10 @@ const Settings: React.FC<SettingsProps> = ({
         password: staffPassword || 'Testing@123',
         name: staffName,
         role: staffRole,
-        company_id: activeCompanyId
+        company_id: localActiveId
       });
 
-      await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: activeCompanyId, user_id: staffId }]);
+      await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: localActiveId, user_id: staffId }]);
       
       setStaffName('');
       setStaffUsername('');
@@ -262,7 +277,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         
-        {/* PROFILE SIGNATURE MODULE */}
+        {/* PROFILE BLOCK */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
           <div className="flex items-center gap-3 mb-6">
              <div className="p-2 bg-indigo-100 rounded-lg text-indigo-600">
@@ -292,7 +307,7 @@ const Settings: React.FC<SettingsProps> = ({
           </form>
         </div>
 
-        {/* 🏢 ISOLATED ENVIRONMENT CONFIGURATIONS LAYER */}
+        {/* 🏢 ISOLATED CONFIGURATIONS LAYER */}
         {!isMasterZenithScope && (
           <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
             <div className="flex items-center gap-3 mb-5">
@@ -313,7 +328,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Billing Communications Anchor</label>
-                  <input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input type="email" value={companyEmail} onChange={e => setCompanyEmail(target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tax Registration ID / GST (Optional)</label>
@@ -442,7 +457,7 @@ const Settings: React.FC<SettingsProps> = ({
             )}
           </div>
 
-          {/* Inline Tenant Staff Add Trigger Form Block */}
+          {/* Inline Tenant Staff Add Form */}
           {isAddingTenantStaff && !isMasterZenithScope && (
             <form onSubmit={handleTenantAddStaffOnly} className="bg-slate-50 p-5 border border-slate-200 rounded-xl mb-6 space-y-4 shadow-inner">
               <h4 className="text-xs font-bold text-gray-700 uppercase">Lock New Employee Account into "{companyName}" Workspace</h4>
