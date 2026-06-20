@@ -58,6 +58,9 @@ import { getCompanySettings, saveCompanySettings, activateSubscription, getDaysR
 import { CloudService } from './services/cloudService';
 import { supabase } from './services/supabaseService'; 
 
+// 👑 VERCEL TELEMETRY ENGINE ADDITION
+import { SpeedInsights } from "@vercel/speed-insights/react";
+
 type View = 
   | 'DASHBOARD'
   | 'CHART_OF_ACCOUNTS' 
@@ -242,7 +245,7 @@ const App: React.FC = () => {
     } catch (e) {
         console.error("Operation Sync Failed:", e);
         setSyncStatus('error');
-        alert("Database sync failed! Validation mismatch.");
+        alert("Database sync failed! Check matrix fields.");
     }
   };
 
@@ -318,7 +321,9 @@ const App: React.FC = () => {
   };
 
   const handleDeleteUnit = (id: string) => {
-    handleCloudOperation(() => CloudService.deleteUnit(id));
+    handleCloudOperation(async () => {
+        await CloudService.deleteUnit(id);
+    });
   };
 
   const trialBalance = useMemo(() => calculateTrialBalance(ledgers, vouchers), [ledgers, vouchers]);
@@ -607,6 +612,9 @@ const App: React.FC = () => {
       </main>
 
       <AIAssistant summary={financialSummary} trialBalance={trialBalance} />
+      
+      {/* 👑 LIVE SPEED INSIGHTS ENGINE CONTAINER */}
+      <SpeedInsights />
     </div>
   );
 };
