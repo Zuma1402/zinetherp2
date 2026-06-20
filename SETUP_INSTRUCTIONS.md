@@ -7,43 +7,49 @@
 1. **Visit**: https://supabase.com
 2. **Click**: "Start your project" or Sign in
 3. **Create New Project** with these settings:
-   - **Project Name**: `zinetherp` (or any name)
-   - **Database Password**: Create a strong password (save it!)
-   - **Region**: Pick closest to you
+
+   * **Project Name**: `zinetherp` (or any name)
+   * **Database Password**: Create a strong password (save it!)
+   * **Region**: Pick closest to you
 4. **Wait** 2-3 minutes for setup to complete
 5. **You'll see** the dashboard
 
----
+\---
 
 ### **STEP 2: Copy Your Credentials (2 minutes)**
 
 1. **In Supabase Dashboard**, go to **Settings → API** (left sidebar)
 2. **Copy these values**:
-   - **Project URL** (looks like: `https://abcdefgh.supabase.co`)
-   - **anon public** key (long string starting with `eyJ...`)
 
----
+   * **Project URL** (looks like: `https://abcdefgh.supabase.co`)
+   * **anon public** key (long string starting with `eyJ...`)
+
+\---
 
 ### **STEP 3: Update Your Project Configuration (1 minute)**
 
 1. **Open** `.env.local` file in your project (at root)
 2. **Find these lines**:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_project_url_here
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+
+```env
+   VITE\\\\\\\_SUPABASE 	\\\\\\\_URL=your\\\\\\\_supabase\\\\\\\_project\\\\\\\_url\\\\\\\_here
+   VITE\\\\\\\_SUPABASE\\\\\\\_ANON\\\\\\\_KEY=your\\\\\\\_supabase\\\\\\\_anon\\\\\\\_key\\\\\\\_here
    ```
+
 3. **Replace with your actual values**:
-   ```env
-   VITE_SUPABASE_URL=https://abcdefgh.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+
+```env
+   VITE\\\\\\\_SUPABASE\\\\\\\_URL=https://abcdefgh.supabase.co
+   VITE\\\\\\\_SUPABASE\\\\\\\_ANON\\\\\\\_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
    ```
+
 4. **Save** the file
 
----
+\---
 
 ### **STEP 4: Setup Database Tables (3 minutes)**
 
-1. **Open** `SUPABASE_SETUP.sql` file from your project
+1. **Open** `SUPABASE\\\\\\\_SETUP.sql` file from your project
 2. **Copy ALL the contents** (Ctrl+A, Ctrl+C)
 3. **In Supabase**, go to **SQL Editor** (left sidebar)
 4. **Click** "+ New Query"
@@ -52,7 +58,7 @@
 7. **Wait** for execution to complete ✅
 8. **Verify** all tables created (check sidebar for: users, ledgers, vouchers, inventory, etc.)
 
----
+\---
 
 ### **STEP 5: Install Dependencies (2 minutes)**
 
@@ -62,7 +68,7 @@ npm install
 
 This downloads the Supabase library and all other packages.
 
----
+\---
 
 ### **STEP 6: Start the Application**
 
@@ -72,98 +78,106 @@ npm run dev
 
 The app will start on `http://localhost:5173`
 
----
+\---
 
 ### **STEP 7: Login to Your App**
 
 **Default Admin Credentials:**
-- Username: `admin`
-- Password: `password`
+
+* Username: `admin`
+* Password: `password`
 
 (You can change these in Settings after logging in)
 
----
+\---
 
 ## ✅ Checklist Before You Start
 
-- [ ] Created Supabase account
-- [ ] Created new project in Supabase
-- [ ] Copied Project URL from API settings
-- [ ] Copied anon key from API settings
-- [ ] Updated `.env.local` with credentials
-- [ ] Ran `SUPABASE_SETUP.sql` in Supabase SQL Editor
-- [ ] Ran `npm install`
-- [ ] Started app with `npm run dev`
-- [ ] Logged in successfully
+* \[ ] Created Supabase account
+* \[ ] Created new project in Supabase
+* \[ ] Copied Project URL from API settings
+* \[ ] Copied anon key from API settings
+* \[ ] Updated `.env.local` with credentials
+* \[ ] Ran `SUPABASE\\\\\\\_SETUP.sql` in Supabase SQL Editor
+* \[ ] Ran `npm install`
+* \[ ] Started app with `npm run dev`
+* \[ ] Logged in successfully
 
----
+\---
 
-## 🆘 Common Issues & Solutions
+## 🆘 Common Issues \& Solutions
 
 ### Issue: "Missing Supabase configuration" Error
 
 **Solution:**
+
 1. Check `.env.local` file exists in root directory
 2. Make sure values are NOT wrapped in quotes
 3. Correct format:
-   ```env
-   VITE_SUPABASE_URL=https://...
-   VITE_SUPABASE_ANON_KEY=eyJ...
+
+```env
+   VITE\\\\\\\_SUPABASE\\\\\\\_URL=https://...
+   VITE\\\\\\\_SUPABASE\\\\\\\_ANON\\\\\\\_KEY=eyJ...
    ```
+
 4. After fixing, restart dev server (stop and `npm run dev`)
 
----
+\---
 
 ### Issue: "Cannot connect to database"
 
 **Solution:**
+
 1. Check internet connection
 2. Go to Supabase dashboard and verify project is "running"
 3. Copy credentials again (maybe typo)
 4. Check if your region is correct
 
----
+\---
 
 ### Issue: "Table does not exist" Error
 
 **Solution:**
-1. Go to Supabase SQL Editor
-2. Run `SUPABASE_SETUP.sql` again
-3. Check left sidebar to confirm tables exist:
-   - `users`
-   - `ledgers`
-   - `vouchers`
-   - `inventory`
-   - `company_settings`
-   - `units`
-   - `stock_transactions`
-   - `voucher_entries`
 
----
+1. Go to Supabase SQL Editor
+2. Run `SUPABASE\\\\\\\_SETUP.sql` again
+3. Check left sidebar to confirm tables exist:
+
+   * `users`
+   * `ledgers`
+   * `vouchers`
+   * `inventory`
+   * `company\\\\\\\_settings`
+   * `units`
+   * `stock\\\\\\\_transactions`
+   * `voucher\\\\\\\_entries`
+
+\---
 
 ### Issue: "Invalid login credentials"
 
 **Solution:**
+
 1. Make sure you typed `admin` and `password` correctly
 2. If you changed the password, use the new one
 3. Check if users table exists (see above)
 4. Run SQL setup again to ensure admin user was created
 
----
+\---
 
 ## 📊 What Each File Does
 
-| File | Purpose |
-|------|---------|
-| `.env.local` | **YOUR CONFIG** - Your Supabase credentials go here |
-| `SUPABASE_SETUP.sql` | **DATABASE SCHEMA** - All SQL to create tables |
-| `SUPABASE_MIGRATION_GUIDE.md` | **DETAILED GUIDE** - Full documentation |
-| `services/supabaseService.ts` | **CONNECTION** - How app connects to Supabase |
-| `services/authService.ts` | **USERS** - Login and user management |
-| `services/cloudService.ts` | **DATA** - Save/load ledgers, invoices, inventory |
-| `services/settingsService.ts` | **SETTINGS** - Company info and subscriptions |
+|File|Purpose|
+|-|-|
+|`.env.local`|**YOUR CONFIG** - Your Supabase credentials go here|
+|`SUPABASE\\\\\\\_SETUP.sql`|**DATABASE SCHEMA** - All SQL to create tables|
+|`SUPABASE\\\\\\\_MIGRATION\\\\\\\_GUIDE.md`|**DETAILED GUIDE** - Full documentation|
+|`services/supabaseService.ts`|**CONNECTION** - How app connects to Supabase|
+|`services/authService.ts`|**USERS** - Login and user management|
+|`services/cloudService.ts`|**DATA** - Save/load ledgers, invoices, inventory|
+|`services/settingsService.ts`|**SETTINGS** - Company info and subscriptions|
 
----
+\---
 
 ## 🔒 Security Tips
 
@@ -172,7 +186,7 @@ The app will start on `http://localhost:5173`
 3. **Change the default password** (admin/password) in Settings
 4. **Keep your Supabase credentials safe**
 
----
+\---
 
 ## 📈 What Happens When You Run the Project?
 
@@ -182,11 +196,12 @@ The app will start on `http://localhost:5173`
 4. **Any Action** → Create invoice? Save to Supabase
 5. **Refresh Page** → Data still there (stored in cloud!)
 
----
+\---
 
 ## 🎯 Next Steps After Setup
 
 ### Test These Features:
+
 1. **Create a Ledger** → Go to General Ledger, add new account
 2. **Create an Invoice** → Go to Sales Invoice, create invoice
 3. **Add Inventory** → Go to Inventory, add an item
@@ -194,26 +209,29 @@ The app will start on `http://localhost:5173`
 5. **Refresh Page** → All data should still be there ✅
 
 ### Verify It Works:
-- Data persists after refresh (it's in Supabase!)
-- No more localStorage (checked console? Nothing there!)
-- All operations are automatic (no manual save button!)
 
----
+* Data persists after refresh (it's in Supabase!)
+* No more localStorage (checked console? Nothing there!)
+* All operations are automatic (no manual save button!)
+
+\---
 
 ## 📞 Getting Help
 
 ### If Something Goes Wrong:
+
 1. Check browser console (F12) for error messages
 2. Check Supabase dashboard for any alerts
-3. Review `SUPABASE_MIGRATION_GUIDE.md` for detailed docs
-4. Try running `SUPABASE_SETUP.sql` again
+3. Review `SUPABASE\\\\\\\_MIGRATION\\\\\\\_GUIDE.md` for detailed docs
+4. Try running `SUPABASE\\\\\\\_SETUP.sql` again
 
 ### Supabase Resources:
-- Docs: https://supabase.com/docs
-- Status: https://status.supabase.io
-- Discord: https://discord.supabase.io
 
----
+* Docs: https://supabase.com/docs
+* Status: https://status.supabase.io
+* Discord: https://discord.supabase.io
+
+\---
 
 ## 🎉 You're All Set!
 
@@ -227,18 +245,20 @@ Once you complete all 7 steps above, your ZinethERP will be:
 
 **Happy accounting! 📊**
 
----
+\---
 
 ### Questions About the SQL?
 
-The `SUPABASE_SETUP.sql` creates:
-- **users table** → Store user accounts
-- **company_settings table** → Store company info
-- **ledgers table** → Store chart of accounts
-- **vouchers table** → Store transaction headers
-- **voucher_entries table** → Store transaction details
-- **inventory table** → Store stock items
-- **stock_transactions table** → Store inventory movements
-- **units table** → Store measurement units
+The `SUPABASE\\\\\\\_SETUP.sql` creates:
+
+* **users table** → Store user accounts
+* **company\_settings table** → Store company info
+* **ledgers table** → Store chart of accounts
+* **vouchers table** → Store transaction headers
+* **voucher\_entries table** → Store transaction details
+* **inventory table** → Store stock items
+* **stock\_transactions table** → Store inventory movements
+* **units table** → Store measurement units
 
 All with proper relationships, indexes, and data types. Nothing hardcoded! ✨
+

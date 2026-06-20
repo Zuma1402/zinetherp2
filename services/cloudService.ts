@@ -11,12 +11,18 @@ export const CloudService = {
       let unitsQuery = supabase.from('units').select('*');
       let transactionsQuery = supabase.from('stock_transactions').select('*');
 
-      // Secure Filter Application Matrix
+      // Secure Filter Application Matrix: Strict Isolation
       if (companyId && typeof companyId === 'string' && companyId.trim() !== '') {
         ledgersQuery = ledgersQuery.eq('company_id', companyId);
         vouchersQuery = vouchersQuery.eq('company_id', companyId);
         inventoryQuery = inventoryQuery.eq('company_id', companyId);
         transactionsQuery = transactionsQuery.eq('company_id', companyId);
+      } else {
+        // Anti-Leak Check: If no company context (Zineth Master root view), isolate completely
+        ledgersQuery = ledgersQuery.is('company_id', null);
+        vouchersQuery = vouchersQuery.is('company_id', null);
+        inventoryQuery = inventoryQuery.is('company_id', null);
+        transactionsQuery = transactionsQuery.is('company_id', null);
       }
 
       const [ledgersRes, vouchersRes, inventoryRes, unitsRes, transactionsRes] = await Promise.all([
@@ -39,6 +45,7 @@ export const CloudService = {
         type: r.type,
         group: r.group,
         openingBalance: r.opening_balance ? Number(r.opening_balance) : 0,
+        company_id: r.company_id || undefined
       });
 
       const mapInventoryFromDb = (r: any): InventoryItem => ({
@@ -49,6 +56,7 @@ export const CloudService = {
         costPrice: r.cost_price !== null && r.cost_price !== undefined ? Number(r.cost_price) : undefined,
         currentStock: r.current_stock ? Number(r.current_stock) : 0,
         minStockLevel: r.min_stock_level !== null && r.min_stock_level !== undefined ? Number(r.min_stock_level) : undefined,
+        company_id: r.company_id || undefined
       });
 
       const mapStockFromDb = (r: any): StockTransaction => ({
@@ -56,6 +64,7 @@ export const CloudService = {
         qty: r.qty ? Number(r.qty) : 0,
         rate: r.rate ? Number(r.rate) : 0,
         voucherId: r.voucher_id,
+        company_id: r.company_id || undefined
       });
 
       const mapUnitFromDb = (r: any): Unit => ({
@@ -78,6 +87,7 @@ export const CloudService = {
         number: v.number,
         type: v.type,
         narration: v.narration,
+        company_id: v.company_id || undefined,
         entries: (v.voucher_entries || []).map((e: any) => ({
           ledgerId: e.ledger_id,
           debit: e.debit ? Number(e.debit) : 0,
@@ -116,6 +126,7 @@ export const CloudService = {
         type: data.type,
         group: data.group,
         openingBalance: data.opening_balance ? Number(data.opening_balance) : 0,
+        company_id: data.company_id || undefined
       } as Ledger;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
@@ -146,6 +157,7 @@ export const CloudService = {
         type: data.type,
         group: data.group,
         openingBalance: data.opening_balance ? Number(data.opening_balance) : 0,
+        company_id: data.company_id || undefined
       } as Ledger;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
@@ -179,16 +191,16 @@ export const CloudService = {
       if (voucherError) throw voucherError;
 
       const entries = (voucher.entries || []).map((e: any) => ({
-  voucher_id: voucher.id,
-  ledger_id: e.ledgerId,
-  debit: e.debit,
-  credit: e.credit,
-  company_id: voucher.company_id || null,
-}));
+        voucher_id: voucher.id,
+        ledger_id: e.ledgerId,
+        debit: e.debit,
+        credit: e.credit,
+        company_id: voucher.company_id || null,
+      }));
 
-const { error: entriesError } = await supabase
-  .from('voucher_entries')
-  .insert(entries);
+      const { error: entriesError } = await supabase
+        .from('voucher_entries')
+        .insert(entries);
 
       if (entriesError) throw entriesError;
       return voucherData;
@@ -218,7 +230,7 @@ const { error: entriesError } = await supabase
         rate: item.rate,
         cost_price: item.costPrice ?? null,
         current_stock: item.currentStock,
-        min_stock_level: item.minStockLevel ?? null,
+        min_stock_level: item.min_stock_level ?? null,
         company_id: item.company_id || null,
       };
 
@@ -239,6 +251,7 @@ const { error: entriesError } = await supabase
         costPrice: d.cost_price !== null && d.cost_price !== undefined ? Number(d.cost_price) : undefined,
         currentStock: d.current_stock ? Number(d.current_stock) : 0,
         minStockLevel: d.min_stock_level !== null && d.min_stock_level !== undefined ? Number(d.min_stock_level) : undefined,
+        company_id: d.company_id || undefined
       } as InventoryItem;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
@@ -257,7 +270,6 @@ const { error: entriesError } = await supabase
   async saveStockTransactions(newTransactions: any[]) {
     try {
       const payloads = newTransactions.map((t: any) => ({
-        id: t.id,
         item_id: t.itemId,
         qty: t.qty,
         rate: t.rate,
@@ -276,6 +288,7 @@ const { error: entriesError } = await supabase
         qty: Number(d.qty),
         rate: Number(d.rate),
         voucherId: d.voucher_id,
+        company_id: d.company_id || undefined
       }));
     } catch (error) {
       throw new Error(handleSupabaseError(error));

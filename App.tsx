@@ -54,7 +54,7 @@ import PurchaseRefundEntry from './components/purchase/PurchaseRefundEntry';
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
 import { calculateTrialBalance, calculateFinancialSummary } from './services/accountingService';
 import { getCurrentUser, logout } from './services/authService';
-import { getCompanySettings, activateSubscription, getDaysRemaining } from './services/settingsService';
+import { getCompanySettings, saveCompanySettings, activateSubscription, getDaysRemaining } from './services/settingsService';
 import { CloudService } from './services/cloudService';
 import { supabase } from './services/supabaseService'; 
 
@@ -104,7 +104,9 @@ const App: React.FC = () => {
 
   // New Multi-Company States
   const [companies, setCompanies] = useState<any[]>([]);
-  const [activeCompanyId, setActiveCompanyId] = useState<string>('');
+  const [activeCompanyId, setActiveCompanyId] = useState<string>(
+    localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
+  );
 
   // Menu State
   const [salesMenuOpen, setSalesMenuOpen] = useState(false);
@@ -120,8 +122,10 @@ const App: React.FC = () => {
       setInventoryItems(data.inventory);
       setUnits(data.units);
       setStockTransactions(data.transactions);
-      if (data.ledgers.length > 0 && !selectedLedgerForView) {
+      if (data.ledgers.length > 0) {
         setSelectedLedgerForView(data.ledgers[0].id);
+      } else {
+        setSelectedLedgerForView('');
       }
     } catch (error) {
       console.error("Cloud reload failed", error);
@@ -132,18 +136,36 @@ const App: React.FC = () => {
   // New function to load companies mapped to user
   const fetchUserCompanies = async () => {
     try {
-      const { data: mapping, error: mapErr } = await supabase
+      const currentSession = getCurrentUser();
+      if (!currentSession) return;
+
+      const { data: mapping } = await supabase
         .from('user_companies')
-        .select('company_id, companies(id, name)');
+        .select('company_id, companies(id, name)')
+        .eq('user_id', currentSession.id);
       
       if (mapping && mapping.length > 0) {
         const formattedCompanies = mapping.map((m: any) => m.companies).filter(Boolean);
-        setCompanies(formattedCompanies);
-        if (formattedCompanies.length > 0) {
-          // If activeCompanyId isn't set yet, pick the first one
-          if (!activeCompanyId) {
-            setActiveCompanyId(formattedCompanies[0].id);
-            setCompanyName(formattedCompanies[0].name);
+        
+        // Dropdown Duplication blocker rule injection at navbar layer
+        const uniqueCompaniesMap = new Map();
+        formattedCompanies.forEach((c: any) => {
+          uniqueCompaniesMap.set(c.name.trim().toLowerCase(), c);
+        });
+        const finalUniqueList = Array.from(uniqueCompaniesMap.values());
+        setCompanies(finalUniqueList);
+
+        if (finalUniqueList.length > 0) {
+          const storedId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+          const matchedComp = finalUniqueList.find(c => c.id === storedId);
+          
+          if (matchedComp) {
+            setActiveCompanyId(matchedComp.id);
+            setCompanyName(matchedComp.name);
+          } else {
+            setActiveCompanyId(finalUniqueList[0].id);
+            setCompanyName(finalUniqueList[0].name);
+            localStorage.setItem('supabase_active_company_id', finalUniqueList[0].id);
           }
         }
       }
@@ -158,8 +180,7 @@ const App: React.FC = () => {
         const session = getCurrentUser();
         if (session) setUser(session);
         
-        const settings = getCompanySettings();
-        if (settings.companyName && !activeCompanyId) setCompanyName(settings.companyName);
+        const settings = await getCompanySettings();
         setSubscriptionStatus(settings.subscriptionStatus);
 
         await fetchUserCompanies(); 
@@ -177,6 +198,8 @@ const App: React.FC = () => {
   const handleLogout = () => {
     logout();
     setUser(null);
+    localStorage.removeItem('supabase_active_company_id');
+    localStorage.removeItem('active_company_id');
   };
 
   const handleCloudOperation = async (operation: () => Promise<any>) => {
@@ -188,7 +211,7 @@ const App: React.FC = () => {
     } catch (e) {
         console.error("Operation Sync Failed:", e);
         setSyncStatus('error');
-        alert("Database sync failed! Make sure database schemas are matched.");
+        alert("Database sync failed! Check matrix fields.");
     }
   };
 
@@ -309,9 +332,7 @@ const App: React.FC = () => {
 
   const SidebarContent = () => (
     <>
-        {/* Dropdown Frame with Integrated ZinethERP Brand Identity */}
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* 👑 BRAND LOGO SECTION COMPLIANT WITH image_48aa27.png */}
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shadow-indigo-200">
                 z
@@ -321,7 +342,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* DYNAMIC WORKSPACE SELECTOR BASED ON USER ROLE PROTECTION */}
             {user?.role === 'ADMIN' ? (
               <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 shadow-sm mb-2">
                 <Building2 size={18} className="text-indigo-600 shrink-0" />
@@ -329,11 +349,13 @@ const App: React.FC = () => {
                   value={activeCompanyId || 'default'} 
                   onChange={(e) => {
                     const val = e.target.value;
-                    if (val !== 'default' && companies.length > 0) {
+                    if (val && val !== 'default') {
                       const comp = companies.find(c => c.id === val);
                       if (comp) {
                         setActiveCompanyId(comp.id);
                         setCompanyName(comp.name);
+                        localStorage.setItem('supabase_active_company_id', comp.id);
+                        localStorage.setItem('active_company_id', comp.id);
                       }
                     }
                   }}
@@ -348,7 +370,7 @@ const App: React.FC = () => {
                     ))
                   ) : (
                     <option value="default" className="bg-white text-gray-800 font-sans font-medium">
-                      {companyName || 'Achievers account'}
+                      {companyName}
                     </option>
                   )}
                 </select>
@@ -356,7 +378,7 @@ const App: React.FC = () => {
               </div>
             ) : (
               <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-700 shadow-inner mb-2">
-                🔒 {companies.find(c => c.id === activeCompanyId)?.name || companyName || 'Assigned Company'}
+                🏢 {companies.find(c => c.id === activeCompanyId)?.name || companyName || 'Assigned Company'}
               </div>
             )}
 
@@ -456,9 +478,7 @@ const App: React.FC = () => {
         <SidebarContent />
       </aside>
 
-      {/* Main Structural Frame holding Header and Pages safely */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Main Header Panel with elegant Clean UI Overhaul */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 shrink-0 shadow-sm">
             <div className="flex items-center gap-4">
               <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition md:hidden">
@@ -476,7 +496,6 @@ const App: React.FC = () => {
             </div>
         </header>
 
-        {/* Inner Content Area holding view routing wrappers */}
         <div className="flex-1 overflow-auto p-4 md:p-6">
             <div className="max-w-7xl mx-auto">
                 {currentView === 'DASHBOARD' && (
@@ -554,7 +573,6 @@ const App: React.FC = () => {
                     onUpdateUser={setUser} 
                     onUpdateCompany={setCompanyName} 
                     onCompanyCreated={async () => {
-                      // Trigger callback to re-pull user corporate mapped profiles
                       await fetchUserCompanies();
                     }}
                   />
