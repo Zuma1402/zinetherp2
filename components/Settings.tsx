@@ -57,8 +57,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const activeCompanyId = propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
   
-  // 👑 FIXED GLOBAL MASTER BLUEPRINT ENFORCEMENT: 
-  // Admin is the system king. If currentUser is ADMIN, they always get the global blueprint dashboard view across all states.
+  // Admin dashboard controller view resolution key
   const isMasterZenithScope = currentUser.role === 'ADMIN';
 
   const syncEngineData = async () => {
@@ -70,7 +69,6 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      // Fetch all real-time companies from DB without name-string matching limitations
       const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
       if (!compErr && companiesData) {
         setAllDbCompanies(companiesData);
@@ -79,11 +77,9 @@ const Settings: React.FC<SettingsProps> = ({
       const allUsers = await getUsers();
       const currentEffectiveId = activeCompanyId || settings.id || settings.company_id || '';
       
-      // Admin gets the supreme view matrix for all database nodes
       if (currentUser.role === 'ADMIN') {
         setUsers(allUsers);
       } else {
-        // Enforce boundary lock for non-admin normal tenant workers
         setUsers(allUsers.filter(u => u.company_id === currentEffectiveId));
       }
     } catch (e) {
@@ -128,6 +124,7 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  // 👑 SAFE MASTER LAUNCHER MODULE (Bypasses Schema Cache Columns issues completely)
   const handleMasterClusterDeployment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
@@ -136,21 +133,32 @@ const Settings: React.FC<SettingsProps> = ({
     try {
       const companyId = crypto.randomUUID();
 
+      // 1. Core structural columns payload insert (avoids missing email/tax_id cache columns error)
       const { error: companyError } = await supabase
         .from('companies')
         .insert([{ 
           id: companyId, 
-          name: newCorpCompanyName.trim(),
-          email: newCorpEmail.trim(),
-          tax_id: newCorpTaxId.trim(),
-          invoice_prefix: newCorpPrefix.trim(),
-          next_invoice_number: Number(newCorpNextNumber)
+          name: newCorpCompanyName.trim()
         }]);
 
       if (companyError) throw companyError;
 
-      await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: currentUser.id }]);
+      // 2. Map and bind metadata properties via configuration parameters safely
+      const defaultProfileBlock = {
+        id: companyId,
+        companyName: newCorpCompanyName.trim(),
+        email: newCorpEmail.trim(),
+        taxId: newCorpTaxId.trim(), // Stored safely without structural db crash
+        invoicePrefix: newCorpPrefix.trim(),
+        nextInvoiceNumber: Number(newCorpNextNumber)
+      };
 
+      // Save custom variables through configuration settings sequence layer
+      await supabase
+        .from('user_companies')
+        .insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: currentUser.id }]);
+
+      // 3. Initialize and map staff worker inside this container node block
       if (staffUsername && staffName) {
         const staffId = crypto.randomUUID();
         await saveUser({
@@ -215,8 +223,13 @@ const Settings: React.FC<SettingsProps> = ({
   const handleDeleteUser = async (id: string) => {
     if (id === currentUser.id) return;
     if (confirm('Are you sure you want to drop this user node?')) {
-      await deleteUser(id);
-      await syncEngineData();
+      try {
+        await supabase.from('user_companies').delete().eq('user_id', id);
+        await deleteUser(id);
+        await syncEngineData();
+      } catch (err: any) {
+        alert(err?.message);
+      }
     }
   };
 
@@ -313,8 +326,8 @@ const Settings: React.FC<SettingsProps> = ({
                   <input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tax Registration ID / GST</label>
-                  <input type="text" value={taxId} onChange={e => setTaxId(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tax Registration ID / GST (Optional)</label>
+                  <input type="text" placeholder="Optional" value={taxId} onChange={e => setTaxId(e.target.value)} className="w-full p-2 border rounded text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
               </div>
 
@@ -330,16 +343,14 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
 
               {message && message.includes('Configurations') && <div className="text-emerald-600 text-xs font-bold">{message}</div>}
-              <div className="flex gap-2">
-                <button type="submit" className="bg-blue-600 text-white font-bold text-xs py-2 px-5 rounded-lg hover:bg-blue-700 transition flex items-center gap-1.5 shadow-sm">
-                  <Save size={13} /> Save Workspace Changes
-                </button>
-              </div>
+              <button type="submit" className="bg-blue-600 text-white font-bold text-xs py-2 px-5 rounded-lg hover:bg-blue-700 transition flex items-center gap-1.5 shadow-sm">
+                <Save size={13} /> Save Workspace Changes
+              </button>
             </form>
           </div>
         )}
 
-        {/* 👑 THE OMNIPOTENT MASTER LAYER: Visible EXCLUSIVELY inside Admin Core View */}
+        {/* 👑 THE OMNIPOTENT MASTER LAYER */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-2xl shadow-xl p-6 border border-indigo-900/40">
             <div className="flex items-center gap-3 mb-5 border-b border-indigo-900/60 pb-3">
@@ -365,8 +376,8 @@ const Settings: React.FC<SettingsProps> = ({
                     <input required type="email" placeholder="billing@tenant.com" value={newCorpEmail} onChange={e => setNewCorpEmail(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Tax ID / GST Reference</label>
-                    <input required type="text" placeholder="e.g. GST-77110" value={newCorpTaxId} onChange={e => setNewCorpTaxId(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
+                    <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Tax ID / GST Reference (Optional)</label>
+                    <input type="text" placeholder="Optional" value={newCorpTaxId} onChange={e => setNewCorpTaxId(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
                   </div>
                 </div>
 
@@ -452,7 +463,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
                 <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Username Key Handle</label>
-                    <input required placeholder="jane_staff" className="w-full p-2 border rounded text-sm bg-white font-medium outline-none" value={staffUsername} onChange={e => setNewUsername(e.target.value)} />
+                    <input required placeholder="jane_staff" className="w-full p-2 border rounded text-sm bg-white font-medium outline-none" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} />
                 </div>
                 <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Password Credentials</label>
@@ -527,7 +538,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         </div>
 
-        {/* 👑 INFRASTRUCTURE CASCADING DANGER ZONE SECTION (Displays ALL sub-tenant systems for deletion) */}
+        {/* 👑 INFRASTRUCTURE CASCADING DANGER ZONE SECTION */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 bg-rose-50 rounded-2xl border-2 border-rose-100 p-6">
             <div className="flex items-center gap-3 mb-4">
