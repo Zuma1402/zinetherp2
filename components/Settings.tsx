@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Role, Department, Division, Ledger } from '../types';
+import { User, Role, Department, Division, Ledger, AccountType } from '../types';
 import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
@@ -38,6 +38,12 @@ const Settings: React.FC<SettingsProps> = ({
   const [defaultPurchaseLedger, setDefaultPurchaseLedger] = useState('');
   const [defaultStockLedger, setDefaultStockLedger] = useState('');
   const [isMappingSaving, setIsMappingSaving] = useState(false);
+
+  // ➕ QUICK ADD LEDGER MODAL STATES
+  const [isQuickLedgerModalOpen, setIsQuickLedgerModalOpen] = useState(false);
+  const [quickLedgerName, setQuickLedgerName] = useState('');
+  const [quickLedgerType, setQuickLedgerType] = useState<AccountType>(AccountType.INCOME);
+  const [quickLedgerGroup, setQuickLedgerGroup] = useState('');
 
   // States Matrix
   const [users, setUsers] = useState<User[]>([]);
@@ -88,7 +94,6 @@ const Settings: React.FC<SettingsProps> = ({
   const fetchLedgerMappingData = async (companyId: string) => {
     if (!companyId) return;
     try {
-      // 1. Fetch ledgers belonging explicitly to this partition company node context
       const { data: ledgersData } = await supabase
         .from('ledgers')
         .select('*')
@@ -105,7 +110,6 @@ const Settings: React.FC<SettingsProps> = ({
         })));
       }
 
-      // 2. Fetch already committed configuration bindings matrix settings values
       const { data: mappings } = await supabase
         .from('company_settings')
         .select('*')
@@ -159,7 +163,6 @@ const Settings: React.FC<SettingsProps> = ({
         setUsers(mappedUsers.filter(u => u.company_id === currentSelectionId));
       }
 
-      // Trigger automatic background loading for mappings
       if (currentSelectionId) {
         fetchLedgerMappingData(currentSelectionId);
       }
@@ -212,7 +215,6 @@ const Settings: React.FC<SettingsProps> = ({
 
     setIsMappingSaving(true);
     try {
-      // Upsert direct mappings settings configurations parameters state columns fields into cloud table matching company node
       const { error } = await supabase
         .from('company_settings')
         .upsert({
@@ -230,6 +232,60 @@ const Settings: React.FC<SettingsProps> = ({
       alert(`Ledger configuration blueprint crash: ${err.message}`);
     } finally {
       setIsMappingSaving(false);
+    }
+  };
+
+  // ➕ QUICK ADD LEDGER SUBMIT WITH AUTOMATIC DROPDOWN BINDING
+  const handleQuickLedgerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickLedgerName.trim() || !localActiveId) return;
+
+    try {
+      const newLedgerId = crypto.randomUUID();
+      const defaultGroup = quickLedgerGroup.trim() || (quickLedgerType === AccountType.INCOME ? 'Operating Revenue' : quickLedgerType === AccountType.EXPENSE ? 'Operating Expenses' : 'Inventory Stock');
+
+      const { error } = await supabase.from('ledgers').insert([
+        {
+          id: newLedgerId,
+          name: quickLedgerName.trim(),
+          type: quickLedgerType,
+          group_name: defaultGroup,
+          opening_balance: 0,
+          company_id: localActiveId
+        }
+      ]);
+
+      if (error) throw error;
+
+      // Automatically auto-select the newly created ledger in its target category type mapping slot
+      if (quickLedgerType === AccountType.INCOME) setDefaultSalesLedger(newLedgerId);
+      if (quickLedgerType === AccountType.EXPENSE) setDefaultPurchaseLedger(newLedgerId);
+      if (quickLedgerType === AccountType.ASSET) setDefaultStockLedger(newLedgerId);
+
+      setQuickLedgerName('');
+      setQuickLedgerGroup('');
+      setIsQuickLedgerModalOpen(false);
+      alert(`Ledger "${quickLedgerName}" deployed and auto-selected!`);
+      
+      // Refresh lookup engine state matrices
+      if (localActiveId) {
+        fetchLedgerMappingData(localActiveId);
+      }
+    } catch (err: any) {
+      alert(`Quick ledger failure: ${err.message}`);
+    }
+  };
+
+  // Dropdown interception helper to capture quick add triggers
+  const handleDropdownIntercept = (val: string, typeTarget: AccountType, defaultGroupTarget: string) => {
+    if (val === 'QUICK_ADD_SLOT_TRIGGER') {
+      setQuickLedgerType(typeTarget);
+      setQuickLedgerGroup(defaultGroupTarget);
+      setIsQuickLedgerModalOpen(true);
+    } else {
+      if (typeTarget === AccountType.INCOME) setDefaultSalesLedger(val);
+      if (typeTarget === AccountType.EXPENSE) setDefaultPurchaseLedger(val);
+      if (typeTarget === AccountType.ASSET) setDefaultStockLedger(val);
     }
   };
 
@@ -534,29 +590,32 @@ const Settings: React.FC<SettingsProps> = ({
             <form onSubmit={handleSaveLedgerMappings} className="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Default Sales Income Ledger</label>
-                <select value={defaultSalesLedger} onChange={e => setDefaultSalesLedger(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+                <select value={defaultSalesLedger} onChange={e => handleDropdownIntercept(e.target.value, AccountType.INCOME, 'Operating Revenue')} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
                   <option value="">-- Mapped Sales Account --</option>
                   {allCompanyLedgers.filter(l => l.type === 'INCOME').map(l => (
                     <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
                   ))}
+                  <option value="QUICK_ADD_SLOT_TRIGGER" className="text-indigo-600 font-black bg-indigo-50/50">➕ Add New Income Account</option>
                 </select>
               </div>
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Default Purchase Expense Ledger</label>
-                <select value={defaultPurchaseLedger} onChange={e => setDefaultPurchaseLedger(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+                <select value={defaultPurchaseLedger} onChange={e => handleDropdownIntercept(e.target.value, AccountType.EXPENSE, 'Operating Expenses')} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
                   <option value="">-- Mapped Procurement Account --</option>
                   {allCompanyLedgers.filter(l => l.type === 'EXPENSE').map(l => (
                     <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
                   ))}
+                  <option value="QUICK_ADD_SLOT_TRIGGER" className="text-indigo-600 font-black bg-indigo-50/50">➕ Add New Expense Account</option>
                 </select>
               </div>
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Default Inventory Stock Asset</label>
-                <select value={defaultStockLedger} onChange={e => setDefaultStockLedger(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+                <select value={defaultStockLedger} onChange={e => handleDropdownIntercept(e.target.value, AccountType.ASSET, 'Stock-in-Hand')} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
                   <option value="">-- Mapped Valuation Stock Asset --</option>
-                  {allCompanyLedgers.filter(l => l.type === 'ASSET' && (l.group.toLowerCase().includes('stock') || l.name.toLowerCase().includes('stock'))).map(l => (
+                  {allCompanyLedgers.filter(l => l.type === 'ASSET' && (l.group.toLowerCase().includes('stock') || l.name.toLowerCase().includes('stock') || l.group.toLowerCase().includes('asset'))).map(l => (
                     <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
                   ))}
+                  <option value="QUICK_ADD_SLOT_TRIGGER" className="text-indigo-600 font-black bg-indigo-50/50">➕ Add New Inventory Asset</option>
                 </select>
               </div>
               <div className="md:col-span-3 flex justify-end border-t border-gray-100 pt-3">
@@ -731,6 +790,52 @@ const Settings: React.FC<SettingsProps> = ({
         )}
 
       </div>
+
+      {/* ➕ QUICK ADD LEDGER MODAL COMPONENT */}
+      {isQuickLedgerModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full border shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="border-b pb-2 mb-4">
+              <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
+                <span className="text-indigo-600">➕</span>
+                Quick Add Default Account
+              </h3>
+              <p className="text-[10px] text-gray-400 font-medium">This ledger instance will automatically lock and link to your mapping dropdown slot.</p>
+            </div>
+
+            <form onSubmit={handleQuickLedgerSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ledger / Head Account Name</label>
+                <input 
+                  autoFocus 
+                  type="text" 
+                  value={quickLedgerName} 
+                  onChange={e => setQuickLedgerName(e.target.value)} 
+                  className="w-full p-2.5 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold outline-none" 
+                  placeholder={quickLedgerType === AccountType.INCOME ? "e.g. Local Sales Revenue" : quickLedgerType === AccountType.EXPENSE ? "e.g. Raw Material Procurement" : "e.g. Main Stock Warehouse"} 
+                  required 
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Account Category Type</label>
+                <input 
+                  type="text" 
+                  value={quickLedgerType} 
+                  disabled 
+                  className="w-full p-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-black text-gray-500 uppercase tracking-widest text-center cursor-not-allowed" 
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button type="button" onClick={() => setIsQuickLedgerModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-gray-600 uppercase tracking-wider">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Deploy Account</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
