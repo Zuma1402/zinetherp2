@@ -80,7 +80,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         setActiveCompanyId(targetId);
 
         if (targetId) {
-          // ⚙️ Load live backend mapped double-entry settings blueprint configurations
           const { data: mapRecord } = await supabase
             .from('company_settings')
             .select('*')
@@ -89,7 +88,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
           if (mapRecord) {
             setMappedSalesLedgerId(mapRecord.default_sales_ledger || '');
-            setMappedCogsLedgerId(mapRecord.default_purchase_ledger || ''); // Fallback target pointer
+            setMappedCogsLedgerId(mapRecord.default_purchase_ledger || '');
             setMappedStockLedgerId(mapRecord.default_stock_ledger || '');
           }
         }
@@ -101,7 +100,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     fetchLookups();
   }, []);
 
-  // Sync props matrix
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 
   const handleRowMetricChange = (index: number, field: string, value: any) => {
@@ -217,7 +215,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const totalAmountBasePKR = foreignTotalAmount * exchangeRate;
 
   const handleSubmit = () => {
-    // ⚙️ Dynamic Mapped Targets resolution matching global configuration control panels
     const salesLedger = ledgers.find(l => l.id === mappedSalesId) || ledgers.find(l => l.name.toLowerCase().includes('sales') && l.type === AccountType.INCOME);
     const cogsLedger = ledgers.find(l => l.name.toLowerCase().includes('cost of goods') && l.type === AccountType.EXPENSE);
     const stockLedger = ledgers.find(l => l.id === mappedStockId) || ledgers.find(l => l.name.toLowerCase().includes('stock') && l.type === AccountType.ASSET);
@@ -262,11 +259,11 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const activeCustomerObj = ledgers.find(l => l.id === customerId);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto">
       
-      {/* 📄 SCREEN INPUT FORMS BLOCK CONTAINER - Prints are dynamically hidden */}
-      <div className="no-print bg-gray-50/50 p-2 md:p-6 rounded-2xl space-y-6 relative">
-        {/* 👑 Header Action Strip */}
+      {/* 🛡️ 1. SCREEN INPUT FORMS BLOCK CONTAINER - Prints are 100% absolutely hidden */}
+      <div className="print:hidden bg-gray-50/50 p-2 md:p-6 rounded-2xl space-y-6 relative">
+        {/* Header Action Strip */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
           <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
             <span className="bg-indigo-600 text-white p-2 rounded-xl shadow-xs"><ShoppingCart size={18} /></span>
@@ -280,7 +277,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* 🏢 Split Meta Layout Section */}
+        {/* Split Meta Layout Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-1">
@@ -318,7 +315,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* 📊 High-Density Table Display */}
+        {/* High-Density Table Display */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
           <div className="overflow-x-auto w-full scrollbar-thin">
             <table className="w-full text-left border-collapse table-fixed min-w-[1150px]">
@@ -400,7 +397,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* 📄 DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
+      {/* 📄 2. DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
       <div className="hidden print:block printable-invoice-canvas bg-white p-10 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
         
         {/* Brand Header */}
@@ -422,7 +419,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* Client Metadata Address Block */}
+        {/* Client Metadata Address Box */}
         <div className="grid grid-cols-2 gap-8 text-xs border-b border-gray-200 pb-6 pt-2">
           <div>
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Billed To / Customer Node:</h5>
@@ -465,7 +462,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                 })
               ) : (
                 <tr>
-                  <td colSpan={4} className="p-3 pl-4 text-gray-400 italic text-center">No active materials mapped inside this snapshot transaction slip</td>
+                  <td colSpan={4} className="p-6 pl-4 text-gray-400 italic text-center font-medium">
+                    No active materials mapped inside this snapshot transaction slip
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -512,7 +511,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
       {/* 📦 QUICK ADD PRODUCT MODAL */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
             <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b pb-2">Quick Add Product Listing</h3>
             <form onSubmit={handleQuickProductSubmit} className="space-y-4">
@@ -541,7 +540,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
       {/* OTHER QUICK POPUPS */}
       {isCustModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Customer</h3>
             <form onSubmit={handleAddCustomerSubmit} className="space-y-4">
@@ -553,7 +552,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       )}
 
       {isDeptModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Department</h3>
             <form onSubmit={handleQuickDeptSubmit} className="space-y-4">
@@ -565,7 +564,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       )}
 
       {isDivModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Division</h3>
             <form onSubmit={handleQuickDivSubmit} className="space-y-4">
