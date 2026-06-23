@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, Department, Division } from '../types';
-import { Save, Plus, Trash2, Calendar, Layers, Compass, Clock } from 'lucide-react';
+import { Save, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 
 interface GeneralVoucherEntryProps {
@@ -22,6 +22,10 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [voucherNo, setVoucherNo] = useState('VCH-AUTO');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [narration, setNarration] = useState('');
+
+  // 🧾 Multi-Currency Configuration Matrix
+  const [currency, setCurrency] = useState<string>('PKR');
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
   
   const [entries, setEntries] = useState<RowEntry[]>([
     { ledgerId: '', debit: 0, credit: 0, departmentId: '', divisionId: '' },
@@ -50,7 +54,6 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const updateRow = (index: number, key: keyof RowEntry, value: any) => {
     const next = [...entries];
     
-    // Dropdown value validation trigger check
     if (key === 'departmentId' && value === 'QUICK_ADD_ROW_DEPT') {
       setActiveRowIndex(index);
       setIsDeptModalOpen(true);
@@ -110,10 +113,10 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
     setNewDivName('');
   };
 
-  const totalDebit = entries.reduce((acc, curr) => acc + (curr.debit || 0), 0);
-  const totalCredit = entries.reduce((acc, curr) => acc + (curr.credit || 0), 0);
-  const difference = Math.abs(totalDebit - totalCredit);
-  const isBalanced = totalDebit === totalCredit && totalDebit > 0;
+  const totalDebitForeign = entries.reduce((acc, curr) => acc + (curr.debit || 0), 0);
+  const totalCreditForeign = entries.reduce((acc, curr) => acc + (curr.credit || 0), 0);
+  const difference = Math.abs(totalDebitForeign - totalCreditForeign);
+  const isBalanced = totalDebitForeign === totalCreditForeign && totalDebitForeign > 0;
 
   const handleSubmit = () => {
     if (!isBalanced) {
@@ -125,20 +128,23 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       date,
       number: voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo,
       type: voucherType,
-      narration: narration || 'Journal adjustment post',
+      narration: narration || `Journal Post (${currency})`,
+      // 🧮 Automatic conversion to system baseline array values
       entries: entries.map(e => ({
         ledgerId: e.ledgerId,
-        debit: e.debit,
-        credit: e.credit,
+        debit: e.debit * exchangeRate,
+        credit: e.credit * exchangeRate,
         departmentId: e.departmentId || undefined,
         divisionId: e.divisionId || undefined
-      }))
-    });
+      })),
+      currency,
+      exchangeRate,
+      foreignTotal: totalDebitForeign
+    } as any);
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto p-2">
-      {/* 1. RESTORED Upper Voucher Control Box Header Section */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200/60 shadow-sm">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
@@ -161,54 +167,43 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs font-bold text-gray-700">
+        {/* CONTROLS EXPANDED TO FIVE COLUMNS TO HOUSE INTER-EXCHANGE DROPDOWNS */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs font-bold text-gray-700">
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher Type</label>
-            <select 
-              value={voucherType} 
-              onChange={e => setVoucherType(e.target.value as VoucherType)}
-              className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none"
-            >
+            <select value={voucherType} onChange={e => setVoucherType(e.target.value as VoucherType)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
               <option value="JOURNAL">JOURNAL</option>
               <option value="PAYMENT">PAYMENT</option>
               <option value="RECEIPT">RECEIPT</option>
             </select>
           </div>
-
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher #</label>
-            <input 
-              type="text" 
-              value={voucherNo} 
-              disabled
-              className="w-full p-3 border border-gray-100 rounded-xl bg-gray-50/50 text-gray-500 font-mono font-bold outline-none"
-            />
+            <input type="text" value={voucherNo} disabled className="w-full p-3 border border-gray-100 rounded-xl bg-gray-50/50 text-gray-500 font-mono font-bold outline-none" />
           </div>
-
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Date</label>
-            <input 
-              type="date" 
-              value={date} 
-              onChange={e => setDate(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs text-gray-800 font-bold outline-none" 
-            />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-xs text-gray-800 font-bold outline-none" />
           </div>
-
           <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher Narration</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Adjustment entry notes..." 
-              value={narration}
-              onChange={e => setNarration(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-800 font-medium outline-none placeholder:text-gray-300"
-            />
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Currency</label>
+            <select value={currency} onChange={e => { const val = e.target.value; setCurrency(val); if(val==='PKR') setExchangeRate(1); }} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
+              <option value="PKR">PKR (Base)</option>
+              <option value="USD">USD ($)</option>
+              <option value="AED">AED (Dirham)</option>
+            </select>
           </div>
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Rate (1 {currency} = ? PKR)</label>
+            <input type="number" value={exchangeRate} disabled={currency==='PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-indigo-600 font-black text-center text-xs outline-none disabled:bg-gray-50" min="0.01" step="any" />
+          </div>
+        </div>
+        <div className="mt-4">
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher Narration</label>
+          <input type="text" placeholder="e.g. Adjustment entry notes..." value={narration} onChange={e => setNarration(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-800 font-medium outline-none placeholder:text-gray-300" />
         </div>
       </div>
 
-      {/* 2. FIXED Grid Table Matrix Sheet */}
       <div className="bg-white rounded-[2rem] shadow-2xl border border-gray-200/80 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -218,8 +213,8 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
                 <th className="p-4 min-w-[240px]">Ledger Account</th>
                 <th className="p-4 w-44">Cost Center (Dept)</th>
                 <th className="p-4 w-44">Segment (Div)</th>
-                <th className="p-4 w-36 text-right">Debit</th>
-                <th className="p-4 w-36 text-right">Credit</th>
+                <th className="p-4 w-36 text-right">Debit ({currency})</th>
+                <th className="p-4 w-36 text-right">Credit ({currency})</th>
                 <th className="p-4 w-12 text-center"></th>
               </tr>
             </thead>
@@ -227,125 +222,74 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
               {entries.map((item, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
                   <td className="p-4 text-center text-gray-400 font-mono text-xs">{idx + 1}</td>
-                  
-                  {/* Account Choice */}
                   <td className="p-3">
-                    <select
-                      value={item.ledgerId}
-                      onChange={e => updateRow(idx, 'ledgerId', e.target.value)}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none"
-                    >
+                    <select value={item.ledgerId} onChange={e => updateRow(idx, 'ledgerId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none" >
                       <option value="">Select Ledger...</option>
                       {ledgers.map(l => (
                         <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
                       ))}
                     </select>
                   </td>
-
-                  {/* Inline Department Selector Option */}
                   <td className="p-3">
-                    <select
-                      value={item.departmentId}
-                      onChange={e => updateRow(idx, 'departmentId', e.target.value)}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs outline-none"
-                    >
+                    <select value={item.departmentId} onChange={e => updateRow(idx, 'departmentId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs outline-none" >
                       <option value="">Choose Dept...</option>
-                      {departments.map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                       <option value="QUICK_ADD_ROW_DEPT" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Dept</option>
                     </select>
                   </td>
-
-                  {/* Inline Division Selector Option */}
                   <td className="p-3">
-                    <select
-                      value={item.divisionId}
-                      onChange={e => updateRow(idx, 'divisionId', e.target.value)}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs outline-none"
-                    >
+                    <select value={item.divisionId} onChange={e => updateRow(idx, 'divisionId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs outline-none" >
                       <option value="">Choose Div...</option>
-                      {divisions.map(div => (
-                        <option key={div.id} value={div.id}>{div.name}</option>
-                      ))}
+                      {divisions.map(div => <option key={div.id} value={div.id}>{div.name}</option>)}
                       <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Div</option>
                     </select>
                   </td>
-
-                  {/* Debit Amount */}
                   <td className="p-3">
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      value={item.debit || ''}
-                      onChange={e => updateRow(idx, 'debit', e.target.value)}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none"
-                    />
+                    <input type="number" placeholder="0.00" value={item.debit || ''} onChange={e => updateRow(idx, 'debit', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none" />
                   </td>
-
-                  {/* Credit Amount */}
                   <td className="p-3">
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      value={item.credit || ''}
-                      onChange={e => updateRow(idx, 'credit', e.target.value)}
-                      className="w-full p-2.5 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none"
-                    />
+                    <input type="number" placeholder="0.00" value={item.credit || ''} onChange={e => updateRow(idx, 'credit', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none" />
                   </td>
-
-                  {/* Line Delete */}
                   <td className="p-3 text-center">
-                    <button
-                      onClick={() => removeLineItem(idx)}
-                      disabled={entries.length <= 2}
-                      className={`p-2 rounded-lg transition-colors ${entries.length <= 2 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:bg-rose-50 hover:text-rose-500'}`}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <button onClick={() => removeLineItem(idx)} disabled={entries.length <= 2} className={`p-2 rounded-lg transition-colors ${entries.length <= 2 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:bg-rose-50 hover:text-rose-500'}`}><Trash2 size={14} /></button>
                   </td>
                 </tr>
               ))}
 
-              {/* RESTORED Total Calculations Sheet Footer Row */}
               <tr className="bg-slate-50/50 font-mono font-black text-xs text-slate-700">
                 <td colSpan={4} className="p-5 text-right font-sans uppercase tracking-widest text-gray-400 text-[10px]">Total</td>
-                <td className="p-5 text-right text-indigo-700 text-sm border-t">{totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                <td className="p-5 text-right text-indigo-700 text-sm border-t">{totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td className="p-5 text-right text-indigo-700 text-sm border-t">{totalDebitForeign.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                <td className="p-5 text-right text-indigo-700 text-sm border-t">{totalCreditForeign.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 <td></td>
               </tr>
+              {currency !== 'PKR' && (
+                <tr className="bg-indigo-50/30 text-indigo-900 font-bold text-xs font-mono">
+                  <td colSpan={4} className="p-3 text-right font-sans text-[10px] text-indigo-400 uppercase tracking-wider">Base Matrix Equivalent (PKR):</td>
+                  <td className="p-3 text-right border-t text-indigo-600">{(totalDebitForeign * exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td className="p-3 text-right border-t text-indigo-600">{(totalCreditForeign * exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td></td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* RESTORED Action Controls Footer Add Line Item Bar */}
         <div className="p-5 bg-gray-50/40 border-t flex justify-between items-center text-xs">
-          <button
-            onClick={addLineItem}
-            className="flex items-center gap-1.5 px-4 py-2 border border-dashed border-indigo-300 text-indigo-600 bg-indigo-50/30 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-sm"
-          >
-            <Plus size={14} /> Add Line Item
-          </button>
-          
+          <button onClick={addLineItem} className="flex items-center gap-1.5 px-4 py-2 border border-dashed border-indigo-300 text-indigo-600 bg-indigo-50/30 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-sm" ><Plus size={14} /> Add Line Item</button>
           {difference > 0 && (
-            <span className="font-mono font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">
-              Difference: {difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </span>
+            <span className="font-mono font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">Difference: {difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           )}
         </div>
       </div>
 
-      {/* Popups Forms Blocks Modals */}
+      {/* QUICK ADD MODALS RESIDENT BLOCKS */}
       {isDeptModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Add Department</h3>
             <form onSubmit={handleQuickDeptSubmit} className="space-y-4">
               <input autoFocus type="text" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-indigo-500" placeholder="e.g. Marketing" required />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button>
-              </div>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
             </form>
           </div>
         </div>
@@ -357,10 +301,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Add Division</h3>
             <form onSubmit={handleQuickDivSubmit} className="space-y-4">
               <input autoFocus type="text" value={newDivName} onChange={e => setNewDivName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-indigo-500" placeholder="e.g. Northern Region" required />
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button>
-              </div>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
             </form>
           </div>
         </div>

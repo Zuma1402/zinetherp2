@@ -89,7 +89,7 @@ type View =
   | 'EXPENSES'
   | 'REPORT_PL'
   | 'REPORT_BS'
-  | 'REPORT_AGING' // 👈 1. View configuration matrix registered here
+  | 'REPORT_AGING' 
   | 'SETTINGS';
 
 const App: React.FC = () => {
@@ -483,7 +483,7 @@ const App: React.FC = () => {
                   <div className="space-y-0.5 mt-1 animate-in slide-in-from-top-2 duration-200">
                      <SidebarItem view="REPORT_PL" label="Profit & Loss" nested />
                      <SidebarItem view="REPORT_BS" label="Balance Sheet" nested />
-                     <SidebarItem view="REPORT_AGING" label="Aging Analysis" nested /> {/* 👈 2. Sidebar route item registered */}
+                     <SidebarItem view="REPORT_AGING" label="Aging Analysis" nested /> 
                   </div>
                 )}
             </div>
@@ -603,7 +603,7 @@ const App: React.FC = () => {
                 {currentView === 'REPORT_BS' && (
                     <BalanceSheet vouchers={vouchers} ledgers={ledgers} companyName={companyName} />
                 )}
-                {currentView === 'REPORT_AGING' && ( // 👈 3. Render container mapping complete
+                {currentView === 'REPORT_AGING' && ( 
                     <AgingReports ledgers={ledgers} vouchers={vouchers} />
                 )}
                 {currentView === 'SETTINGS' && (
@@ -621,11 +621,7 @@ const App: React.FC = () => {
       </main>
 
       <AIAssistant summary={financialSummary} trialBalance={trialBalance} />
-      
-      {/* 👑 LIVE SPEED INSIGHTS ENGINE CONTAINER */}
       <SpeedInsights />
-      
-      {/* 👑 LIVE WEB ANALYTICS TELEMETRY CONTAINER */}
       <Analytics />
     </div>
   );
