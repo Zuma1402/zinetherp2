@@ -57,7 +57,7 @@ import { AgingReports } from './components/AgingReports';
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
 import { calculateTrialBalance, calculateFinancialSummary } from './services/accountingService';
 import { getCurrentUser, logout } from './services/authService';
-import { getCompanySettings, saveCompanySettings, activateSubscription, getDaysRemaining } from './services/settingsService';
+import { getCompanySettings, saveCompanySettings } from './services/settingsService';
 import { CloudService } from './services/cloudService';
 import { supabase } from './services/supabaseService'; 
 
@@ -123,6 +123,7 @@ const App: React.FC = () => {
 
   // Helper to completely reload fresh state from Cloud DB on any update
   const reloadCloudData = async (targetCompanyId: string) => {
+    if (!targetCompanyId) return;
     setSyncStatus('syncing');
     try {
       const data = await CloudService.fetchAllData(targetCompanyId); 
@@ -148,8 +149,7 @@ const App: React.FC = () => {
     try {
       let finalUniqueList: any[] = [];
       
-      if (currentUserSession.role === 'ADMIN') {
-        // Global blueprint context allocation
+      if (currentUserSession.role === 'ADMIN' && !currentUserSession.company_id) {
         const { data: allComps } = await supabase.from('companies').select('id, name');
         if (allComps) {
           const uniqueCompaniesMap = new Map();
@@ -157,16 +157,10 @@ const App: React.FC = () => {
           finalUniqueList = Array.from(uniqueCompaniesMap.values());
         }
       } else {
-        const { data: mapping } = await supabase
-          .from('user_companies')
-          .select('company_id, companies(id, name)')
-          .eq('user_id', currentUserSession.id);
-        
-        if (mapping && mapping.length > 0) {
-          const formattedCompanies = mapping.map((m: any) => m.companies).filter(Boolean);
-          const uniqueCompaniesMap = new Map();
-          formattedCompanies.forEach((c: any) => uniqueCompaniesMap.set(c.name.trim().toLowerCase(), c));
-          finalUniqueList = Array.from(uniqueCompaniesMap.values());
+        const boundCompanyId = currentUserSession.company_id || localStorage.getItem('supabase_active_company_id') || '';
+        const { data: allComps } = await supabase.from('companies').select('id, name');
+        if (allComps && boundCompanyId) {
+          finalUniqueList = allComps.filter((c: any) => c.id === boundCompanyId);
         }
       }
 
@@ -215,7 +209,6 @@ const App: React.FC = () => {
     init();
   }, []); 
 
-  // Watch for activeCompanyId mutations to explicitly trigger a re-fetch block pipeline
   useEffect(() => {
     if (activeCompanyId && !isLoading) {
       reloadCloudData(activeCompanyId);
@@ -242,6 +235,12 @@ const App: React.FC = () => {
   };
 
   const handleCloudOperation = async (operation: () => Promise<any>) => {
+    // 🛡️ ROLE SECURITY GUARDRAIL: Strict dynamic read-only blocker
+    if (user?.role === 'VIEWER') {
+      alert("Security Enforcement Matrix: Your read-only profile cannot commit database mutations!");
+      return;
+    }
+
     setSyncStatus('syncing');
     try {
         await operation();
@@ -387,6 +386,7 @@ const App: React.FC = () => {
               <Building2 size={18} className="text-indigo-600 shrink-0" />
               <select 
                 value={activeCompanyId || 'default'} 
+                disabled={user?.role !== 'ADMIN'}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val && val !== 'default') {
@@ -399,7 +399,7 @@ const App: React.FC = () => {
                     }
                   }
                 }}
-                className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans"
+                className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans disabled:cursor-not-allowed"
                 style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
               >
                 {companies.length > 0 ? (
@@ -414,7 +414,7 @@ const App: React.FC = () => {
                   </option>
                 )}
               </select>
-              <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />
+              {user?.role === 'ADMIN' && <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />}
             </div>
 
             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white border border-gray-200 px-2 py-1 rounded w-fit uppercase tracking-widest shadow-sm">
@@ -487,7 +487,8 @@ const App: React.FC = () => {
                   </div>
                 )}
             </div>
-            <SidebarItem view="SETTINGS" icon={SettingsIcon} label="Settings" />
+            {/* 🛡️ Hide completely if non-admin restricted worker */}
+            {user?.role === 'ADMIN' && <SidebarItem view="SETTINGS" icon={SettingsIcon} label="Settings" />}
         </nav>
 
         <div className="p-4 border-t border-gray-100 bg-gray-50/50">
@@ -526,8 +527,8 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-full border border-indigo-100 shadow-sm">
-                Logged user: <span className="font-black text-indigo-900">{user?.username}</span>
+              <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1 rounded-full border border-indigo-100 shadow-sm uppercase tracking-wider">
+                Role: <span className="font-black text-indigo-950">{user?.role}</span> (@{user?.username})
               </span>
             </div>
         </header>
@@ -606,7 +607,7 @@ const App: React.FC = () => {
                 {currentView === 'REPORT_AGING' && ( 
                     <AgingReports ledgers={ledgers} vouchers={vouchers} />
                 )}
-                {currentView === 'SETTINGS' && (
+                {currentView === 'SETTINGS' && user?.role === 'ADMIN' && (
                   <Settings 
                     currentUser={user} 
                     onUpdateUser={setUser} 

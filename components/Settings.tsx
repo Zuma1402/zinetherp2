@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, Role } from '../types';
+import { User, Role, Department, Division } from '../types';
 import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
-import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Pencil, Landmark, AlertTriangle, Key } from 'lucide-react';
+import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key } from 'lucide-react';
 
 interface SettingsProps {
   currentUser: User;
@@ -51,7 +51,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [staffRole, setStaffRole] = useState<Role>('ACCOUNTANT');
   const [isAddingTenantStaff, setIsAddingTenantStaff] = useState(false);
 
-  // 🌟 LOCAL ENGINE STATE SYNCHRONIZER (Bypasses prop delay lag completely)
+  // 🌟 LOCAL ENGINE STATE SYNCHRONIZER
   const [localActiveId, setLocalActiveId] = useState(
     propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
   );
@@ -84,7 +84,6 @@ const Settings: React.FC<SettingsProps> = ({
 
       const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
       if (!compErr && companiesData) {
-        // 🌟 DROP-DOWN DUPLICATION BLOCKER: UI level par strictly filter out karega
         const uniqueCompaniesMap = new Map();
         companiesData.forEach(c => {
           const cleanName = c.name.trim().toLowerCase();
@@ -103,12 +102,8 @@ const Settings: React.FC<SettingsProps> = ({
         return { ...u, company_id: match ? match.company_id : u.company_id };
       });
 
-      const resolvedMasterRow = companiesData?.find(c => c.name.toLowerCase().replace(/\s+/g, '') === 'zinetherp');
       const currentSelectionId = localActiveId || '';
-      const selectedCompObj = companiesData?.find(c => c.id === currentSelectionId);
-      const selectedNameClean = selectedCompObj ? selectedCompObj.name.toLowerCase().replace(/\s+/g, '') : '';
-
-      if (currentUser.role === 'ADMIN' && (!currentSelectionId || selectedNameClean === 'zinetherp' || currentSelectionId === '11111111-1111-1111-1111-111111111111')) {
+      if (currentUser.role === 'ADMIN' && (!currentSelectionId || activeSelectionNameClean === 'zinetherp' || currentSelectionId === '11111111-1111-1111-1111-111111111111')) {
         setUsers(mappedUsers);
       } else {
         setUsers(mappedUsers.filter(u => u.company_id === currentSelectionId));
@@ -155,18 +150,14 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 🌟 FIX DROP-DOWN REDUNDANCY CREATOR FUNCTION: Ab kabhi duplicate insert nahi ho sakti!
   const handleMasterClusterDeployment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCorpCompanyName.trim() || isCreatingCorp) return;
 
     setIsCreatingCorp(true);
     try {
-      // Step A: Check if company with exact name already registered
       const targetNameClean = newCorpCompanyName.trim();
-      const { data: existingComps } = await supabase
-        .from('companies')
-        .select('id, name');
+      const { data: existingComps } = await supabase.from('companies').select('id, name');
       
       const isDuplicate = existingComps?.some(c => c.name.trim().toLowerCase() === targetNameClean.toLowerCase());
       if (isDuplicate) {
@@ -176,15 +167,9 @@ const Settings: React.FC<SettingsProps> = ({
       }
 
       const companyId = crypto.randomUUID();
-
-      // Step B: Direct atomic insert block sequence
-      const { error: companyError } = await supabase
-        .from('companies')
-        .insert([{ id: companyId, name: targetNameClean }]);
-
+      const { error: companyError } = await supabase.from('companies').insert([{ id: companyId, name: targetNameClean }]);
       if (companyError) throw companyError;
 
-      // Link creator profile
       await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: currentUser.id }]);
 
       if (staffUsername && staffName) {
@@ -197,7 +182,6 @@ const Settings: React.FC<SettingsProps> = ({
           role: staffRole,
           company_id: companyId
         });
-
         await supabase.from('user_companies').insert([{ id: crypto.randomUUID(), company_id: companyId, user_id: staffId }]);
       }
 
@@ -222,7 +206,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleTenantAddStaffOnly = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!staffUsername || !staffName) return;
+    if (!staffUsername || !staffName || !localActiveId) return;
 
     try {
       const staffId = crypto.randomUUID();
@@ -299,7 +283,6 @@ const Settings: React.FC<SettingsProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        
         {/* PROFILE BLOCK */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
           <div className="flex items-center gap-3 mb-6">
@@ -473,7 +456,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
             </div>
             
-            {!isMasterZenithScope && (
+            {!isMasterZenithScope && currentUser.role === 'ADMIN' && (
               <button onClick={() => setIsAddingTenantStaff(!isAddingTenantStaff)} className="bg-indigo-600 text-white text-xs font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition">
                 {isAddingTenantStaff ? 'Cancel Configuration' : <><Plus size={13}/> Add Staff to {companyName}</>}
               </button>
@@ -563,15 +546,15 @@ const Settings: React.FC<SettingsProps> = ({
 
                       <td className="p-3">
                         <span className={`text-[9px] px-2 py-0.5 rounded-full font-black border uppercase tracking-wider shadow-sm
-                          ${u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-blue-50 text-blue-700 border-blue-200'}
+                          ${u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border-purple-200' : u.role === 'ACCOUNTANT' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}
                         `}>
-                          {u.role === 'ADMIN' ? 'GLOBAL SUPERVISOR' : 'TENANT WORKSPACE RESTRICTED'}
+                          {u.role === 'ADMIN' ? 'GLOBAL SUPERVISOR' : u.role === 'ACCOUNTANT' ? 'EDITOR (WORKSPACE BOUND)' : 'VIEWER (READ ONLY)'}
                         </span>
                       </td>
 
                       <td className="p-3 text-right pr-4">
                          <div className="flex justify-end gap-1">
-                            {u.id !== currentUser.id && (
+                            {u.id !== currentUser.id && currentUser.role === 'ADMIN' && (
                                 <button onClick={() => handleDeleteUser(u.id)} className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition"><Trash2 size={15} /></button>
                             )}
                          </div>

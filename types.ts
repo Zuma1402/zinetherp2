@@ -1,3 +1,5 @@
+export type Role = 'ADMIN' | 'ACCOUNTANT' | 'VIEWER';
+
 export enum AccountType {
   ASSET = 'ASSET',
   LIABILITY = 'LIABILITY',
@@ -29,8 +31,8 @@ export interface VoucherEntry {
   ledgerId: string;
   debit: number;
   credit: number;
-  departmentId?: string; // ⭐ New Field for Cost Center / Department tracking
-  divisionId?: string;   // ⭐ New Field for Regional / Division tracking
+  departmentId?: string; // ⭐ Field for Cost Center / Department tracking
+  divisionId?: string;   // ⭐ Field for Regional / Division tracking
 }
 
 export interface Voucher {
@@ -40,6 +42,9 @@ export interface Voucher {
   type: VoucherType;
   narration: string;
   entries: VoucherEntry[];
+  currency?: string;
+  exchangeRate?: number;
+  foreignTotal?: number;
 }
 
 export interface TrialBalanceRow {
@@ -60,14 +65,13 @@ export interface FinancialSummary {
   netProfit: number;
 }
 
-export type Role = 'ADMIN' | 'ACCOUNTANT' | 'VIEWER';
-
 export interface User {
   id: string;
   username: string; // Used as login ID (e.g., email or handle)
   password: string; // In a real app, this would be hashed
   name: string;
   role: Role;
+  company_id?: string; // ⭐ Company bound partition identifier
 }
 
 export interface InventoryItem {
