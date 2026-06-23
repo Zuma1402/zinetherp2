@@ -27,6 +27,15 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(items);
 
+  // ⚙️ Dynamic Mapped Accounts Local Configuration State Hooks
+  const [mappedSalesId, setMappedSalesLedgerId] = useState('');
+  const [mappedCogsId, setMappedCogsLedgerId] = useState('');
+  const [mappedStockId, setMappedStockLedgerId] = useState('');
+  const [companyName, setCompanyName] = useState('ZinethERP');
+  const [companyEmail, setCompanyEmail] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [activeCompanyId, setActiveCompanyId] = useState('');
+
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [isDivModalOpen, setIsDivModalOpen] = useState(false);
   const [isCustModalOpen, setIsCustModalOpen] = useState(false);
@@ -63,6 +72,27 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         const prefix = settings.invoicePrefix || 'INV-';
         const nextNum = settings.nextInvoiceNumber || 1;
         setInvoiceNo(`${prefix}${nextNum.toString().padStart(4, '0')}`);
+        setCompanyName(settings.companyName || 'ZinethERP');
+        setCompanyEmail(settings.email || '');
+        setTaxId(settings.taxId || '');
+
+        const targetId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+        setActiveCompanyId(targetId);
+
+        if (targetId) {
+          // ⚙️ Load live backend mapped double-entry settings blueprint configurations
+          const { data: mapRecord } = await supabase
+            .from('company_settings')
+            .select('*')
+            .eq('company_id', targetId)
+            .single();
+
+          if (mapRecord) {
+            setMappedSalesLedgerId(mapRecord.default_sales_ledger || '');
+            setMappedCogsLedgerId(mapRecord.default_purchase_ledger || ''); // Fallback target pointer
+            setMappedStockLedgerId(mapRecord.default_stock_ledger || '');
+          }
+        }
       } catch (error) {
         setInvoiceNo('INV-0001');
       }
@@ -77,17 +107,17 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const handleRowMetricChange = (index: number, field: string, value: any) => {
     const updated = [...lineItems];
     
-    if (field === 'itemId' && value === 'QUICK_ADD_ROW_PRODUCT') {
+    if (value === 'QUICK_ADD_ROW_PRODUCT') {
       setActiveRowIndex(index);
       setIsProductModalOpen(true);
       return;
     }
-    if (field === 'departmentId' && value === 'QUICK_ADD_ROW_DEPT') {
+    if (value === 'QUICK_ADD_ROW_DEPT') {
       setActiveRowIndex(index);
       setIsDeptModalOpen(true);
       return;
     }
-    if (field === 'divisionId' && value === 'QUICK_ADD_ROW_DIV') {
+    if (value === 'QUICK_ADD_ROW_DIV') {
       setActiveRowIndex(index);
       setIsDivModalOpen(true);
       return;
@@ -117,7 +147,8 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       name: newProductName.trim(),
       cost_price: newProductCost,
       rate: newProductRate,
-      current_stock: 0
+      current_stock: 0,
+      company_id: activeCompanyId || undefined
     };
 
     await supabase.from('inventory_items').insert([newRecord]);
@@ -141,7 +172,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     e.preventDefault();
     if (!newDeptName.trim() || activeRowIndex === null) return;
     const id = newDeptName.trim().toLowerCase().replace(/\s+/g, '_');
-    await supabase.from('departments').insert([{ id, name: newDeptName.trim() }]);
+    await supabase.from('departments').insert([{ id, name: newDeptName.trim(), company_id: activeCompanyId || undefined }]);
     await fetchLookups();
     
     const updated = [...lineItems];
@@ -155,7 +186,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     e.preventDefault();
     if (!newDivName.trim() || activeRowIndex === null) return;
     const id = newDivName.trim().toLowerCase().replace(/\s+/g, '_');
-    await supabase.from('divisions').insert([{ id, name: newDivName.trim() }]);
+    await supabase.from('divisions').insert([{ id, name: newDivName.trim(), company_id: activeCompanyId || undefined }]);
     await fetchLookups();
 
     const updated = [...lineItems];
@@ -186,12 +217,13 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const totalAmountBasePKR = foreignTotalAmount * exchangeRate;
 
   const handleSubmit = () => {
-    const salesLedger = ledgers.find(l => l.name.toLowerCase().includes('sales') && l.type === AccountType.INCOME);
+    // ⚙️ Dynamic Mapped Targets resolution matching global configuration control panels
+    const salesLedger = ledgers.find(l => l.id === mappedSalesId) || ledgers.find(l => l.name.toLowerCase().includes('sales') && l.type === AccountType.INCOME);
     const cogsLedger = ledgers.find(l => l.name.toLowerCase().includes('cost of goods') && l.type === AccountType.EXPENSE);
-    const stockLedger = ledgers.find(l => l.name.toLowerCase().includes('stock') && l.type === AccountType.ASSET);
+    const stockLedger = ledgers.find(l => l.id === mappedStockId) || ledgers.find(l => l.name.toLowerCase().includes('stock') && l.type === AccountType.ASSET);
 
     if (!customerId || !salesLedger || foreignTotalAmount <= 0) {
-      alert("Please fill all details correctly.");
+      alert("Please fill all details correctly and map your default configurations.");
       return;
     }
 
@@ -227,155 +259,255 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     })();
   };
 
+  const activeCustomerObj = ledgers.find(l => l.id === customerId);
+
   return (
-    <div className="bg-gray-50/50 p-2 md:p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in dynamic-layouts relative">
-      <style>{`
-        @media print {
-          body * { visibility: hidden; background: white !important; }
-          .dynamic-layouts, .dynamic-layouts * { visibility: visible; }
-          .dynamic-layouts { position: absolute; left: 0; top: 0; width: 100%; border: none !important; box-shadow: none !important; padding: 0 !important; }
-          .no-print-el { display: none !important; }
-        }
-      `}</style>
+    <div className="max-w-7xl mx-auto space-y-6">
+      
+      {/* 📄 SCREEN INPUT FORMS BLOCK CONTAINER - Prints are dynamically hidden */}
+      <div className="no-print bg-gray-50/50 p-2 md:p-6 rounded-2xl space-y-6 relative">
+        {/* 👑 Header Action Strip */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
+          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
+            <span className="bg-indigo-600 text-white p-2 rounded-xl shadow-xs"><ShoppingCart size={18} /></span>
+            Create Sales Invoice
+          </h2>
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+            <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
+              <Printer size={14} /> Export / Print
+            </button>
+            <span className="text-[10px] bg-green-50 text-green-600 px-3 py-1.5 rounded-full font-black uppercase tracking-widest border border-green-100 flex items-center gap-1"><LinkIcon size={10}/>Live Sync</span>
+          </div>
+        </div>
 
-      {/* 👑 Header Action Strip */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
-        <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
-          <span className="bg-indigo-600 text-white p-2 rounded-xl shadow-xs"><ShoppingCart size={18} /></span>
-          Create Sales Invoice
-        </h2>
-        <div className="flex flex-wrap items-center gap-2.5 no-print-el w-full sm:w-auto justify-end">
-          <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
-            <Printer size={14} /> Export / Print
+        {/* 🏢 Split Meta Layout Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-1">
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Billed To Customer</label>
+              <select value={customerId} onChange={e => e.target.value === 'QUICK_ADD_CUST' ? setIsCustModalOpen(true) : setCustomerId(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-xs outline-none transition-all">
+                <option value="">Select Customer Registry...</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="QUICK_ADD_CUST" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Customer</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Invoice Number</label>
+              <input type="text" value={invoiceNo} readOnly className="w-full p-2.5 bg-slate-100/80 border border-gray-200 rounded-xl text-indigo-600 font-mono font-black text-xs text-center outline-none" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Issue Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2.5 border border-gray-200 focus:border-indigo-500 rounded-xl bg-gray-50 text-xs text-gray-800 font-bold outline-none shadow-xs transition-all" />
+            </div>
+          </div>
+
+          <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Currency</label>
+              <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === 'PKR') setExchangeRate(1); }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
+                <option value="PKR">PKR (Base)</option>
+                <option value="USD">USD ($)</option>
+                <option value="AED">AED (AED)</option>
+                <option value="GBP">GBP (£)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate</label>
+              <input type="number" value={exchangeRate} disabled={currency === 'PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === 'PKR' ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-indigo-200 text-indigo-600 ring-2 ring-indigo-50/50'}`} min="0.01" step="any" />
+            </div>
+          </div>
+        </div>
+
+        {/* 📊 High-Density Table Display */}
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
+          <div className="overflow-x-auto w-full scrollbar-thin">
+            <table className="w-full text-left border-collapse table-fixed min-w-[1150px]">
+              <thead className="bg-gray-50 text-slate-400 font-black text-[10px] uppercase tracking-widest border-b border-gray-200">
+                <tr>
+                  <th className="p-4 pl-6 w-[28%]">Product Detail / Master Ledger</th>
+                  <th className="p-4 w-[16%]">Cost Center (Dept)</th>
+                  <th className="p-4 w-[16%]">Segment (Div)</th>
+                  <th className="p-4 w-[8%] text-center">Qty</th>
+                  <th className="p-4 w-[8%] text-center">Cur</th>
+                  <th className="p-4 w-[12%] text-right">Price</th>
+                  <th className="p-4 w-[12%] text-right pr-6">Line Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-xs font-bold text-gray-700">
+                {lineItems.map((line, idx) => (
+                  <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-3 pl-6">
+                      <select value={line.itemId} onChange={e => handleRowMetricChange(idx, 'itemId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-800 shadow-xs focus:border-indigo-500" >
+                        <option value="">-- Select Product From Master --</option>
+                        {inventoryItems.map(item => ( <option key={item.id} value={item.id}>{item.name} (Stock: {item.currentStock})</option> ))}
+                        <option value="QUICK_ADD_ROW_PRODUCT" className="text-indigo-600 font-black bg-indigo-50">➕ Add New Product Listing</option>
+                      </select>
+                    </td>
+                    <td className="p-3">
+                      <select value={line.departmentId} onChange={e => handleRowMetricChange(idx, 'departmentId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-indigo-500">
+                        <option value="">Global / Unallocated</option>
+                        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        <option value="QUICK_ADD_ROW_DEPT" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Department</option>
+                      </select>
+                    </td>
+                    <td className="p-3">
+                      <select value={line.divisionId} onChange={e => handleRowMetricChange(idx, 'divisionId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-indigo-500">
+                        <option value="">Whole Strategy</option>
+                        {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Division</option>
+                      </select>
+                    </td>
+                    <td className="p-3"><input type="number" value={line.qty} onChange={e => handleRowMetricChange(idx, 'qty', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-black" /></td>
+                    <td className="p-3 text-center"><span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[11px] font-black uppercase tracking-wider">{currency}</span></td>
+                    <td className="p-3"><input type="number" value={line.rate} onChange={e => handleRowMetricChange(idx, 'rate', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-right font-mono font-bold" /></td>
+                    <td className="p-3 text-right font-mono text-gray-900 pr-6 text-xs flex items-center justify-end gap-3 h-[52px]">
+                      <span>{line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500 transition-colors disabled:opacity-30"><Trash2 size={14}/></button>
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-slate-50/50 font-black text-xs border-t">
+                  <td colSpan={5} className="p-4 text-right uppercase tracking-wider text-slate-400 text-[10px]">Grand Total ({currency}):</td>
+                  <td colSpan={2} className="p-4 text-right font-mono text-sm text-gray-900 pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                </tr>
+                {currency !== 'PKR' && (
+                  <tr className="bg-indigo-50/30 text-xs text-indigo-900 font-bold">
+                    <td colSpan={5} className="p-3 text-right uppercase text-[10px] tracking-wider text-indigo-400">Equivalent Base Total:</td>
+                    <td colSpan={2} className="p-3 text-right font-mono pr-6">PKR {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="p-4 bg-gray-50/50 border-t border-gray-100">
+            <button onClick={() => setLineItems([...lineItems, { itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }])} className="text-xs font-bold text-indigo-600 border border-dashed border-indigo-300 px-4 py-2 rounded-xl bg-white hover:bg-indigo-50 transition-all shadow-xs">
+              + Add New Entry Row
+            </button>
+          </div>
+        </div>
+
+        {/* Narration Memo */}
+        <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs">
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Narration / Remarks Context</label>
+          <textarea rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Internal ledger accounting comments..." className="w-full border border-gray-200 p-3 rounded-xl text-xs outline-none bg-gray-50/50 focus:bg-white focus:border-indigo-500 font-medium transition-all" />
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button onClick={onCancel} className="px-5 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">Discard Draft</button>
+          <button onClick={handleSubmit} className="px-10 py-3 bg-gray-900 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-black flex items-center gap-2 shadow-md transition-all">
+            <Save size={15} /> Post Invoice Ledger
           </button>
-          <span className="text-[10px] bg-green-50 text-green-600 px-3 py-1.5 rounded-full font-black uppercase tracking-widest border border-green-100 flex items-center gap-1"><LinkIcon size={10}/>Live Sync</span>
         </div>
       </div>
 
-      {/* 🏢 Split Meta Layout Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Card 1: Core Document Properties */}
-        <div className="lg:col-span-2 bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="sm:col-span-1">
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Billed To Customer</label>
-            <select value={customerId} onChange={e => e.target.value === 'QUICK_ADD_CUST' ? setIsCustModalOpen(true) : setCustomerId(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-xs outline-none transition-all">
-              <option value="">Select Customer Registry...</option>
-              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              <option value="QUICK_ADD_CUST" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Customer</option>
-            </select>
-          </div>
+      {/* 📄 DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
+      <div className="hidden print:block printable-invoice-canvas bg-white p-10 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
+        
+        {/* Brand Header */}
+        <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Invoice Number</label>
-            <input type="text" value={invoiceNo} readOnly className="w-full p-2.5 bg-slate-100/80 border border-gray-200 rounded-xl text-indigo-600 font-mono font-black text-xs text-center outline-none" />
+            <h1 className="text-3xl font-black tracking-tight uppercase text-gray-900" style={{ fontSize: '28px', fontWeight: '900' }}>
+              {companyName || "ZinethERP Entity"}
+            </h1>
+            <p className="text-xs text-gray-600 font-bold mt-1 tracking-wider uppercase">Official Transaction Document Ledger</p>
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Issue Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2.5 border border-gray-200 focus:border-indigo-500 rounded-xl bg-gray-50 text-xs text-gray-800 font-bold outline-none shadow-xs transition-all" />
+          <div className="text-right">
+            <span className="bg-black text-white px-4 py-1 rounded text-xs font-black tracking-widest uppercase">
+              Commercial Invoice
+            </span>
+            <h4 className="text-md font-mono font-black text-gray-950 mt-3" style={{ fontSize: '16px' }}>
+              #{invoiceNo || "INV-0001"}
+            </h4>
+            <p className="text-[11px] text-gray-600 font-bold mt-0.5">Date: {date}</p>
           </div>
         </div>
 
-        {/* Card 2: Currency Exchange Parameters */}
-        <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-2 gap-4">
+        {/* Client Metadata Address Block */}
+        <div className="grid grid-cols-2 gap-8 text-xs border-b border-gray-200 pb-6 pt-2">
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Currency</label>
-            <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === 'PKR') setExchangeRate(1); }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
-              <option value="PKR">PKR (Base)</option>
-              <option value="USD">USD ($)</option>
-              <option value="AED">AED (AED)</option>
-              <option value="GBP">GBP (£)</option>
-            </select>
+            <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Billed To / Customer Node:</h5>
+            <p className="text-gray-950 font-black text-sm" style={{ fontSize: '14px', fontWeight: '800' }}>
+              {activeCustomerObj ? activeCustomerObj.name : "Walking Trade / Cash Client"}
+            </p>
+            {currency && <p className="text-gray-600 font-bold mt-1.5">Trading Currency: <span className="font-mono text-gray-900 font-black">{currency}</span></p>}
           </div>
-          <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate</label>
-            <input type="number" value={exchangeRate} disabled={currency === 'PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === 'PKR' ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-indigo-200 text-indigo-600 ring-2 ring-indigo-50/50'}`} min="0.01" step="any" />
+          <div className="text-right">
+            <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Issued From Workspace:</h5>
+            <p className="text-gray-900 font-black text-sm uppercase">{companyName}</p>
+            <p className="text-gray-600 font-bold mt-0.5">{companyEmail || "billing@corporate.node"}</p>
+            {taxId && <p className="text-gray-500 font-bold mt-0.5">Tax Registration / GST: <span className="font-mono text-gray-900">{taxId}</span></p>}
           </div>
         </div>
-      </div>
 
-      {/* 📊 High-Density Strict Responsive Scroll Grid */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
-        <div className="overflow-x-auto w-full scrollbar-thin">
-          <table className="w-full text-left border-collapse table-fixed min-w-[1150px]">
-            <thead className="bg-gray-50 text-slate-400 font-black text-[10px] uppercase tracking-widest border-b border-gray-200">
+        {/* Clean Line Items Valuation Table */}
+        <div className="w-full pt-2">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-gray-100 border-b-2 border-gray-400 text-gray-700 font-black uppercase text-[9px] tracking-widest">
               <tr>
-                <th className="p-4 pl-6 w-[28%]">Product Detail / Master Ledger</th>
-                <th className="p-4 w-[16%]">Cost Center (Dept)</th>
-                <th className="p-4 w-[16%]">Segment (Div)</th>
-                <th className="p-4 w-[8%] text-center">Qty</th>
-                <th className="p-4 w-[8%] text-center">Cur</th>
-                <th className="p-4 w-[12%] text-right">Price</th>
-                <th className="p-4 w-[12%] text-right pr-6">Line Total</th>
+                <th className="p-3 pl-4">Product Detail / Master Ledger Description</th>
+                <th className="p-3 text-center w-20">Qty</th>
+                <th className="p-3 text-right w-32">Unit Rate</th>
+                <th className="p-3 text-right pr-4 w-36">Extended Net Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 text-xs font-bold text-gray-700">
-              {lineItems.map((line, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="p-3 pl-6">
-                    <select value={line.itemId} onChange={e => handleRowMetricChange(idx, 'itemId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-800 shadow-xs focus:border-indigo-500" >
-                      <option value="">-- Select Product From Master --</option>
-                      {inventoryItems.map(item => ( <option key={item.id} value={item.id}>{item.name} (Stock: {item.currentStock})</option> ))}
-                      <option value="QUICK_ADD_ROW_PRODUCT" className="text-indigo-600 font-black bg-indigo-50 no-print-el">➕ Add New Product Listing</option>
-                    </select>
-                  </td>
-                  <td className="p-3">
-                    <select value={line.departmentId} onChange={e => handleRowMetricChange(idx, 'departmentId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-indigo-500">
-                      <option value="">Global / Unallocated</option>
-                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="QUICK_ADD_ROW_DEPT" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Department</option>
-                    </select>
-                  </td>
-                  <td className="p-3">
-                    <select value={line.divisionId} onChange={e => handleRowMetricChange(idx, 'divisionId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-indigo-500">
-                      <option value="">Whole Strategy</option>
-                      {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Division</option>
-                    </select>
-                  </td>
-                  <td className="p-3"><input type="number" value={line.qty} onChange={e => handleRowMetricChange(idx, 'qty', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-black" /></td>
-                  
-                  {/* 💵 Dynamic Currency Column Integration */}
-                  <td className="p-3 text-center"><span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[11px] font-black uppercase tracking-wider">{currency}</span></td>
-                  
-                  <td className="p-3"><input type="number" value={line.rate} onChange={e => handleRowMetricChange(idx, 'rate', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-right font-mono font-bold" /></td>
-                  <td className="p-3 text-right font-mono text-gray-900 pr-6 text-xs flex items-center justify-end gap-3 h-[52px]">
-                    <span>{line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500 transition-colors disabled:opacity-30 no-print-el"><Trash2 size={14}/></button>
-                  </td>
-                </tr>
-              ))}
-              
-              {/* Grand Totals Presentation Fields */}
-              <tr className="bg-slate-50/50 font-black text-xs border-t">
-                <td colSpan={5} className="p-4 text-right uppercase tracking-wider text-slate-400 text-[10px]">Grand Total ({currency}):</td>
-                <td colSpan={2} className="p-4 text-right font-mono text-sm text-gray-900 pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-              </tr>
-              {currency !== 'PKR' && (
-                <tr className="bg-indigo-50/30 text-xs text-indigo-900 font-bold">
-                  <td colSpan={5} className="p-3 text-right uppercase text-[10px] tracking-wider text-indigo-400">Equivalent Base Total:</td>
-                  <td colSpan={2} className="p-3 text-right font-mono pr-6">PKR {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            <tbody className="divide-y divide-gray-300 text-gray-900 font-bold">
+              {lineItems.length > 0 && lineItems[0].itemId !== '' ? (
+                lineItems.map((item, idx) => {
+                  const targetProd = inventoryItems.find(i => i.id === item.itemId);
+                  return (
+                    <tr key={idx} className="border-b border-gray-200">
+                      <td className="p-3 pl-4 text-gray-900 font-extrabold">{targetProd ? targetProd.name : "Stock Inventory Item"}</td>
+                      <td className="p-3 text-center font-mono">{item.qty}</td>
+                      <td className="p-3 text-right font-mono">{item.rate?.toLocaleString()}</td>
+                      <td className="p-3 text-right font-mono text-gray-900 pr-4">{item.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan={4} className="p-3 pl-4 text-gray-400 italic text-center">No active materials mapped inside this snapshot transaction slip</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="p-4 bg-gray-50/50 border-t border-gray-100 no-print-el">
-          <button onClick={() => setLineItems([...lineItems, { itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }])} className="text-xs font-bold text-indigo-600 border border-dashed border-indigo-300 px-4 py-2 rounded-xl bg-white hover:bg-indigo-50 transition-all shadow-xs">
-            + Add New Entry Row
-          </button>
+
+        {/* Financial Metrics Summary Ledger Row */}
+        <div className="flex justify-between items-end pt-6 border-t-2 border-gray-400">
+          <div className="text-[10px] text-gray-500 max-w-sm font-medium leading-relaxed">
+            <p className="font-black text-gray-700 uppercase tracking-wider mb-1" style={{ fontSize: '9px' }}>Terms & Regulatory Statements:</p>
+            Computer-generated structural ledger document token entry. Auto-balanced and processed dynamically across partitioned corporate network modules. Standard ledger base index values.
+          </div>
+          
+          <div className="w-72 space-y-2 text-xs text-right">
+            <div className="flex justify-between text-gray-600 font-bold">
+              <span>Sub Total Balance:</span>
+              <span className="font-mono text-gray-900 font-black">{foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            </div>
+            {exchangeRate && exchangeRate !== 1 && (
+              <div className="flex justify-between text-gray-500 font-medium text-[11px]">
+                <span>Exchange Multiplier:</span>
+                <span className="font-mono font-bold">x {exchangeRate}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-gray-900 font-black text-sm pt-2 border-t-2 border-black">
+              <span className="uppercase tracking-wider">Net Amount Due:</span>
+              <span className="font-mono text-base text-black" style={{ fontSize: '16px', fontWeight: '900' }}>
+                {currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Narration Memo and Save Triggers Footer */}
-      <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs">
-        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Narration / Remarks Context</label>
-        <textarea rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Internal ledger accounting comments..." className="w-full border border-gray-200 p-3 rounded-xl text-xs outline-none bg-gray-50/50 focus:bg-white focus:border-indigo-500 font-medium transition-all" />
-      </div>
-
-      <div className="flex justify-end gap-3 no-print-el">
-        <button onClick={onCancel} className="px-5 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">Discard Draft</button>
-        <button onClick={handleSubmit} className="px-10 py-3 bg-gray-900 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-black flex items-center gap-2 shadow-md transition-all">
-          <Save size={15} /> Post Invoice Ledger
-        </button>
+        {/* Sign Ledger Line */}
+        <div className="pt-20 flex justify-between items-center text-xs">
+          <div className="text-gray-400 font-mono text-[10px]">
+            System Node Hash ID: {activeCompanyId?.substring(0,8)}
+          </div>
+          <div className="border-t-2 border-black pt-2 w-52 text-center text-[10px] font-black tracking-widest text-gray-900 uppercase">
+            Authorized Controller Stamp
+          </div>
+        </div>
       </div>
 
       {/* 📦 QUICK ADD PRODUCT MODAL */}
@@ -407,7 +539,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       )}
 
-      {/* PREVIOUS MODALS FULLY CONTROLLED */}
+      {/* OTHER QUICK POPUPS */}
       {isCustModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
@@ -443,6 +575,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
       )}
+
     </div>
   );
 };
