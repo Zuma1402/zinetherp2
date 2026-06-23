@@ -149,17 +149,22 @@ const App: React.FC = () => {
     try {
       let finalUniqueList: any[] = [];
       
-      if (currentUserSession.role === 'ADMIN' && !currentUserSession.company_id) {
-        const { data: allComps } = await supabase.from('companies').select('id, name');
+      const { data: allComps } = await supabase.from('companies').select('id, name');
+      const { data: userCompJunction } = await supabase
+        .from('user_companies')
+        .select('company_id')
+        .eq('user_id', currentUserSession.id);
+
+      const boundCompanyId = currentUserSession.company_id || (userCompJunction && userCompJunction[0]?.company_id) || '';
+
+      if (currentUserSession.role === 'ADMIN' && !boundCompanyId) {
         if (allComps) {
           const uniqueCompaniesMap = new Map();
           allComps.forEach((c: any) => uniqueCompaniesMap.set(c.name.trim().toLowerCase(), c));
           finalUniqueList = Array.from(uniqueCompaniesMap.values());
         }
-      } else {
-        const boundCompanyId = currentUserSession.company_id || localStorage.getItem('supabase_active_company_id') || '';
-        const { data: allComps } = await supabase.from('companies').select('id, name');
-        if (allComps && boundCompanyId) {
+      } else if (boundCompanyId) {
+        if (allComps) {
           finalUniqueList = allComps.filter((c: any) => c.id === boundCompanyId);
         }
       }
@@ -167,20 +172,14 @@ const App: React.FC = () => {
       setCompanies(finalUniqueList);
 
       if (finalUniqueList.length > 0) {
-        const storedId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
-        const matchedComp = finalUniqueList.find(c => c.id === storedId);
+        const storedId = boundCompanyId || localStorage.getItem('supabase_active_company_id') || finalUniqueList[0].id;
+        const matchedComp = finalUniqueList.find(c => c.id === storedId) || finalUniqueList[0];
         
-        if (matchedComp) {
-          setActiveCompanyId(matchedComp.id);
-          setCompanyName(matchedComp.name);
-          return matchedComp.id;
-        } else {
-          setActiveCompanyId(finalUniqueList[0].id);
-          setCompanyName(finalUniqueList[0].name);
-          localStorage.setItem('supabase_active_company_id', finalUniqueList[0].id);
-          localStorage.setItem('active_company_id', finalUniqueList[0].id);
-          return finalUniqueList[0].id;
-        }
+        setActiveCompanyId(matchedComp.id);
+        setCompanyName(matchedComp.name);
+        localStorage.setItem('supabase_active_company_id', matchedComp.id);
+        localStorage.setItem('active_company_id', matchedComp.id);
+        return matchedComp.id;
       }
       return '';
     } catch (err) {
@@ -386,7 +385,7 @@ const App: React.FC = () => {
               <Building2 size={18} className="text-indigo-600 shrink-0" />
               <select 
                 value={activeCompanyId || 'default'} 
-                disabled={user?.role !== 'ADMIN'}
+                disabled={companies.length <= 1}
                 onChange={(e) => {
                   const val = e.target.value;
                   if (val && val !== 'default') {
@@ -399,7 +398,7 @@ const App: React.FC = () => {
                     }
                   }
                 }}
-                className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans disabled:cursor-not-allowed"
+                className="w-full bg-transparent text-sm font-black text-indigo-900 focus:outline-none cursor-pointer pr-6 border-none appearance-none font-sans disabled:cursor-default"
                 style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
               >
                 {companies.length > 0 ? (
@@ -414,7 +413,7 @@ const App: React.FC = () => {
                   </option>
                 )}
               </select>
-              {user?.role === 'ADMIN' && <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />}
+              {companies.length > 1 && <ChevronDown size={14} className="text-indigo-500 absolute right-3 pointer-events-none" />}
             </div>
 
             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 bg-white border border-gray-200 px-2 py-1 rounded w-fit uppercase tracking-widest shadow-sm">
@@ -587,7 +586,7 @@ const App: React.FC = () => {
                   <TransactionManager title="Purchase Bills" type={VoucherType.PURCHASE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseInvoice} formProps={{ ledgers, items: inventoryItems, onAddLedger: handleAddLedger, trialBalance }} />
                 )}
                 {currentView === 'PURCHASE_RETURN' && (
-                  <TransactionManager title="Purchase Returns" type={VoucherType.DEBIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseReturn} formProps={{ ledgers, items: inventoryItems, trialBalance }} />
+                  <TransactionManager title="Purchase Returns" type={VoucherType.DEBIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseReturn} fontProps={{ ledgers, items: inventoryItems, trialBalance }} />
                 )}
                 {currentView === 'MAKE_PAYMENT' && (
                   <TransactionManager title="Payments to Vendors" type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={MakePaymentEntry} formProps={{ ledgers, trialBalance }} />
