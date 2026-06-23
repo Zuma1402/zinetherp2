@@ -70,7 +70,12 @@ const Settings: React.FC<SettingsProps> = ({
   const activeSelectionObj = allDbCompanies.find(c => c.id === localActiveId);
   const activeSelectionNameClean = activeSelectionObj ? activeSelectionObj.name.toLowerCase().replace(/\s+/g, '') : '';
   
-  const isMasterZenithScope = currentUser.role === 'ADMIN' && 
+  // 🛡️ SECURITY HIERARCHY DEFINITION
+  // Super Admin: Has role ADMIN and NO bounded company_id in profile record
+  const isSuperAdminRoot = currentUser.role === 'ADMIN' && !currentUser.company_id;
+  
+  // Master Zenith Scope for Infrastructure view control
+  const isMasterZenithScope = isSuperAdminRoot && 
     (!localActiveId || localActiveId === '' || activeSelectionNameClean === 'zinetherp' || (masterCompanyRow && localActiveId === masterCompanyRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111');
 
   const syncEngineData = async () => {
@@ -103,9 +108,11 @@ const Settings: React.FC<SettingsProps> = ({
       });
 
       const currentSelectionId = localActiveId || '';
-      if (currentUser.role === 'ADMIN' && (!currentSelectionId || activeSelectionNameClean === 'zinetherp' || currentSelectionId === '11111111-1111-1111-1111-111111111111')) {
+      
+      if (isMasterZenithScope) {
         setUsers(mappedUsers);
       } else {
+        // Company Admin or standard staff sees only users explicitly locked to this single active company node partition
         setUsers(mappedUsers.filter(u => u.company_id === currentSelectionId));
       }
     } catch (e) {
@@ -234,7 +241,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteUser = async (id: string) => {
     if (id === currentUser.id) return;
-    if (confirm('Are you sure you want to drop this user node?')) {
+    if (confirm('Are you sure you want to drop this user node from this company partition?')) {
       try {
         await supabase.from('user_companies').delete().eq('user_id', id);
         await deleteUser(id);
@@ -422,8 +429,9 @@ const Settings: React.FC<SettingsProps> = ({
                   <div>
                     <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Scope Locked Role Assignment</label>
                     <select value={staffRole} onChange={e => setStaffRole(e.target.value as Role)} className="w-full p-2 text-xs bg-indigo-950 text-indigo-300 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none font-bold">
-                      <option value="ACCOUNTANT">Editor (Workspace Bound)</option>
-                      <option value="VIEWER">Viewer (Workspace Bound)</option>
+                      <option value="ADMIN">ADMIN (Company-Level Sub Admin)</option>
+                      <option value="ACCOUNTANT">Editor / Accountant</option>
+                      <option value="VIEWER">Viewer (Read Only)</option>
                     </select>
                   </div>
                 </div>
@@ -456,6 +464,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
             </div>
             
+            {/* ⭐ Company-Level Admins can now explicitly trigger staff creation ONLY within their company context */}
             {!isMasterZenithScope && currentUser.role === 'ADMIN' && (
               <button onClick={() => setIsAddingTenantStaff(!isAddingTenantStaff)} className="bg-indigo-600 text-white text-xs font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition">
                 {isAddingTenantStaff ? 'Cancel Configuration' : <><Plus size={13}/> Add Staff to {companyName}</>}
@@ -483,8 +492,9 @@ const Settings: React.FC<SettingsProps> = ({
                 <div>
                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Role Type Control</label>
                     <select value={staffRole} onChange={e => setStaffRole(e.target.value as Role)} className="w-full p-2 border rounded text-sm font-bold bg-white outline-none">
-                      <option value="ACCOUNTANT">Editor (Workspace Bound)</option>
-                      <option value="VIEWER">Viewer (Workspace Bound)</option>
+                      <option value="ADMIN">ADMIN (Company-Level Sub Admin)</option>
+                      <option value="ACCOUNTANT">Editor / Accountant</option>
+                      <option value="VIEWER">Viewer (Read Only)</option>
                     </select>
                 </div>
               </div>
@@ -548,12 +558,13 @@ const Settings: React.FC<SettingsProps> = ({
                         <span className={`text-[9px] px-2 py-0.5 rounded-full font-black border uppercase tracking-wider shadow-sm
                           ${u.role === 'ADMIN' ? 'bg-purple-50 text-purple-700 border-purple-200' : u.role === 'ACCOUNTANT' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-500 border-gray-200'}
                         `}>
-                          {u.role === 'ADMIN' ? 'GLOBAL SUPERVISOR' : u.role === 'ACCOUNTANT' ? 'EDITOR (WORKSPACE BOUND)' : 'VIEWER (READ ONLY)'}
+                          {u.role === 'ADMIN' ? (u.company_id ? 'COMPANY ADMIN' : 'GLOBAL SUPERVISOR') : u.role === 'ACCOUNTANT' ? 'EDITOR (WORKSPACE BOUND)' : 'VIEWER (READ ONLY)'}
                         </span>
                       </td>
 
                       <td className="p-3 text-right pr-4">
                          <div className="flex justify-end gap-1">
+                            {/* ⭐ Company Admin can delete users within their company, Super admin can drop anyone */}
                             {u.id !== currentUser.id && currentUser.role === 'ADMIN' && (
                                 <button onClick={() => handleDeleteUser(u.id)} className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition"><Trash2 size={15} /></button>
                             )}
