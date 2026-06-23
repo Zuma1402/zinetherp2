@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Role, Department, Division } from '../types';
+import { User, Role, Department, Division, Ledger } from '../types';
 import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
@@ -31,6 +31,13 @@ const Settings: React.FC<SettingsProps> = ({
   const [taxId, setTaxId] = useState('');
   const [invoicePrefix, setInvoicePrefix] = useState('INV-');
   const [nextInvoiceNumber, setNextInvoiceNumber] = useState(1);
+
+  // ⚙️ STRUCTURAL LEDGER MAPPING CONFIGURATION SYSTEM HOOKS
+  const [allCompanyLedgers, setAllCompanyLedgers] = useState<Ledger[]>([]);
+  const [defaultSalesLedger, setDefaultSalesLedger] = useState('');
+  const [defaultPurchaseLedger, setDefaultPurchaseLedger] = useState('');
+  const [defaultStockLedger, setDefaultStockLedger] = useState('');
+  const [isMappingSaving, setIsMappingSaving] = useState(false);
 
   // States Matrix
   const [users, setUsers] = useState<User[]>([]);
@@ -71,12 +78,49 @@ const Settings: React.FC<SettingsProps> = ({
   const activeSelectionNameClean = activeSelectionObj ? activeSelectionObj.name.toLowerCase().replace(/\s+/g, '') : '';
   
   // 🛡️ SECURITY HIERARCHY DEFINITION
-  // Super Admin: Has role ADMIN and NO bounded company_id in profile record
   const isSuperAdminRoot = currentUser.role === 'ADMIN' && !currentUser.company_id;
   
   // Master Zenith Scope for Infrastructure view control
   const isMasterZenithScope = isSuperAdminRoot && 
     (!localActiveId || localActiveId === '' || activeSelectionNameClean === 'zinetherp' || (masterCompanyRow && localActiveId === masterCompanyRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111');
+
+  // Fetch lookups matrix lists for ledgers mapping control room
+  const fetchLedgerMappingData = async (companyId: string) => {
+    if (!companyId) return;
+    try {
+      // 1. Fetch ledgers belonging explicitly to this partition company node context
+      const { data: ledgersData } = await supabase
+        .from('ledgers')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('name');
+      
+      if (ledgersData) {
+        setAllCompanyLedgers(ledgersData.map(l => ({
+          id: l.id,
+          name: l.name,
+          type: l.type,
+          group: l.group_name || l.group,
+          openingBalance: l.opening_balance || 0
+        })));
+      }
+
+      // 2. Fetch already committed configuration bindings matrix settings values
+      const { data: mappings } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('company_id', companyId)
+        .single();
+      
+      if (mappings) {
+        setDefaultSalesLedger(mappings.default_sales_ledger || '');
+        setDefaultPurchaseLedger(mappings.default_purchase_ledger || '');
+        setDefaultStockLedger(mappings.default_stock_ledger || '');
+      }
+    } catch (err) {
+      console.error("Ledger maps registry reading crash:", err);
+    }
+  };
 
   const syncEngineData = async () => {
     try {
@@ -112,8 +156,12 @@ const Settings: React.FC<SettingsProps> = ({
       if (isMasterZenithScope) {
         setUsers(mappedUsers);
       } else {
-        // Company Admin or standard staff sees only users explicitly locked to this single active company node partition
         setUsers(mappedUsers.filter(u => u.company_id === currentSelectionId));
+      }
+
+      // Trigger automatic background loading for mappings
+      if (currentSelectionId) {
+        fetchLedgerMappingData(currentSelectionId);
       }
     } catch (e) {
       console.error("Scope synchronization failure:", e);
@@ -154,6 +202,34 @@ const Settings: React.FC<SettingsProps> = ({
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  // 📝 SUBMISSION HANDLER TO COMMIT DEFAULT ACCOUNT CONFIGURATION MAPPINGS
+  const handleSaveLedgerMappings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!localActiveId) return;
+
+    setIsMappingSaving(true);
+    try {
+      // Upsert direct mappings settings configurations parameters state columns fields into cloud table matching company node
+      const { error } = await supabase
+        .from('company_settings')
+        .upsert({
+          company_id: localActiveId,
+          default_sales_ledger: defaultSalesLedger || null,
+          default_purchase_ledger: defaultPurchaseLedger || null,
+          default_stock_ledger: defaultStockLedger || null
+        }, { onConflict: 'company_id' });
+
+      if (error) throw error;
+      
+      alert("Chart of accounts automatic double-entry ledgers mapping saved!");
+      await syncEngineData();
+    } catch (err: any) {
+      alert(`Ledger configuration blueprint crash: ${err.message}`);
+    } finally {
+      setIsMappingSaving(false);
     }
   };
 
@@ -444,6 +520,54 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
+        {/* 🗺️ THE AUTOMATED DOUBLE-ENTRY LEDGERS MAPPING ROOM CONTROL PANEL */}
+        {!isMasterZenithScope && currentUser.role === 'ADMIN' && (
+          <div className="md:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+            <div className="border-b pb-3">
+              <h2 className="text-md font-black text-gray-800 flex items-center gap-2">
+                <span className="bg-indigo-50 text-indigo-600 p-1 rounded-lg">⚙️</span>
+                Double-Entry Ledgers Mapping Control Panel
+              </h2>
+              <p className="text-xs text-gray-400 mt-1 font-semibold">Map global default income, material expenditures, and inventory valuation accounts explicitly for system balance processing nodes.</p>
+            </div>
+
+            <form onSubmit={handleSaveLedgerMappings} className="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Default Sales Income Ledger</label>
+                <select value={defaultSalesLedger} onChange={e => setDefaultSalesLedger(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+                  <option value="">-- Mapped Sales Account --</option>
+                  {allCompanyLedgers.filter(l => l.type === 'INCOME').map(l => (
+                    <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Default Purchase Expense Ledger</label>
+                <select value={defaultPurchaseLedger} onChange={e => setDefaultPurchaseLedger(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+                  <option value="">-- Mapped Procurement Account --</option>
+                  {allCompanyLedgers.filter(l => l.type === 'EXPENSE').map(l => (
+                    <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Default Inventory Stock Asset</label>
+                <select value={defaultStockLedger} onChange={e => setDefaultStockLedger(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+                  <option value="">-- Mapped Valuation Stock Asset --</option>
+                  {allCompanyLedgers.filter(l => l.type === 'ASSET' && (l.group.toLowerCase().includes('stock') || l.name.toLowerCase().includes('stock'))).map(l => (
+                    <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-3 flex justify-end border-t border-gray-100 pt-3">
+                <button type="submit" disabled={isMappingSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs py-2.5 px-6 rounded-xl flex items-center gap-1.5 shadow-sm uppercase tracking-wider">
+                  <Save size={13} /> {isMappingSaving ? 'Saving Configurations...' : 'Commit Ledgers Mappings'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* 👑 USER MANAGEMENT MATRIX MONITOR TERMINAL */}
         <div className="md:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-start mb-6">
@@ -464,7 +588,6 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
             </div>
             
-            {/* ⭐ Company-Level Admins can now explicitly trigger staff creation ONLY within their company context */}
             {!isMasterZenithScope && currentUser.role === 'ADMIN' && (
               <button onClick={() => setIsAddingTenantStaff(!isAddingTenantStaff)} className="bg-indigo-600 text-white text-xs font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition">
                 {isAddingTenantStaff ? 'Cancel Configuration' : <><Plus size={13}/> Add Staff to {companyName}</>}
@@ -564,7 +687,6 @@ const Settings: React.FC<SettingsProps> = ({
 
                       <td className="p-3 text-right pr-4">
                          <div className="flex justify-end gap-1">
-                            {/* ⭐ Company Admin can delete users within their company, Super admin can drop anyone */}
                             {u.id !== currentUser.id && currentUser.role === 'ADMIN' && (
                                 <button onClick={() => handleDeleteUser(u.id)} className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition"><Trash2 size={15} /></button>
                             )}
