@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, AccountType, Department, Division } from '../types';
-import { Save, X } from 'lucide-react';
+import { Save, X, ArrowRight } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 
 interface ExpenseEntryProps {
@@ -16,6 +16,10 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
   const [paymentLedgerId, setPaymentLedgerId] = useState('');
   const [amount, setAmount] = useState(0);
   const [narration, setNarration] = useState('');
+
+  // 🧾 MULTI-CURRENCY EXTRA STATE VARIABLES
+  const [currency, setCurrency] = useState<string>('PKR');
+  const [exchangeRate, setExchangeRate] = useState<number>(1);
 
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedDiv, setSelectedDiv] = useState('');
@@ -40,15 +44,18 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
 
   useEffect(() => { fetchDimensions(); }, []);
 
-  const fetchDimensions = async () => {
+  const fetchLookups = async () => {
     const { data: depts } = await supabase.from('departments').select('*').order('name');
     const { data: divs } = await supabase.from('divisions').select('*').order('name');
     if (depts) setDepartments(depts);
     if (divs) setDivisions(divs);
   };
 
+  // Keep identity method alias mapped cleanly
+  const fetchDimensions = fetchLookups;
+
   const expenseAccounts = localLedgers.filter(l => l.type === AccountType.EXPENSE);
-  const paymentAccounts = localLedgers.filter(l => l.group.includes('Cash') || l.group.includes('Bank'));
+  const paymentAccounts = localLedgers.filter(l => l.group.includes('Cash') || l.group.includes('Bank') || l.id.includes('cash') || l.id.includes('bank'));
 
   // ⭐ Handler for the new Expense Account select trigger
   const handleExpenseDropdownChange = (val: string) => {
@@ -121,6 +128,9 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
     setNewDivName('');
   };
 
+  // 🧮 Multi-Currency Scaled Calculation Matrix
+  const amountBasePKR = (amount || 0) * exchangeRate;
+
   const handleSubmit = () => {
     if (!expenseLedgerId || !paymentLedgerId || amount <= 0) {
       alert("Please fill all details correctly.");
@@ -132,90 +142,125 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
       date,
       number: `EXP-${Math.floor(Math.random() * 10000)}`,
       type: VoucherType.PAYMENT,
-      narration: narration || 'Expense Recorded',
+      narration: narration || `Expense Recorded (${currency})`,
+      // 🪙 Entries multiplied cleanly into system PKR standard balances
       entries: [
-        { ledgerId: expenseLedgerId, debit: amount, credit: 0, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined },
-        { ledgerId: paymentLedgerId, debit: 0, credit: amount, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined }
-      ]
-    };
+        { ledgerId: expenseLedgerId, debit: amountBasePKR, credit: 0, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined },
+        { ledgerId: paymentLedgerId, debit: 0, credit: amountBasePKR, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined }
+      ],
+      currency,
+      exchangeRate,
+      foreignTotal: amount
+    } as any;
     onSave(voucher);
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 max-w-2xl mx-auto border border-gray-100 mt-6 relative">
-      <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-        <span className="bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg text-sm font-bold">Record Expense</span>
+    <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 max-w-3xl mx-auto border border-gray-100 mt-6 relative animate-in fade-in">
+      <h2 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
+        <span className="bg-orange-500 text-white px-3 py-1.5 rounded-xl text-sm font-black uppercase tracking-wider">Record Expense</span>
       </h2>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* ⭐ Modified Expense Category Section with Dropdown Add Trigger */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Expense Category</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Expense Category</label>
             <select 
-              className="w-full p-2 border rounded-lg mt-1 text-xs font-bold text-gray-800 outline-none" 
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all" 
               value={expenseLedgerId} 
               onChange={e => handleExpenseDropdownChange(e.target.value)}
             >
               <option value="">Select Account</option>
               {expenseAccounts.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              <option value="QUICK_ADD_EXPENSE_ACCOUNT" className="text-orange-600 font-bold bg-orange-50/50">➕ Add New Expense Account</option>
+              <option value="QUICK_ADD_EXPENSE_ACCOUNT" className="text-orange-600 font-black bg-orange-50/70">➕ Add New Expense Account</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Department</label>
-            <select value={selectedDept} onChange={e => e.target.value === 'QUICK_ADD_DEPT' ? setIsDeptModalOpen(true) : setSelectedDept(e.target.value)} className="w-full p-2 border rounded-lg mt-1 text-xs font-bold text-gray-700">
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Department</label>
+            <select value={selectedDept} onChange={e => e.target.value === 'QUICK_ADD_DEPT' ? setIsDeptModalOpen(true) : setSelectedDept(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
               <option value="">HQ / Central</option>
               {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              <option value="QUICK_ADD_DEPT" className="text-orange-600 font-bold">➕ Add New</option>
+              <option value="QUICK_ADD_DEPT" className="text-orange-600 font-bold bg-orange-50/50">➕ Add New</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Division</label>
-            <select value={selectedDiv} onChange={e => e.target.value === 'QUICK_ADD_DIV' ? setIsDivModalOpen(true) : setSelectedDiv(e.target.value)} className="w-full p-2 border rounded-lg mt-1 text-xs font-bold text-gray-700">
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Division</label>
+            <select value={selectedDiv} onChange={e => e.target.value === 'QUICK_ADD_DIV' ? setIsDivModalOpen(true) : setSelectedDiv(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
               <option value="">Enterprise Strategy</option>
               {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              <option value="QUICK_ADD_DIV" className="text-orange-600 font-bold">➕ Add New</option>
+              <option value="QUICK_ADD_DIV" className="text-orange-600 font-bold bg-orange-50/50">➕ Add New</option>
             </select>
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Paid From</label>
-          <select className="w-full p-2 border rounded-lg mt-1 text-sm" value={paymentLedgerId} onChange={e => setPaymentLedgerId(e.target.value)}>
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Paid From (Cash/Bank Asset)</label>
+          <select className="w-full p-3 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all" value={paymentLedgerId} onChange={e => setPaymentLedgerId(e.target.value)}>
             <option value="">Select Payment Mode (Cash/Bank)</option>
-            {paymentAccounts.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            {paymentAccounts.map(l => <option key={l.id} value={l.id}>{l.name} ({l.group})</option>)}
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        {/* 📑 MULTI-CURRENCY CONVERSION SYSTEM EMBEDDED CARD */}
+        <div className="bg-slate-50 border border-gray-200/60 p-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 shadow-inner">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</label>
-            <input type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} className="w-full p-2 border rounded-lg mt-1 text-right font-bold text-gray-700" />
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Expense Currency</label>
+            <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === 'PKR') setExchangeRate(1); }} className="w-full p-2.5 bg-white border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-black text-gray-800 shadow-sm outline-none transition-all">
+              <option value="PKR">PKR (Local Base Currency)</option>
+              <option value="USD">USD (US Dollar - $)</option>
+              <option value="AED">AED (UAE Dirham)</option>
+              <option value="GBP">GBP (British Pound - £)</option>
+            </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2 border rounded-lg mt-1 text-sm" />
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+              {currency === 'PKR' ? 'Exchange Rate Override' : `Exchange Rate (1 ${currency} = ? PKR)`}
+            </label>
+            <input type="number" value={exchangeRate} disabled={currency === 'PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-sm ${currency === 'PKR' ? 'bg-gray-100/70 border-gray-200 text-gray-400' : 'bg-white border-orange-200 text-orange-600 ring-2 ring-orange-50/50'}`} min="0.01" step="any" />
           </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Amount ({currency})</label>
+            <input type="number" value={amount || ''} onChange={e => setAmount(Number(e.target.value))} className="w-full p-2.5 border border-gray-200 focus:border-orange-500 rounded-xl bg-white font-mono font-black text-xs text-right outline-none shadow-sm transition-all" placeholder="0.00" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2.5 border border-gray-200 focus:border-orange-500 rounded-xl bg-white text-xs font-bold outline-none shadow-sm transition-all" />
+          </div>
+        </div>
+
+        {/* 💵 Visual Conversion Alert Badge Strip */}
+        {currency !== 'PKR' && amount > 0 && (
+          <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center justify-between text-xs text-orange-800 font-bold animate-in zoom-in-95 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <span>{currency} {amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <ArrowRight size={12} className="text-orange-400" />
+              <span>Base Ledger Entry Value:</span>
+            </div>
+            <span className="font-mono font-black">PKR {amountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+          </div>
+        )}
 
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</label>
-          <textarea className="w-full p-2 border rounded-lg mt-1 text-sm" rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Paid office rent..."></textarea>
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Notes / Internal Remarks</label>
+          <textarea className="w-full border border-gray-200 p-3 rounded-xl text-xs outline-none bg-gray-50/50 focus:bg-white focus:border-orange-500 font-medium transition-all" rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Paid office rent, servers subscription billing reference..."></textarea>
         </div>
 
-        <div className="flex gap-3 pt-2">
-          <button onClick={onCancel} className="flex-1 py-2 bg-gray-100 text-gray-700 font-semibold rounded-lg text-sm">Cancel</button>
-          <button onClick={handleSubmit} className="flex-1 py-2 bg-orange-600 text-white font-semibold rounded-lg text-sm hover:bg-orange-700">Record Expense</button>
+        <div className="flex gap-3 pt-2 no-print-el">
+          <button type="button" onClick={onCancel} className="flex-1 py-2.5 bg-gray-100 text-gray-400 font-bold uppercase tracking-widest rounded-xl text-xs transition-colors hover:text-gray-600">Cancel</button>
+          <button type="button" onClick={handleSubmit} className="flex-1 py-2.5 bg-orange-600 text-white font-black uppercase tracking-widest rounded-xl text-xs shadow-md hover:bg-orange-700 transition-all">Record Expense</button>
         </div>
       </div>
 
       {/* ⭐ Quick Add Expense Category Popup Modal Component */}
       {isExpenseAccModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 border">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 border animate-in zoom-in-95 duration-150">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Expense Account</h3>
             <form onSubmit={handleQuickExpenseAccSubmit} className="space-y-4">
               <input 
@@ -238,7 +283,7 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
 
       {/* Department Modal */}
       {isDeptModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-in zoom-in-95 duration-150">
           <div className="bg-white rounded-xl p-5 max-w-sm w-full shadow-xl">
             <h3 className="text-sm font-bold mb-2">Add Department</h3>
             <form onSubmit={handleQuickDeptSubmit} className="space-y-3">
@@ -254,7 +299,7 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
 
       {/* Division Modal */}
       {isDivModalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-in zoom-in-95 duration-150">
           <div className="bg-white rounded-xl p-5 max-w-sm w-full shadow-xl">
             <h3 className="text-sm font-bold mb-2">Add Division</h3>
             <form onSubmit={handleQuickDivSubmit} className="space-y-3">
