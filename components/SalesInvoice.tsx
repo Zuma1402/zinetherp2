@@ -3,7 +3,6 @@ import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer } from 'luc
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
-import ItemAutocomplete from './ItemAutocomplete';
 
 interface SalesInvoiceProps {
   ledgers: Ledger[];
@@ -286,8 +285,20 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             <tbody className="divide-y divide-gray-100 text-xs font-bold text-gray-700">
               {lineItems.map((line, idx) => (
                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                  {/* 🔄 Native Dropdown Selection Injection Block */}
                   <td className="p-3 pl-6">
-                    <ItemAutocomplete items={items} selectedId={line.itemId} onSelect={id => handleRowMetricChange(idx, 'itemId', id)} placeholder="Search product or description..." priceType="rate" />
+                    <select
+                      value={line.itemId}
+                      onChange={e => handleRowMetricChange(idx, 'itemId', e.target.value)}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-800 shadow-sm focus:border-indigo-500 transition-all"
+                    >
+                      <option value="">-- Select Product From Master --</option>
+                      {items.map(item => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} (Stock: {item.currentStock} {item.unit || 'pcs'}) — Price: {item.rate?.toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="p-3">
                     <select value={line.departmentId} onChange={e => handleRowMetricChange(idx, 'departmentId', e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-xl outline-none text-xs text-gray-700 font-medium">
@@ -313,8 +324,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                   </td>
                 </tr>
               ))}
-              
-              {/* Summary Presentation Block Row */}
               <tr className="bg-slate-50/60 font-black text-sm border-t">
                 <td colSpan={5} className="p-4 text-right uppercase tracking-wider text-slate-400 text-[10px]">Total Invoice Balance ({currency}):</td>
                 <td className="p-4 text-right font-mono text-base text-gray-900 pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -343,7 +352,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       </div>
 
       <div className="flex justify-end gap-3 pt-4 border-t no-print-el">
-        <button onClick={onCancel} className="px-6 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">Discard Draft</button>
+        <button onClick={onCancel} className="px-6 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-700 transition-colors">Discard Draft</button>
         <button onClick={handleSubmit} className="px-10 py-3 bg-gray-900 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-black flex items-center gap-2 shadow-md transition-all">
           <Save size={16} /> Save Invoice
         </button>

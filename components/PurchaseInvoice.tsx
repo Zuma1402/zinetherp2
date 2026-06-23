@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, ShoppingBag, Printer } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, Department, Division } from '../types';
 import { supabase } from '../services/supabaseService';
-import ItemAutocomplete from './ItemAutocomplete';
 
 interface PurchaseInvoiceProps {
   ledgers: Ledger[];
@@ -118,7 +117,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
 
   return (
     <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-6xl mx-auto border border-gray-100 animate-in fade-in relative dynamic-layouts">
-      {/* Dynamic Embedded Rules for Standard A4 Canvas Printing */}
       <style>{`
         @media print {
           body * { visibility: hidden; background: white !important; }
@@ -136,7 +134,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
           New Purchase Bill
         </h2>
         <div className="flex items-center gap-3 no-print-el">
-          {/* ⭐ Clean Integrated PDF/Print Button */}
           <button 
             onClick={() => window.print()} 
             className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-sm"
@@ -160,7 +157,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         <div><label className="block text-[10px] font-black text-blue-900/40 uppercase tracking-[0.2em] mb-1">Post Date</label><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border border-blue-100 rounded-xl bg-white font-bold text-xs shadow-xs" /></div>
       </div>
 
-      {/* RESTORED FULL PURCHASE GRID MATRIX */}
       <div className="border border-blue-50 rounded-[2.5rem] overflow-hidden mb-8 shadow-sm bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-full">
@@ -178,21 +174,33 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
             <tbody className="divide-y divide-gray-50 text-xs font-bold text-gray-700">
               {lineItems.map((line, idx) => (
                 <tr key={idx} className="hover:bg-blue-50/10 transition-colors">
+                  {/* 🔄 Native Dropdown Selection Injection Block */}
                   <td className="p-4 pl-6">
-                    <ItemAutocomplete items={items} selectedId={line.itemId} onSelect={id => handleRowMetricChange(idx, 'itemId', id)} placeholder="Search materials or items..." priceType="costPrice" />
+                    <select
+                      value={line.itemId}
+                      onChange={e => handleRowMetricChange(idx, 'itemId', e.target.value)}
+                      className="w-full p-2.5 bg-white border border-gray-200 rounded-xl outline-none text-xs font-bold text-gray-800 shadow-sm focus:border-blue-500 transition-all"
+                    >
+                      <option value="">-- Select Material / Asset From Master --</option>
+                      {items.map(item => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} (Stock: {item.currentStock} {item.unit || 'pcs'}) — Cost: {item.costPrice?.toLocaleString() || '0'}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="p-4">
                     <select value={line.departmentId} onChange={e => handleRowMetricChange(idx, 'departmentId', e.target.value)} className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs outline-none">
                       <option value="">Global / Unallocated</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="QUICK_ADD_ROW_DEPT" className="text-blue-600 font-bold bg-blue-50 no-print-el">➕ Add New Department</option>
+                      <option value="QUICK_ADD_ROW_DEPT" className="text-blue-600 font-bold bg-indigo-50 no-print-el">➕ Add New Department</option>
                     </select>
                   </td>
                   <td className="p-4">
                     <select value={line.divisionId} onChange={e => handleRowMetricChange(idx, 'divisionId', e.target.value)} className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs outline-none">
                       <option value="">Whole Strategy</option>
                       {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="QUICK_ADD_ROW_DIV" className="text-blue-600 font-bold bg-blue-50 no-print-el">➕ Add New Division</option>
+                      <option value="QUICK_ADD_ROW_DIV" className="text-blue-600 font-bold bg-indigo-50 no-print-el">➕ Add New Division</option>
                     </select>
                   </td>
                   <td className="p-4"><input type="number" value={line.qty} onChange={e => handleRowMetricChange(idx, 'qty', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-black" /></td>
@@ -201,7 +209,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
                   <td className="p-4 text-center no-print-el"><button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500"><Trash2 size={16}/></button></td>
                 </tr>
               ))}
-              {/* RESTORED BOTTOM AMOUNT ROW SUMMARY */}
               <tr className="bg-blue-50/10 font-black text-sm text-gray-900">
                 <td colSpan={5} className="p-5 text-right uppercase tracking-wider text-slate-400 text-[10px]">Total Bill Amount:</td>
                 <td className="p-5 text-right font-mono text-base pr-6">${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -210,7 +217,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
             </tbody>
           </table>
         </div>
-        {/* RESTORED BUTTON FOOTER */}
         <div className="p-4 bg-blue-50/20 border-t no-print-el">
           <button onClick={() => setLineItems([...lineItems, { itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }])} className="text-xs font-bold text-blue-600 border border-dashed border-blue-200 px-5 py-2 rounded-xl bg-white hover:bg-blue-50 transition-all shadow-sm">
             + NEW PURCHASE ENTRY
@@ -218,13 +224,11 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         </div>
       </div>
 
-      {/* RESTORED NARRATION BOX */}
       <div className="bg-white p-5 border border-gray-200 rounded-2xl mb-6">
         <label className="block text-[10px] font-black text-blue-900/40 uppercase tracking-[0.2em] mb-2">Narration / Internal Remarks</label>
         <textarea rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Purchase notes..." className="w-full border p-3 rounded-xl text-xs outline-none bg-white font-medium" />
       </div>
 
-      {/* RESTORED SAVE DISCARD ACTIONS */}
       <div className="flex justify-end gap-3 pt-4 border-t no-print-el">
         <button onClick={onCancel} className="px-6 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-700">Abort Post</button>
         <button onClick={handleSubmit} className="px-12 py-3.5 bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-blue-700 flex items-center gap-2 shadow-md">
