@@ -90,7 +90,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   };
 
   const handleQuickDeptSubmit = async (e: React.FormEvent) => {
-    preventDefault();
+    e.preventDefault();
     if (!newDeptName.trim() || activeRowIndex === null) return;
     const id = newDeptName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('departments').insert([{ id, name: newDeptName.trim() }]);
@@ -219,38 +219,53 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* RE-ARCHITECTED CONTROLS GRID WITH INTEGRATED CURRENCY CHANNELS */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-6 bg-slate-50 border border-gray-200/60 rounded-2xl mb-6">
-        <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Billed To (Customer)</label>
-          <select value={customerId} onChange={e => e.target.value === 'QUICK_ADD_CUST' ? setIsCustModalOpen(true) : setCustomerId(e.target.value)} className="w-full p-3 bg-white border border-gray-300 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none">
-            <option value="">Select Customer Registry...</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            <option value="QUICK_ADD_CUST" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Customer</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Invoice #</label>
-          <input type="text" value={invoiceNo} readOnly className="w-full p-3 bg-white border border-gray-200 rounded-xl text-indigo-600 font-mono font-black text-xs text-center shadow-inner" />
-        </div>
-        <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Date</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl bg-white text-xs text-gray-800 font-bold outline-none shadow-sm" />
+      {/* 💎 Structural 2-Row Clean Layout Matrix */}
+      <div className="space-y-4 p-6 bg-slate-50 border border-gray-200/60 rounded-2xl mb-6 shadow-inner">
+        {/* Row 1: Primary Document Info */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Billed To (Customer)</label>
+            <select value={customerId} onChange={e => e.target.value === 'QUICK_ADD_CUST' ? setIsCustModalOpen(true) : setCustomerId(e.target.value)} className="w-full p-3 bg-white border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+              <option value="">Select Customer Registry...</option>
+              {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="QUICK_ADD_CUST" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Customer</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Invoice #</label>
+            <input type="text" value={invoiceNo} readOnly className="w-full p-3 bg-white border border-gray-200 rounded-xl text-indigo-600 font-mono font-black text-xs text-center shadow-inner" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border border-gray-200 focus:border-indigo-500 rounded-xl bg-white text-xs text-gray-800 font-bold outline-none shadow-sm transition-all" />
+          </div>
         </div>
         
-        {/* 📑 Currency Matrix Controllers Section */}
-        <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Billing Currency</label>
-          <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === 'PKR') setExchangeRate(1); }} className="w-full p-3 bg-white border border-gray-300 rounded-xl text-xs font-black text-gray-800 shadow-sm outline-none">
-            <option value="PKR">PKR (Base)</option>
-            <option value="USD">USD ($)</option>
-            <option value="AED">AED (Dirham)</option>
-            <option value="GBP">GBP (£)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Exchange Rate (1 {currency} = ? PKR)</label>
-          <input type="number" value={exchangeRate} disabled={currency === 'PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-indigo-600 font-black text-xs text-center shadow-sm disabled:bg-gray-100 disabled:text-gray-400 outline-none" min="0.01" step="any" />
+        {/* Row 2: Currency Switchers & Exchange Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-gray-200/40">
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Billing Currency</label>
+            <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === 'PKR') setExchangeRate(1); }} className="w-full p-3 bg-white border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-black text-gray-800 shadow-sm outline-none transition-all">
+              <option value="PKR">PKR (Local Base Currency)</option>
+              <option value="USD">USD (US Dollar - $)</option>
+              <option value="AED">AED (UAE Dirham)</option>
+              <option value="GBP">GBP (British Pound - £)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+              {currency === 'PKR' ? 'Exchange Rate Override' : `Exchange Rate (1 ${currency} = ? PKR)`}
+            </label>
+            <input 
+              type="number" 
+              value={exchangeRate} 
+              disabled={currency === 'PKR'} 
+              onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} 
+              className={`w-full p-3 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-sm ${currency === 'PKR' ? 'bg-gray-100/70 border-gray-200 text-gray-400' : 'bg-white border-indigo-200 text-indigo-600 focus:border-indigo-500 ring-2 ring-indigo-50'}`} 
+              min="0.01" 
+              step="any" 
+            />
+          </div>
         </div>
       </div>
 
