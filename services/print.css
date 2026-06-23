@@ -1,0 +1,52 @@
+/* 📄 ENTERPRISE GRADE PRINT UTILITY SYSTEM MATRIX */
+@media print {
+  /* 1. Hide everything that isn't a bill core wrapper */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* 2. Target only the designated print sheet and its child contents */
+  .printable-invoice-canvas,
+  .printable-invoice-canvas * {
+    visibility: visible;
+  }
+  
+  /* 3. Absolute layout sheet positioning bounds force standard print layout scale */
+  .printable-invoice-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* 4. Hide structural sidebars, navigation layout bars, buttons anchors */
+  aside, 
+  header, 
+  button, 
+  .no-print,
+  nav,
+  input[type="button"],
+  select {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+  }
+
+  /* 5. Force background tracking colors to show correctly on premium matrix hardware ink jets */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  @page {
+    size: A4;
+    margin: 15mm 15mm 15mm 15mm;
+  }
+}

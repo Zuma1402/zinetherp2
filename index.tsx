@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './print.css'; // 📄 INTERPRATIONAL PRINT CANVAS RULEBOOK LINKED 
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
