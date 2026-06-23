@@ -31,7 +31,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [mappedSalesId, setMappedSalesLedgerId] = useState('');
   const [mappedCogsId, setMappedCogsLedgerId] = useState('');
   const [mappedStockId, setMappedStockLedgerId] = useState('');
-  const [companyName, setCompanyName] = useState('ZinethERP');
+  
+  // Active Tenant Context Information Mappings
+  const [companyName, setCompanyName] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
   const [taxId, setTaxId] = useState('');
   const [activeCompanyId, setActiveCompanyId] = useState('');
@@ -72,8 +74,10 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         const prefix = settings.invoicePrefix || 'INV-';
         const nextNum = settings.nextInvoiceNumber || 1;
         setInvoiceNo(`${prefix}${nextNum.toString().padStart(4, '0')}`);
+        
+        // ⭐ Fetch direct configured profile workspace variables
         setCompanyName(settings.companyName || 'ZinethERP');
-        setCompanyEmail(settings.email || '');
+        setCompanyEmail(settings.email || settings.companyEmail || '');
         setTaxId(settings.taxId || '');
 
         const targetId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
@@ -261,7 +265,21 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   return (
     <div className="max-w-7xl mx-auto">
       
-      {/* 🛡️ 1. SCREEN INPUT FORMS BLOCK CONTAINER - Prints are 100% absolutely hidden */}
+      {/* ⚠️ FORCE-WIPE BROWSER AUTO HEADERS/FOOTERS (ZinethERP text on top screen) */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 0mm !important; /* This completely wipes browser default text, date, and URL frames */
+          }
+          body {
+            padding: 15mm !important; /* Force content boundary safe space layout */
+            background-color: #ffffff !important;
+          }
+        }
+      `}</style>
+      
+      {/* 🛡️ 1. SCREEN INPUT FORMS BLOCK CONTAINER */}
       <div className="print:hidden bg-gray-50/50 p-2 md:p-6 rounded-2xl space-y-6 relative">
         {/* Header Action Strip */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
@@ -398,9 +416,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       </div>
 
       {/* 📄 2. DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
-      <div className="hidden print:block printable-invoice-canvas bg-white p-10 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
+      <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
         
-        {/* Brand Header */}
+        {/* ⭐ Brand Header Row: Placed perfectly at left corner, browser headers killed */}
         <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight uppercase text-gray-900" style={{ fontSize: '28px', fontWeight: '900' }}>
@@ -419,7 +437,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* Client Metadata Address Box */}
+        {/* ⭐ Client Metadata & Active Company Dynamic Profile Hub */}
         <div className="grid grid-cols-2 gap-8 text-xs border-b border-gray-200 pb-6 pt-2">
           <div>
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Billed To / Customer Node:</h5>
@@ -430,8 +448,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
           <div className="text-right">
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Issued From Workspace:</h5>
+            {/* ⭐ Prints explicit active workspace name and communications mail anchor */}
             <p className="text-gray-900 font-black text-sm uppercase">{companyName}</p>
-            <p className="text-gray-600 font-bold mt-0.5">{companyEmail || "billing@corporate.node"}</p>
+            <p className="text-gray-600 font-bold mt-0.5">{companyEmail || "billing@zinetherp.app"}</p>
             {taxId && <p className="text-gray-500 font-bold mt-0.5">Tax Registration / GST: <span className="font-mono text-gray-900">{taxId}</span></p>}
           </div>
         </div>
