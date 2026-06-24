@@ -415,14 +415,14 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* 📄 2. DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
-      <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
+{/* 📄 2. DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
+      <div className="hidden print:block printable-invoice-canvas bg-white p-10 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
         
-        {/* ⭐ Brand Header Row: Placed perfectly at left corner, browser headers killed */}
+        {/* Brand Header */}
         <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight uppercase text-gray-900" style={{ fontSize: '28px', fontWeight: '900' }}>
-              {companyName || "ZinethERP Entity"}
+              {companyName || localStorage.getItem('active_company_name') || "ZinethERP Entity"}
             </h1>
             <p className="text-xs text-gray-600 font-bold mt-1 tracking-wider uppercase">Official Transaction Document Ledger</p>
           </div>
@@ -437,7 +437,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* ⭐ Client Metadata & Active Company Dynamic Profile Hub */}
+        {/* Client Metadata Address Box */}
         <div className="grid grid-cols-2 gap-8 text-xs border-b border-gray-200 pb-6 pt-2">
           <div>
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Billed To / Customer Node:</h5>
@@ -448,9 +448,13 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
           <div className="text-right">
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Issued From Workspace:</h5>
-            {/* ⭐ Prints explicit active workspace name and communications mail anchor */}
-            <p className="text-gray-900 font-black text-sm uppercase">{companyName}</p>
-            <p className="text-gray-600 font-bold mt-0.5">{companyEmail || "billing@zinetherp.app"}</p>
+            {/* ⭐ Strict Dynamic Data Bindings from Local State Node Matrix */}
+            <p className="text-gray-900 font-black text-sm uppercase" style={{ fontSize: '14px', fontWeight: '900' }}>
+              {companyName || "ZinethERP"}
+            </p>
+            <p className="text-gray-700 font-bold mt-0.5 font-sans">
+              {companyEmail || "billing@zinetherp.com"}
+            </p>
             {taxId && <p className="text-gray-500 font-bold mt-0.5">Tax Registration / GST: <span className="font-mono text-gray-900">{taxId}</span></p>}
           </div>
         </div>
@@ -527,7 +531,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
       </div>
-
       {/* 📦 QUICK ADD PRODUCT MODAL */}
       {isProductModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
