@@ -76,23 +76,29 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         setInvoiceNo(`${prefix}${nextNum.toString().padStart(4, '0')}`);
         setTaxId(settings.taxId || '');
 
-        const targetId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+        // 🎯 FOOLPROOF CONTEXT SEARCH Matrix: Checks every possible storage slot for active entity ID
+        const targetId = 
+          localStorage.getItem('supabase_active_company_id') || 
+          localStorage.getItem('active_company_id') || 
+          localStorage.getItem('company_id') || '';
+          
         setActiveCompanyId(targetId);
 
-        if (targetId) {
-          // 🏢 Dynamic Corporate Workspace Identity Lookup Routing
-          const { data: activeCompanyData } = await supabase
+        if (targetId && targetId !== '') {
+          // 🏢 Live dynamic corporate branding metadata fetch route
+          const { data: activeCompanyData, error: compFetchError } = await supabase
             .from('companies')
             .select('name, email')
             .eq('id', targetId)
-            .single();
+            .maybeSingle();
 
-          if (activeCompanyData) {
+          if (activeCompanyData && !compFetchError) {
             setCompanyName(activeCompanyData.name);
             setCompanyEmail(activeCompanyData.email || `${activeCompanyData.name.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
           } else {
-            setCompanyName(settings.companyName || 'ZinethERP');
-            setCompanyEmail(settings.email || settings.companyEmail || 'billing@zinetherp.app');
+            const fallbackSessionName = localStorage.getItem('active_company_name') || settings.companyName;
+            setCompanyName(fallbackSessionName || 'ZinethERP');
+            setCompanyEmail(settings.email || 'billing@zinetherp.app');
           }
 
           // ⚙️ Load backend configuration default accounts
@@ -100,7 +106,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             .from('company_settings')
             .select('*')
             .eq('company_id', targetId)
-            .single();
+            .maybeSingle();
 
           if (mapRecord) {
             setMappedSalesLedgerId(mapRecord.default_sales_ledger || '');
@@ -108,10 +114,12 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             setMappedStockLedgerId(mapRecord.default_stock_ledger || '');
           }
         } else {
-          setCompanyName(settings.companyName || 'ZinethERP');
+          const fallbackCompName = localStorage.getItem('active_company_name') || settings.companyName || 'ZinethERP';
+          setCompanyName(fallbackCompName);
           setCompanyEmail(settings.email || settings.companyEmail || 'billing@zinetherp.app');
         }
       } catch (error) {
+        console.error("Context initialization error:", error);
         setInvoiceNo('INV-0001');
         setCompanyName('ZinethERP');
         setCompanyEmail('billing@zinetherp.app');
@@ -119,7 +127,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     };
     initializeInvoice();
     fetchLookups();
-  }, []);
+  }, [ledgers.length]); // Forced reactive re-evaluation when ledgers collection populates
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 
