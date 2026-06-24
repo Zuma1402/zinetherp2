@@ -85,7 +85,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         setActiveCompanyId(targetId);
 
         if (targetId && targetId !== '') {
-          // 🏢 Live dynamic corporate branding metadata fetch route
+          // 🏢 Live dynamic corporate branding metadata fetch route from DB directly
           const { data: activeCompanyData, error: compFetchError } = await supabase
             .from('companies')
             .select('name, email')
@@ -127,7 +127,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     };
     initializeInvoice();
     fetchLookups();
-  }, [ledgers.length]); // Forced reactive re-evaluation when ledgers collection populates
+  }, [ledgers.length, customerId]); // Reactive re-evaluation array
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 
