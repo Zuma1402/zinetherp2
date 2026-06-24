@@ -59,7 +59,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   ]);
 
   const fetchLookups = async () => {
-    // 🎯 Catch the absolute active partition company id safely on every call cycle
+    // 🎯 Catch active partition company id safely on every loop call cycle
     const targetId = 
       localStorage.getItem('supabase_active_company_id') || 
       localStorage.getItem('active_company_id') || 
@@ -109,7 +109,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           localStorage.getItem('company_id') || '';
 
         // Pre-set reactive local storage tokens to bypass network latency gaps
-        if (!companyName || companyName === 'ZinethERP') {
+        if (!companyName || companyName === 'ZinethERP' || companyName === '') {
           const sessionFallbackName = localStorage.getItem('active_company_name');
           if (sessionFallbackName) {
             setCompanyName(sessionFallbackName);
@@ -488,6 +488,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
           <div className="text-right">
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Issued From Workspace:</h5>
+            {/* ⭐ Directly maps reactive corporate name and authentic workspace email context */}
             <p className="text-gray-900 font-black text-sm uppercase" style={{ fontSize: '14px', fontWeight: '900' }}>
               {companyName || "ZinethERP"}
             </p>
@@ -571,7 +572,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* 📦 QUICK ADD PRODUCT MODAL */}
+      {/* QUICK POPUPS MATRIX UNTOUCHED */}
       {isProductModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
@@ -600,7 +601,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       )}
 
-      {/* OTHER QUICK POPUPS */}
       {isCustModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
