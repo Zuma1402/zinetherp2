@@ -59,12 +59,39 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   ]);
 
   const fetchLookups = async () => {
+    // 🎯 Catch the absolute active partition company id safely on every call cycle
+    const targetId = 
+      localStorage.getItem('supabase_active_company_id') || 
+      localStorage.getItem('active_company_id') || 
+      localStorage.getItem('company_id') || '';
+      
+    setActiveCompanyId(targetId);
+
     const { data: d } = await supabase.from('departments').select('*').order('name');
     const { data: v } = await supabase.from('divisions').select('*').order('name');
     const { data: i } = await supabase.from('inventory_items').select('*').order('name');
+    
     if (d) setDepartments(d);
     if (v) setDivisions(v);
     if (i) setInventoryItems(i);
+
+    // 🏢 Live dynamic corporate branding metadata fetch route from DB directly
+    if (targetId && targetId !== '') {
+      try {
+        const { data: activeCompanyData } = await supabase
+          .from('companies')
+          .select('name, email')
+          .eq('id', targetId)
+          .maybeSingle();
+
+        if (activeCompanyData) {
+          setCompanyName(activeCompanyData.name);
+          setCompanyEmail(activeCompanyData.email || `${activeCompanyData.name.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
+        }
+      } catch (err) {
+        console.error("Branding database reactive tracking read error:", err);
+      }
+    }
   };
 
   useEffect(() => {
@@ -76,32 +103,25 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         setInvoiceNo(`${prefix}${nextNum.toString().padStart(4, '0')}`);
         setTaxId(settings.taxId || '');
 
-        // 🎯 FOOLPROOF CONTEXT SEARCH Matrix: Checks every possible storage slot for active entity ID
         const targetId = 
           localStorage.getItem('supabase_active_company_id') || 
           localStorage.getItem('active_company_id') || 
           localStorage.getItem('company_id') || '';
-          
-        setActiveCompanyId(targetId);
 
-        if (targetId && targetId !== '') {
-          // 🏢 Live dynamic corporate branding metadata fetch route from DB directly
-          const { data: activeCompanyData, error: compFetchError } = await supabase
-            .from('companies')
-            .select('name, email')
-            .eq('id', targetId)
-            .maybeSingle();
-
-          if (activeCompanyData && !compFetchError) {
-            setCompanyName(activeCompanyData.name);
-            setCompanyEmail(activeCompanyData.email || `${activeCompanyData.name.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
+        // Pre-set reactive local storage tokens to bypass network latency gaps
+        if (!companyName || companyName === 'ZinethERP') {
+          const sessionFallbackName = localStorage.getItem('active_company_name');
+          if (sessionFallbackName) {
+            setCompanyName(sessionFallbackName);
+            setCompanyEmail(`${sessionFallbackName.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
           } else {
-            const fallbackSessionName = localStorage.getItem('active_company_name') || settings.companyName;
-            setCompanyName(fallbackSessionName || 'ZinethERP');
+            setCompanyName(settings.companyName || 'ZinethERP');
             setCompanyEmail(settings.email || 'billing@zinetherp.app');
           }
+        }
 
-          // ⚙️ Load backend configuration default accounts
+        if (targetId) {
+          // Load backend configuration default accounts mapping registry
           const { data: mapRecord } = await supabase
             .from('company_settings')
             .select('*')
@@ -113,21 +133,16 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             setMappedCogsLedgerId(mapRecord.default_purchase_ledger || '');
             setMappedStockLedgerId(mapRecord.default_stock_ledger || '');
           }
-        } else {
-          const fallbackCompName = localStorage.getItem('active_company_name') || settings.companyName || 'ZinethERP';
-          setCompanyName(fallbackCompName);
-          setCompanyEmail(settings.email || settings.companyEmail || 'billing@zinetherp.app');
         }
       } catch (error) {
         console.error("Context initialization error:", error);
         setInvoiceNo('INV-0001');
-        setCompanyName('ZinethERP');
-        setCompanyEmail('billing@zinetherp.app');
       }
     };
+
     initializeInvoice();
     fetchLookups();
-  }, [ledgers.length, customerId]); // Reactive re-evaluation array
+  }, [customerId, ledgers.length, date]); // ⭐ Reactive array forces full lifecycle update when context properties mount
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 
