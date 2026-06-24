@@ -74,16 +74,28 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         const prefix = settings.invoicePrefix || 'INV-';
         const nextNum = settings.nextInvoiceNumber || 1;
         setInvoiceNo(`${prefix}${nextNum.toString().padStart(4, '0')}`);
-        
-        // ⭐ Fetch direct configured profile workspace variables
-        setCompanyName(settings.companyName || 'ZinethERP');
-        setCompanyEmail(settings.email || settings.companyEmail || '');
         setTaxId(settings.taxId || '');
 
         const targetId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
         setActiveCompanyId(targetId);
 
         if (targetId) {
+          // 🏢 Dynamic Corporate Workspace Identity Lookup Routing
+          const { data: activeCompanyData } = await supabase
+            .from('companies')
+            .select('name, email')
+            .eq('id', targetId)
+            .single();
+
+          if (activeCompanyData) {
+            setCompanyName(activeCompanyData.name);
+            setCompanyEmail(activeCompanyData.email || `${activeCompanyData.name.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
+          } else {
+            setCompanyName(settings.companyName || 'ZinethERP');
+            setCompanyEmail(settings.email || settings.companyEmail || 'billing@zinetherp.app');
+          }
+
+          // ⚙️ Load backend configuration default accounts
           const { data: mapRecord } = await supabase
             .from('company_settings')
             .select('*')
@@ -95,9 +107,14 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             setMappedCogsLedgerId(mapRecord.default_purchase_ledger || '');
             setMappedStockLedgerId(mapRecord.default_stock_ledger || '');
           }
+        } else {
+          setCompanyName(settings.companyName || 'ZinethERP');
+          setCompanyEmail(settings.email || settings.companyEmail || 'billing@zinetherp.app');
         }
       } catch (error) {
         setInvoiceNo('INV-0001');
+        setCompanyName('ZinethERP');
+        setCompanyEmail('billing@zinetherp.app');
       }
     };
     initializeInvoice();
@@ -265,15 +282,15 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   return (
     <div className="max-w-7xl mx-auto">
       
-      {/* ⚠️ FORCE-WIPE BROWSER AUTO HEADERS/FOOTERS (ZinethERP text on top screen) */}
+      {/* ⚠️ FORCE-WIPE BROWSER AUTO HEADERS/FOOTERS (Wipes default title strings) */}
       <style>{`
         @media print {
           @page {
             size: A4;
-            margin: 0mm !important; /* This completely wipes browser default text, date, and URL frames */
+            margin: 0mm !important;
           }
           body {
-            padding: 15mm !important; /* Force content boundary safe space layout */
+            padding: 15mm !important;
             background-color: #ffffff !important;
           }
         }
@@ -339,7 +356,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             <table className="w-full text-left border-collapse table-fixed min-w-[1150px]">
               <thead className="bg-gray-50 text-slate-400 font-black text-[10px] uppercase tracking-widest border-b border-gray-200">
                 <tr>
-                  <th className="p-4 pl-6 w-[28%]">Product Detail / Master Ledger</th>
+                  <th className="p-4 w-[28%] pl-6">Product Detail / Master Ledger</th>
                   <th className="p-4 w-[16%]">Cost Center (Dept)</th>
                   <th className="p-4 w-[16%]">Segment (Div)</th>
                   <th className="p-4 w-[8%] text-center">Qty</th>
@@ -415,14 +432,14 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-{/* 📄 2. DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
-      <div className="hidden print:block printable-invoice-canvas bg-white p-10 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
+      {/* 📄 2. DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
+      <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
         
         {/* Brand Header */}
         <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight uppercase text-gray-900" style={{ fontSize: '28px', fontWeight: '900' }}>
-              {companyName || localStorage.getItem('active_company_name') || "ZinethERP Entity"}
+              {companyName || "ZinethERP Entity"}
             </h1>
             <p className="text-xs text-gray-600 font-bold mt-1 tracking-wider uppercase">Official Transaction Document Ledger</p>
           </div>
@@ -448,7 +465,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
           <div className="text-right">
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Issued From Workspace:</h5>
-            {/* ⭐ Strict Dynamic Data Bindings from Local State Node Matrix */}
             <p className="text-gray-900 font-black text-sm uppercase" style={{ fontSize: '14px', fontWeight: '900' }}>
               {companyName || "ZinethERP"}
             </p>
@@ -531,6 +547,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
       </div>
+
       {/* 📦 QUICK ADD PRODUCT MODAL */}
       {isProductModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
