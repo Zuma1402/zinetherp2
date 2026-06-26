@@ -278,19 +278,20 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
       {/* 📊 High-Density Strict Responsive Scroll Grid */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
         <div className="overflow-x-auto w-full scrollbar-thin">
-          <table className="w-full text-left border-collapse table-fixed min-w-[1250px]">
+          <table className="w-full text-left border-collapse table-fixed min-w-[1350px]">
             <thead className="bg-blue-50/30 border-b text-gray-400 font-black text-[10px] uppercase tracking-widest">
               <tr>
-                <th className="p-5 pl-6 w-[24%]">Procured Item / Notes</th>
-                <th className="p-5 w-40">Cost Center (Dept)</th>
-                <th className="p-5 w-40">Segment (Div)</th>
-                <th className="p-5 w-20 text-center">Qty</th>
-                <th className="p-5 w-20 text-center">Cur</th>
-                <th className="p-5 w-28 text-right">Cost Rate</th>
-                {/* ⭐ Tax Dropdown Matrix Column headers added context */}
-                <th className="p-5 w-44">Tax Type</th>
-                <th className="p-5 w-20 text-center">Tax %</th>
-                <th className="p-5 w-32 text-right pr-6">Ext. Price</th>
+                <th className="p-5 pl-6 w-[22%]">Procured Item / Notes</th>
+                <th className="p-5 w-36">Cost Center (Dept)</th>
+                <th className="p-5 w-36">Segment (Div)</th>
+                <th className="p-5 w-16 text-center">Qty</th>
+                <th className="p-5 w-16 text-center">Cur</th>
+                <th className="p-5 w-[10%] text-right">Cost Rate</th>
+                <th className="p-5 w-40">Tax Type</th>
+                <th className="p-5 w-16 text-center">Tax %</th>
+                {/* ⭐ Tax Amt Column Added Here */}
+                <th className="p-5 w-[10%] text-right">Tax Amt</th>
+                <th className="p-5 w-28 text-right pr-6">Ext. Price</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 text-xs font-bold text-gray-700">
@@ -321,7 +322,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
                   <td className="p-4 text-center"><span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[11px] font-black uppercase tracking-wider">{currency}</span></td>
                   <td className="p-4"><input type="number" value={line.rate} onChange={e => handleRowMetricChange(idx, 'rate', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-right font-mono" /></td>
                   
-                  {/* ⭐ Tax drop downs selector elements grid */}
                   <td className="p-4">
                     <select value={line.taxType || ''} onChange={e => {
                       const val = e.target.value;
@@ -347,6 +347,11 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
 
                   <td className="p-4"><input type="number" value={line.taxRate} onChange={e => handleRowMetricChange(idx, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-mono" /></td>
 
+                  {/* ⭐ Tax Amt Input box block layout added */}
+                  <td className="p-4">
+                    <input type="text" readOnly value={line.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} className="w-full p-2 bg-slate-50 border border-gray-100 rounded-xl text-right font-mono text-gray-500 outline-none" />
+                  </td>
+
                   <td className="p-4 text-right pr-6 font-mono text-sm text-blue-900 flex items-center justify-end gap-3 h-[60px]">
                     <span>{line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500 no-print-el"><Trash2 size={14}/></button>
@@ -354,12 +359,12 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
                 </tr>
               ))}
               <tr className="bg-blue-50/10 font-black text-sm text-gray-900 border-t">
-                <td colSpan={7} className="p-5 text-right uppercase tracking-wider text-slate-400 text-[10px]">Total Bill Value ({currency}):</td>
+                <td colSpan={8} className="p-5 text-right uppercase tracking-wider text-slate-400 text-[10px]">Total Bill Value ({currency}):</td>
                 <td colSpan={2} className="p-5 text-right font-mono text-base pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               </tr>
               {currency !== 'PKR' && (
                 <tr className="bg-blue-50/40 text-xs text-blue-900 font-bold">
-                  <td colSpan={7} className="p-3 text-right uppercase text-[10px] tracking-wider text-blue-400">Equivalent Base Value:</td>
+                  <td colSpan={8} className="p-3 text-right uppercase text-[10px] tracking-wider text-blue-400">Equivalent Base Value:</td>
                   <td colSpan={2} className="p-3 text-right font-mono pr-6">PKR {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
               )}
@@ -426,7 +431,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         </div>
       )}
 
-      {/* 📦 QUICK ADD PRODUCT MODAL */}
+      {/* QUICK POPUPS UNTOUCHED MATRIX */}
       {isProductModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
@@ -455,7 +460,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         </div>
       )}
 
-      {/* MODALS */}
+      {/* OTHER POPUPS */}
       {isVendModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">

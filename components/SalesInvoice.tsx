@@ -227,7 +227,8 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     updated[activeRowIndex].rate = newProductRate;
     
     const base = (Number(updated[activeRowIndex].qty) || 0) * newProductRate;
-    updated[activeRowIndex].amount = base + (base * (Number(updated[activeRowIndex].taxRate) || 0)) / 100;
+    updated[activeRowIndex].taxAmount = (base * (Number(updated[activeRowIndex].taxRate) || 0)) / 100;
+    updated[activeRowIndex].amount = base + updated[activeRowIndex].taxAmount;
     
     setLineItems(updated);
     setIsProductModalOpen(false);
@@ -402,18 +403,19 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         {/* High-Density Table Display */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
           <div className="overflow-x-auto w-full scrollbar-thin">
-            <table className="w-full text-left border-collapse table-fixed min-w-[1250px]">
+            <table className="w-full text-left border-collapse table-fixed min-w-[1350px]">
               <thead className="bg-gray-50 text-slate-400 font-black text-[10px] uppercase tracking-widest border-b border-gray-200">
                 <tr>
-                  <th className="p-4 w-[24%] pl-6">Product Detail / Master Ledger</th>
-                  <th className="p-4 w-[14%]">Cost Center (Dept)</th>
-                  <th className="p-4 w-[14%]">Segment (Div)</th>
-                  <th className="p-4 w-[7%] text-center">Qty</th>
-                  <th className="p-4 w-[7%] text-center">Cur</th>
-                  <th className="p-4 w-[11%] text-right">Price</th>
-                  {/* ⭐ Dynamic Dropdown Column header labels added context */}
+                  <th className="p-4 w-[22%] pl-6">Product Detail / Master Ledger</th>
+                  <th className="p-4 w-[12%]">Cost Center (Dept)</th>
+                  <th className="p-4 w-[12%]">Segment (Div)</th>
+                  <th className="p-4 w-[6%] text-center">Qty</th>
+                  <th className="p-4 w-[6%] text-center">Cur</th>
+                  <th className="p-4 w-[10%] text-right">Price</th>
                   <th className="p-4 w-[12%]">Tax Type</th>
-                  <th className="p-4 w-[7%] text-center">Tax %</th>
+                  <th className="p-4 w-[6%] text-center">Tax %</th>
+                  {/* ⭐ Tax Amt Column Added Here */}
+                  <th className="p-4 w-[10%] text-right">Tax Amt</th>
                   <th className="p-4 w-[11%] text-right pr-6">Line Total</th>
                 </tr>
               </thead>
@@ -445,7 +447,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                     <td className="p-3 text-center"><span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[11px] font-black uppercase tracking-wider">{currency}</span></td>
                     <td className="p-3"><input type="number" value={line.rate} onChange={e => handleRowMetricChange(idx, 'rate', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-right font-mono font-bold" /></td>
                     
-                    {/* ⭐ Dynamic Tax Type Select Column added */}
                     <td className="p-3">
                       <select value={line.taxType || ''} onChange={e => {
                         const val = e.target.value;
@@ -471,6 +472,11 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
                     <td className="p-3"><input type="number" value={line.taxRate} onChange={e => handleRowMetricChange(idx, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-mono" /></td>
                     
+                    {/* ⭐ Tax Amt UI Input Layout block added */}
+                    <td className="p-3">
+                      <input type="text" readOnly value={line.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} className="w-full p-2 bg-slate-50 border border-gray-100 rounded-xl text-right font-mono text-gray-500 outline-none" />
+                    </td>
+
                     <td className="p-3 text-right font-mono text-gray-900 pr-6 text-xs flex items-center justify-end gap-3 h-[52px]">
                       <span>{line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500 transition-colors disabled:opacity-30"><Trash2 size={14}/></button>
@@ -478,12 +484,12 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                   </tr>
                 ))}
                 <tr className="bg-slate-50/50 font-black text-xs border-t">
-                  <td colSpan={7} className="p-4 text-right uppercase tracking-wider text-slate-400 text-[10px]">Grand Total ({currency}):</td>
+                  <td colSpan={8} className="p-4 text-right uppercase tracking-wider text-slate-400 text-[10px]">Grand Total ({currency}):</td>
                   <td colSpan={2} className="p-4 text-right font-mono text-sm text-gray-900 pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
                 {currency !== 'PKR' && (
                   <tr className="bg-indigo-50/30 text-xs text-indigo-900 font-bold">
-                    <td colSpan={7} className="p-3 text-right uppercase text-[10px] tracking-wider text-indigo-400">Equivalent Base Total:</td>
+                    <td colSpan={8} className="p-3 text-right uppercase text-[10px] tracking-wider text-indigo-400">Equivalent Base Total:</td>
                     <td colSpan={2} className="p-3 text-right font-mono pr-6">PKR {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
                 )}
@@ -560,9 +566,10 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             <thead className="bg-gray-100 border-b-2 border-gray-400 text-gray-700 font-black uppercase text-[9px] tracking-widest">
               <tr>
                 <th className="p-3 pl-4">Product Detail / Master Ledger Description</th>
-                <th className="p-3 text-center w-20">Qty</th>
-                <th className="p-3 text-right w-24">Unit Rate</th>
+                <th className="p-3 text-center w-16">Qty</th>
+                <th className="p-3 text-right w-28">Unit Rate</th>
                 <th className="p-3 text-center w-24">Tax Link</th>
+                <th className="p-3 text-right w-24">Tax Amt</th>
                 <th className="p-3 text-right pr-4 w-32">Extended Net Amount</th>
               </tr>
             </thead>
@@ -575,14 +582,15 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                       <td className="p-3 pl-4 text-gray-900 font-extrabold">{targetProd ? targetProd.name : "Stock Inventory Item"}</td>
                       <td className="p-3 text-center font-mono">{item.qty}</td>
                       <td className="p-3 text-right font-mono">{item.rate?.toLocaleString()}</td>
-                      <td className="p-3 text-center text-gray-500 text-[11px] uppercase font-black">{item.taxType || 'No Tax'} ({item.taxRate}%)</td>
+                      <td className="p-3 text-center text-gray-500 text-[11px] font-black uppercase">{item.taxType || 'No Tax'} ({item.taxRate}%)</td>
+                      <td className="p-3 text-right font-mono text-gray-600">{item.taxAmount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                       <td className="p-3 text-right font-mono text-gray-900 pr-4">{item.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     </tr>
                   )
                 })
               ) : (
                 <tr>
-                  <td colSpan={5} className="p-6 pl-4 text-gray-400 italic text-center font-medium">
+                  <td colSpan={6} className="p-6 pl-4 text-gray-400 italic text-center font-medium">
                     No active materials mapped inside this snapshot transaction slip
                   </td>
                 </tr>
@@ -669,7 +677,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       )}
 
-      {/* 📦 QUICK ADD PRODUCT MODAL */}
+      {/* QUICK POPUPS UNTOUCHED MATRIX */}
       {isProductModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
@@ -698,7 +706,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       )}
 
-      {/* OTHER QUICK POPUPS */}
       {isCustModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
