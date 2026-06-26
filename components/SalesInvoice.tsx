@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-// ⭐ Loader2 ko yahan safe context mein add kar diya hai taake crash na ho
 import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer, Loader2 } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
@@ -21,8 +20,8 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [narration, setNarration] = useState('');
 
   // 🧾 Dynamic Multi-Currency State Framework Variables
-  const [baseCurrency, setBaseCurrency] = useState<string>('');
-  const [currency, setCurrency] = useState<string>('');
+  const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
+  const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [isCurrencyLoading, setIsCurrencyLoading] = useState<boolean>(true);
 
@@ -113,10 +112,11 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           setBaseCurrency(dbCurrency);
           setCurrency(dbCurrency);
           setExchangeRate(1);
-          setIsCurrencyLoading(false);
         }
       } catch (err) {
         console.error("Critical tracking fallback interceptor trigger error:", err);
+      } finally {
+        // ⭐ Fixed: Executing outside block boundaries to guarantee release
         setIsCurrencyLoading(false);
       }
     } else {
@@ -323,7 +323,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const activeCustomerObj = ledgers.find(l => l.id === customerId);
 
-  if (isCurrencyLoading || !currency || currency === '') {
+  if (isCurrencyLoading) {
     return (
       <div className="w-full h-96 flex items-center justify-center flex-col gap-3">
         <Loader2 className="animate-spin text-indigo-600" size={32} />
@@ -370,7 +370,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
               <select value={customerId} onChange={e => e.target.value === 'QUICK_ADD_CUST' ? setIsCustModalOpen(true) : setCustomerId(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-xs outline-none transition-all">
                 <option value="">Select Customer Registry...</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                <option value="QUICK_ADD_CUST" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Customer</option>
+                <option value="QUICK_ADD_CUST" className="text-indigo-600 font-black bg-indigo-50">➕ Add New Customer</option>
               </select>
             </div>
             <div>
