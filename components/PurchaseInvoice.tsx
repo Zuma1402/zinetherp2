@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, ShoppingBag, Printer } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, Department, Division } from '../types';
 import { supabase } from '../services/supabaseService';
+import { getCompanySettings } from '../services/settingsService';
 
 interface PurchaseInvoiceProps {
   ledgers: Ledger[];
@@ -24,6 +25,13 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(items);
   
+  // 📊 Tax Configuration Matrices
+  const [taxOptions, setTaxOptions] = useState<{name: string, rate: number}[]>([]);
+  const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
+  const [newTaxName, setNewTaxName] = useState('');
+  const [newTaxRate, setNewTaxRate] = useState(0);
+  const [activeTaxRowIdx, setActiveTaxRowIdx] = useState<number | null>(null);
+
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [isDivModalOpen, setIsDivModalOpen] = useState(false);
   const [isVendModalOpen, setIsVendModalOpen] = useState(false);
@@ -39,12 +47,43 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
   const [newProductRate, setNewProductRate] = useState(0);
 
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
+  const [activeCompanyId, setActiveCompanyId] = useState('');
 
   const [lineItems, setLineItems] = useState([
-    { itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
+    { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
   ]);
 
+  const fetchTaxes = async () => {
+    try {
+      const { data, error } = await supabase.from('company_taxes').select('*').order('name');
+      if (data && !error && data.length > 0) {
+        setTaxOptions(data);
+      } else {
+        setTaxOptions([
+          { name: 'GST', rate: 18 },
+          { name: 'ST', rate: 15 },
+          { name: 'IT', rate: 10 },
+          { name: 'VAT', rate: 5 }
+        ]);
+      }
+    } catch (e) {
+      setTaxOptions([
+        { name: 'GST', rate: 18 },
+        { name: 'ST', rate: 15 },
+        { name: 'IT', rate: 10 },
+        { name: 'VAT', rate: 5 }
+      ]);
+    }
+  };
+
   const fetchLookups = async () => {
+    const targetId = 
+      localStorage.getItem('supabase_active_company_id') || 
+      localStorage.getItem('active_company_id') || 
+      localStorage.getItem('company_id') || '';
+      
+    setActiveCompanyId(targetId);
+
     const { data: d } = await supabase.from('departments').select('*').order('name');
     const { data: v } = await supabase.from('divisions').select('*').order('name');
     const { data: i } = await supabase.from('inventory_items').select('*').order('name');
@@ -53,23 +92,27 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     if (i) setInventoryItems(i);
   };
 
-  useEffect(() => { fetchLookups(); }, []);
+  useEffect(() => { 
+    fetchLookups(); 
+    fetchTaxes();
+  }, [supplierId]);
+
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 
   const handleRowMetricChange = (index: number, field: string, value: any) => {
     const updated = [...lineItems];
     
-    if (field === 'itemId' && value === 'QUICK_ADD_ROW_PRODUCT') {
+    if (value === 'QUICK_ADD_ROW_PRODUCT') {
       setActiveRowIndex(index);
       setIsProductModalOpen(true);
       return;
     }
-    if (field === 'departmentId' && value === 'QUICK_ADD_ROW_DEPT') {
+    if (value === 'QUICK_ADD_ROW_DEPT') {
       setActiveRowIndex(index);
       setIsDeptModalOpen(true);
       return;
     }
-    if (field === 'divisionId' && value === 'QUICK_ADD_ROW_DIV') {
+    if (value === 'QUICK_ADD_ROW_DIV') {
       setActiveRowIndex(index);
       setIsDivModalOpen(true);
       return;
@@ -84,7 +127,8 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     }
 
     const base = (Number(updated[index].qty) || 0) * (Number(updated[index].rate) || 0);
-    updated[index].amount = base;
+    updated[index].taxAmount = (base * (Number(updated[index].taxRate) || 0)) / 100;
+    updated[index].amount = base + updated[index].taxAmount;
     setLineItems(updated);
   };
 
@@ -107,7 +151,10 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     const updated = [...lineItems];
     updated[activeRowIndex].itemId = newId;
     updated[activeRowIndex].rate = newProductCost;
-    updated[activeRowIndex].amount = (Number(updated[activeRowIndex].qty) || 0) * newProductCost;
+    
+    const base = (Number(updated[activeRowIndex].qty) || 0) * newProductCost;
+    updated[activeRowIndex].taxAmount = (base * (Number(updated[activeRowIndex].taxRate) || 0)) / 100;
+    updated[activeRowIndex].amount = base + updated[activeRowIndex].taxAmount;
     
     setLineItems(updated);
     setIsProductModalOpen(false);
@@ -192,7 +239,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
 
       {/* 🏢 Split Meta Layout Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Card 1: Core Document Properties */}
         <div className="lg:col-span-2 bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-[10px] font-black text-blue-900/40 uppercase tracking-[0.2em] mb-1.5">Supplier / Vendor Source</label>
@@ -212,7 +258,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
           </div>
         </div>
 
-        {/* Card 2: Currency Exchange Parameters */}
         <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-2 gap-4">
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Billing Currency</label>
@@ -233,15 +278,18 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
       {/* 📊 High-Density Strict Responsive Scroll Grid */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
         <div className="overflow-x-auto w-full scrollbar-thin">
-          <table className="w-full text-left border-collapse table-fixed min-w-[1150px]">
+          <table className="w-full text-left border-collapse table-fixed min-w-[1250px]">
             <thead className="bg-blue-50/30 border-b text-gray-400 font-black text-[10px] uppercase tracking-widest">
               <tr>
-                <th className="p-5 pl-6 w-[28%]">Procured Item / Notes</th>
+                <th className="p-5 pl-6 w-[24%]">Procured Item / Notes</th>
                 <th className="p-5 w-40">Cost Center (Dept)</th>
                 <th className="p-5 w-40">Segment (Div)</th>
                 <th className="p-5 w-20 text-center">Qty</th>
                 <th className="p-5 w-20 text-center">Cur</th>
                 <th className="p-5 w-28 text-right">Cost Rate</th>
+                {/* ⭐ Tax Dropdown Matrix Column headers added context */}
+                <th className="p-5 w-44">Tax Type</th>
+                <th className="p-5 w-20 text-center">Tax %</th>
                 <th className="p-5 w-32 text-right pr-6">Ext. Price</th>
               </tr>
             </thead>
@@ -266,15 +314,39 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
                     <select value={line.divisionId} onChange={e => handleRowMetricChange(idx, 'divisionId', e.target.value)} className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-xs outline-none">
                       <option value="">Whole Strategy</option>
                       {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                      <option value="QUICK_ADD_ROW_DIV" className="text-blue-600 font-bold bg-blue-50 no-print-el">➕ Add New Division</option>
+                      <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50 no-print-el">➕ Add New Division</option>
                     </select>
                   </td>
                   <td className="p-4"><input type="number" value={line.qty} onChange={e => handleRowMetricChange(idx, 'qty', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-black" /></td>
-                  
-                  {/* 💵 Dynamic Currency Column Integration */}
                   <td className="p-4 text-center"><span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[11px] font-black uppercase tracking-wider">{currency}</span></td>
-                  
                   <td className="p-4"><input type="number" value={line.rate} onChange={e => handleRowMetricChange(idx, 'rate', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-right font-mono" /></td>
+                  
+                  {/* ⭐ Tax drop downs selector elements grid */}
+                  <td className="p-4">
+                    <select value={line.taxType || ''} onChange={e => {
+                      const val = e.target.value;
+                      if (val === 'QUICK_ADD_CUSTOM_TAX') {
+                        setActiveTaxRowIdx(idx);
+                        setIsTaxModalOpen(true);
+                        return;
+                      }
+                      const selectedTax = taxOptions.find(t => t.name === val);
+                      const updated = [...lineItems];
+                      updated[idx].taxType = val;
+                      updated[idx].taxRate = selectedTax ? selectedTax.rate : 0;
+                      const base = (Number(updated[idx].qty) || 0) * (Number(updated[idx].rate) || 0);
+                      updated[idx].taxAmount = (base * updated[idx].taxRate) / 100;
+                      updated[idx].amount = base + updated[idx].taxAmount;
+                      setLineItems(updated);
+                    }} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500">
+                      <option value="">-- No Tax --</option>
+                      {taxOptions.map((tax, tIdx) => ( <option key={tIdx} value={tax.name}>{tax.name}</option> ))}
+                      <option value="QUICK_ADD_CUSTOM_TAX" className="text-blue-600 font-black bg-blue-50">➕ Add Custom Tax</option>
+                    </select>
+                  </td>
+
+                  <td className="p-4"><input type="number" value={line.taxRate} onChange={e => handleRowMetricChange(idx, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-mono" /></td>
+
                   <td className="p-4 text-right pr-6 font-mono text-sm text-blue-900 flex items-center justify-end gap-3 h-[60px]">
                     <span>{line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500 no-print-el"><Trash2 size={14}/></button>
@@ -282,12 +354,12 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
                 </tr>
               ))}
               <tr className="bg-blue-50/10 font-black text-sm text-gray-900 border-t">
-                <td colSpan={5} className="p-5 text-right uppercase tracking-wider text-slate-400 text-[10px]">Total Bill Value ({currency}):</td>
+                <td colSpan={7} className="p-5 text-right uppercase tracking-wider text-slate-400 text-[10px]">Total Bill Value ({currency}):</td>
                 <td colSpan={2} className="p-5 text-right font-mono text-base pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               </tr>
               {currency !== 'PKR' && (
                 <tr className="bg-blue-50/40 text-xs text-blue-900 font-bold">
-                  <td colSpan={5} className="p-3 text-right uppercase text-[10px] tracking-wider text-blue-400">Equivalent Base Value:</td>
+                  <td colSpan={7} className="p-3 text-right uppercase text-[10px] tracking-wider text-blue-400">Equivalent Base Value:</td>
                   <td colSpan={2} className="p-3 text-right font-mono pr-6">PKR {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
               )}
@@ -295,13 +367,13 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
           </table>
         </div>
         <div className="p-4 bg-blue-50/20 border-t no-print-el">
-          <button onClick={() => setLineItems([...lineItems, { itemId: '', qty: 1, rate: 0, taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }])} className="text-xs font-bold text-blue-600 border border-dashed border-blue-200 px-5 py-2 rounded-xl bg-white hover:bg-blue-50 transition-all shadow-sm">
+          <button onClick={() => setLineItems([...lineItems, { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }])} className="text-xs font-bold text-blue-600 border border-dashed border-blue-200 px-5 py-2 rounded-xl bg-white hover:bg-blue-50 transition-all shadow-sm">
             + NEW PURCHASE ENTRY
           </button>
         </div>
       </div>
 
-      {/* Narration Memo and Save Triggers Footer */}
+      {/* Narration Memo */}
       <div className="bg-white p-5 border border-gray-200 rounded-2xl mb-6 shadow-xs">
         <label className="block text-[10px] font-black text-blue-900/40 uppercase tracking-[0.2em] mb-2">Narration / Vendor Memo Notes</label>
         <textarea rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Purchase notes..." className="w-full border p-3 rounded-xl text-xs outline-none bg-white font-medium" />
@@ -313,6 +385,46 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
           <Save size={16} /> Record Purchase Bill
         </button>
       </div>
+
+      {/* 📦 QUICK ADD CUSTOM TAX BLUEPRINT MODAL */}
+      {isTaxModalOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b pb-2">Create Custom Tax Matrix</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newTaxName.trim() || activeTaxRowIdx === null) return;
+              const cleanLabel = newTaxName.trim().toUpperCase();
+              const newRecord = { name: cleanLabel, rate: Number(newTaxRate) || 0, company_id: activeCompanyId || undefined };
+              await supabase.from('company_taxes').insert([newRecord]);
+              await fetchTaxes();
+              const updated = [...lineItems];
+              updated[activeTaxRowIdx].taxType = cleanLabel;
+              updated[activeTaxRowIdx].taxRate = Number(newTaxRate) || 0;
+              const base = (Number(updated[activeTaxRowIdx].qty) || 0) * (Number(updated[activeTaxRowIdx].rate) || 0);
+              updated[activeTaxRowIdx].taxAmount = (base * Number(newTaxRate)) / 100;
+              updated[activeTaxRowIdx].amount = base + updated[activeTaxRowIdx].taxAmount;
+              setLineItems(updated);
+              setIsTaxModalOpen(false);
+              setNewTaxName('');
+              setNewTaxRate(0);
+            }} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tax Code</label>
+                <input autoFocus type="text" value={newTaxName} onChange={e => setNewTaxName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-blue-500 font-semibold" placeholder="e.g. FED, KST" required />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Tax Evaluation Rate (%)</label>
+                <input type="number" value={newTaxRate} onChange={e => setNewTaxRate(parseFloat(e.target.value) || 0)} className="w-full border p-2.5 rounded-xl text-xs font-mono font-bold" min="0" max="100" step="any" required />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsTaxModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Add Tax Matrix</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* 📦 QUICK ADD PRODUCT MODAL */}
       {isProductModalOpen && (
