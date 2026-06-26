@@ -118,7 +118,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           
           if (activeCompanyData.base_currency) {
             setBaseCurrency(activeCompanyData.base_currency);
-            setCurrency(activeCompanyData.base_currency); // ⭐ Automatic sync state lock load
+            setCurrency(activeCompanyData.base_currency); // ⭐ Force state initialization onto active entity settings
             setExchangeRate(1);
           }
         }
@@ -401,7 +401,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate (1 {currency} = ? {baseCurrency})</label>
               <input type="number" value={exchangeRate} disabled={currency === baseCurrency} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === baseCurrency ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-indigo-200 text-indigo-600 ring-2 ring-indigo-50/50'}`} min="0.01" step="any" />
             </div>
           </div>
