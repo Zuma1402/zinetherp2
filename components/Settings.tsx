@@ -32,17 +32,17 @@ const Settings: React.FC<SettingsProps> = ({
   const [invoicePrefix, setInvoicePrefix] = useState('INV-');
   const [nextInvoiceNumber, setNextInvoiceNumber] = useState(1);
   
-  // ⭐ Active Company Base Currency (For Tenant Reading view Only)
+  // Active Company Base Currency (For Tenant Reading view Only)
   const [activeCompanyBaseCurrency, setActiveCompanyBaseCurrency] = useState('PKR');
 
-  // ⚙️ STRUCTURAL LEDGER MAPPING CONFIGURATION SYSTEM HOOKS
+  // STRUCTURAL LEDGER MAPPING CONFIGURATION SYSTEM HOOKS
   const [allCompanyLedgers, setAllCompanyLedgers] = useState<Ledger[]>([]);
   const [defaultSalesLedger, setDefaultSalesLedger] = useState('');
   const [defaultPurchaseLedger, setDefaultPurchaseLedger] = useState('');
   const [defaultStockLedger, setDefaultStockLedger] = useState('');
   const [isMappingSaving, setIsMappingSaving] = useState(false);
 
-  // ➕ QUICK ADD LEDGER MODAL STATES
+  // QUICK ADD LEDGER MODAL STATES
   const [isQuickLedgerModalOpen, setIsQuickLedgerModalOpen] = useState(false);
   const [quickLedgerName, setQuickLedgerName] = useState('');
   const [quickLedgerType, setQuickLedgerType] = useState<AccountType>(AccountType.INCOME);
@@ -62,7 +62,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [newCorpPrefix, setNewCorpPrefix] = useState('INV-');
   const [newCorpNextNumber, setNewCorpNextNumber] = useState(1);
   
-  // ⭐ New Base Currency Settle State Field Variable
+  // New Base Currency Settle State Field Variable
   const [newCorpBaseCurrency, setNewCorpBaseCurrency] = useState('PKR');
 
   const [staffName, setStaffName] = useState('');
@@ -71,7 +71,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [staffRole, setStaffRole] = useState<Role>('ACCOUNTANT');
   const [isAddingTenantStaff, setIsAddingTenantStaff] = useState(false);
 
-  // 🌟 LOCAL ENGINE STATE SYNCHRONIZER
+  // LOCAL ENGINE STATE SYNCHRONIZER
   const [localActiveId, setLocalActiveId] = useState(
     propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
   );
@@ -90,7 +90,7 @@ const Settings: React.FC<SettingsProps> = ({
   const activeSelectionObj = allDbCompanies.find(c => c.id === localActiveId);
   const activeSelectionNameClean = activeSelectionObj ? activeSelectionObj.name.toLowerCase().replace(/\s+/g, '') : '';
   
-  // 🛡️ SECURITY HIERARCHY DEFINITION
+  // SECURITY HIERARCHY DEFINITION
   const isSuperAdminRoot = currentUser.role === 'ADMIN' && !currentUser.company_id;
   
   // Master Zenith Scope for Infrastructure view control
@@ -129,7 +129,6 @@ const Settings: React.FC<SettingsProps> = ({
         setDefaultStockLedger(mappings.default_stock_ledger || '');
       }
 
-      // ⭐ Fetch and read company real-time base currency setting profile from DB
       const { data: compProfile } = await supabase
         .from('companies')
         .select('base_currency')
@@ -249,7 +248,8 @@ const Settings: React.FC<SettingsProps> = ({
       await syncEngineData();
     } catch (err: any) {
       alert(`Ledger configuration blueprint crash: ${err.message}`);
-    } fillal {
+    } finally {
+      // ⭐ Fixed from fillal to finally
       setIsMappingSaving(false);
     }
   };
@@ -462,7 +462,7 @@ const Settings: React.FC<SettingsProps> = ({
           </form>
         </div>
 
-        {/* 🏢 ISOLATED CONFIGURATIONS LAYER (TENANT WORKSPACE ENVIRONMENT) */}
+        {/* ISOLATED CONFIGURATIONS LAYER */}
         {!isMasterZenithScope && (
           <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
             <div className="flex items-center gap-3 mb-5">
@@ -491,7 +491,6 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* ⭐ Tenant view Base currency view details indicator layout row */}
               <div className="bg-slate-50 border p-4 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Invoice Generation Prefix</label>
@@ -517,7 +516,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* 👑 THE OMNIPOTENT MASTER LAYER (SUPER-ADMIN CREATION CODES PANEL) */}
+        {/* MASTER LAYER */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-2xl shadow-xl p-6 border border-indigo-900/40">
             <div className="flex items-center gap-3 mb-5 border-b border-indigo-900/60 pb-3">
@@ -546,7 +545,6 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* ⭐ BASE CURRENCY SYSTEM PLACEMENT SELECTION MATRIX DROPDOWN PLACED HERE */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-indigo-950/50 pt-4">
                 <div>
                   <label className="block text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1.5">Reporting / Base Currency</label>
@@ -601,7 +599,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* 🗺️ DOUBLE-ENTRY LEDGERS MAPPING ROOM CONTROL PANEL */}
+        {/* DOUBLE-ENTRY LEDGERS MAPPING ROOM CONTROL PANEL */}
         {!isMasterZenithScope && currentUser.role === 'ADMIN' && (
           <div className="md:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
             <div className="border-b pb-3">
