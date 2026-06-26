@@ -395,7 +395,7 @@ const App: React.FC = () => {
                       setCompanyName(comp.name);
                       localStorage.setItem('supabase_active_company_id', comp.id);
                       localStorage.setItem('active_company_id', comp.id);
-                      // ⭐ Fire custom multi-currency partition listener trigger to force UI state reload
+                      // ⭐ Fire custom multi-currency partition listener trigger to force UI state reload without lag
                       window.dispatchEvent(new CustomEvent('companySwitched', { detail: { id: comp.id, name: comp.name } }));
                     }
                   }
