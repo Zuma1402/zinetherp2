@@ -19,27 +19,28 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [customerId, setCustomerId] = useState('');
   const [narration, setNarration] = useState('');
 
-  // 🧾 Multi-Currency State Framework Variables
-  const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
-  const [currency, setCurrency] = useState<string>('PKR');
+  // 🧾 Dynamic Multi-Currency State (No hardcoded fallback during synchronization)
+  const [baseCurrency, setBaseCurrency] = useState<string>('');
+  const [currency, setCurrency] = useState<string>('');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [isCurrencyLoading, setIsCurrencyLoading] = useState<boolean>(true);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(items);
 
-  // ⚙️ Dynamic Mapped Accounts Local Configuration State Hooks
+  // Mapped Accounts
   const [mappedSalesId, setMappedSalesLedgerId] = useState('');
   const [mappedCogsId, setMappedCogsLedgerId] = useState('');
   const [mappedStockId, setMappedStockLedgerId] = useState('');
   
-  // Active Tenant Context Information Mappings
+  // Active Workspace Branding Metadata
   const [companyName, setCompanyName] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
   const [taxId, setTaxId] = useState('');
   const [activeCompanyId, setActiveCompanyId] = useState('');
 
-  // 📊 Tax Selection Selection Framework States
+  // Tax Management
   const [taxOptions, setTaxOptions] = useState<{name: string, rate: number}[]>([]);
   const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
   const [newTaxName, setNewTaxName] = useState('');
@@ -55,7 +56,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [newDivName, setNewDivName] = useState('');
   const [newCustName, setNewCustName] = useState('');
   
-  // New Product Modal States
   const [newProductName, setNewProductName] = useState('');
   const [newProductCost, setNewProductCost] = useState(0);
   const [newProductRate, setNewProductRate] = useState(0);
@@ -68,28 +68,20 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const fetchTaxes = async () => {
     try {
-      const { data, error } = await supabase.from('company_taxes').select('*').order('name');
-      if (data && !error && data.length > 0) {
+      const { data } = await supabase.from('company_taxes').select('*').order('name');
+      if (data && data.length > 0) {
         setTaxOptions(data);
       } else {
         setTaxOptions([
-          { name: 'GST', rate: 18 },
-          { name: 'ST', rate: 15 },
-          { name: 'IT', rate: 10 },
-          { name: 'VAT', rate: 5 }
+          { name: 'GST', rate: 18 }, { name: 'ST', rate: 15 }, { name: 'IT', rate: 10 }, { name: 'VAT', rate: 5 }
         ]);
       }
     } catch (e) {
-      setTaxOptions([
-        { name: 'GST', rate: 18 },
-        { name: 'ST', rate: 15 },
-        { name: 'IT', rate: 10 },
-        { name: 'VAT', rate: 5 }
-      ]);
+      console.error(e);
     }
   };
 
-  const fetchLookups = async () => {
+  const fetchLookupsAndCurrencyConfig = async () => {
     const targetId = 
       localStorage.getItem('supabase_active_company_id') || 
       localStorage.getItem('active_company_id') || 
@@ -116,21 +108,24 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           setCompanyName(activeCompanyData.name);
           setCompanyEmail(activeCompanyData.email || `${activeCompanyData.name.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
           
-          if (activeCompanyData.base_currency) {
-            setBaseCurrency(activeCompanyData.base_currency);
-            setCurrency(activeCompanyData.base_currency); // ⭐ Explicit override link fixed!
-            setExchangeRate(1);
-          }
+          // ⭐ CRITICAL FIX: Force atomic updates directly onto independent state streams
+          const dbCurrency = activeCompanyData.base_currency || 'PKR';
+          setBaseCurrency(dbCurrency);
+          setCurrency(dbCurrency);
+          setExchangeRate(1);
+          setIsCurrencyLoading(false);
         }
       } catch (err) {
-        console.error("Branding database reactive tracking read error:", err);
+        console.error("Critical tracking fallback interceptor trigger error:", err);
+        setIsCurrencyLoading(false);
       }
+    } else {
+      setIsCurrencyLoading(false);
     }
   };
 
-  // Synchronize on initialization mount context lifecycle loops
   useEffect(() => {
-    const initializeInvoice = async () => {
+    const initializeInvoiceSetupRoom = async () => {
       try {
         const settings = await getCompanySettings();
         const prefix = settings.invoicePrefix || 'INV-';
@@ -140,8 +135,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
         const targetId = 
           localStorage.getItem('supabase_active_company_id') || 
-          localStorage.getItem('active_company_id') || 
-          localStorage.getItem('company_id') || '';
+          localStorage.getItem('active_company_id') || '';
 
         if (targetId) {
           const { data: mapRecord } = await supabase
@@ -157,19 +151,17 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           }
         }
       } catch (error) {
-        console.error("Context initialization error:", error);
-        setInvoiceNo('INV-0001');
+        console.error(error);
       }
     };
 
-    initializeInvoice();
-    fetchLookups();
+    initializeInvoiceSetupRoom();
+    fetchLookupsAndCurrencyConfig();
     fetchTaxes();
 
-    // Listen to sidebar switching events dynamically
-    const handleSwitch = () => fetchLookups();
-    window.addEventListener('companySwitched', handleSwitch);
-    return () => window.removeEventListener('companySwitched', handleSwitch);
+    const handleSwitchEventNode = () => fetchLookupsAndCurrencyConfig();
+    window.addEventListener('companySwitched', handleSwitchEventNode);
+    return () => window.removeEventListener('companySwitched', handleSwitchEventNode);
   }, [customerId, ledgers.length, date]);
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
@@ -222,7 +214,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     };
 
     await supabase.from('inventory_items').insert([newRecord]);
-    await fetchLookups();
+    await fetchLookupsAndCurrencyConfig();
     
     const updated = [...lineItems];
     updated[activeRowIndex].itemId = newId;
@@ -244,7 +236,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     if (!newDeptName.trim() || activeRowIndex === null) return;
     const id = newDeptName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('departments').insert([{ id, name: newDeptName.trim(), company_id: activeCompanyId || undefined }]);
-    await fetchLookups();
+    await fetchLookupsAndCurrencyConfig();
     
     const updated = [...lineItems];
     updated[activeRowIndex].departmentId = id;
@@ -258,7 +250,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     if (!newDivName.trim() || activeRowIndex === null) return;
     const id = newDivName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('divisions').insert([{ id, name: newDivName.trim(), company_id: activeCompanyId || undefined }]);
-    await fetchLookups();
+    await fetchLookupsAndCurrencyConfig();
 
     const updated = [...lineItems];
     updated[activeRowIndex].divisionId = id;
@@ -331,6 +323,16 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const activeCustomerObj = ledgers.find(l => l.id === customerId);
 
+  // Dynamic overlay barrier spinner layout layer to trap async context lags
+  if (isCurrencyLoading || !currency || currency === '') {
+    return (
+      <div className="w-full h-96 flex items-center justify-center flex-col gap-3">
+        <Loader2 className="animate-spin text-indigo-600" size={32} />
+        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest animate-pulse">Syncing Sales Interface Ledger Parity...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto">
       
@@ -347,6 +349,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         }
       `}</style>
       
+      {/* SCREEN INPUT CONTAINER */}
       <div className="print:hidden bg-gray-50/50 p-2 md:p-6 rounded-2xl space-y-6 relative">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
           <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
@@ -399,7 +402,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* High-Density Table Display */}
+        {/* Table Display */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
           <div className="overflow-x-auto w-full scrollbar-thin">
             <table className="w-full text-left border-collapse table-fixed min-w-[1350px]">
@@ -514,10 +517,8 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* 📄 2. PRINT BLOCK */}
+      {/* 📄 PRINT BLOCK */}
       <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
-        
-        {/* Brand Header */}
         <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight uppercase text-gray-900" style={{ fontSize: '28px', fontWeight: '900' }}>
@@ -536,7 +537,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* Client Metadata Address Box */}
         <div className="grid grid-cols-2 gap-8 text-xs border-b border-gray-200 pb-6 pt-2">
           <div>
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Billed To / Customer Node:</h5>
@@ -557,7 +557,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* Clean Line Items Valuation Table */}
         <div className="w-full pt-2">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-gray-100 border-b-2 border-gray-400 text-gray-700 font-black uppercase text-[9px] tracking-widest">
@@ -596,7 +595,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </table>
         </div>
 
-        {/* Financial Metrics Summary Ledger Row */}
         <div className="flex justify-between items-end pt-6 border-t-2 border-gray-400">
           <div className="text-[10px] text-gray-500 max-w-sm font-medium leading-relaxed">
             <p className="font-black text-gray-700 uppercase tracking-wider mb-1" style={{ fontSize: '9px' }}>Terms & Regulatory Statements:</p>
@@ -623,7 +621,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* Sign Ledger Line */}
         <div className="pt-20 flex justify-between items-center text-xs">
           <div className="text-gray-400 font-mono text-[10px]">
             System Node Hash ID: {activeCompanyId?.substring(0,8)}
