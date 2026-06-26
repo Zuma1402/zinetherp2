@@ -20,6 +20,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [narration, setNarration] = useState('');
 
   // 🧾 Multi-Currency State Framework Variables
+  const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
 
@@ -107,13 +108,19 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       try {
         const { data: activeCompanyData } = await supabase
           .from('companies')
-          .select('name, email')
+          .select('name, email, base_currency')
           .eq('id', targetId)
           .maybeSingle();
 
         if (activeCompanyData) {
           setCompanyName(activeCompanyData.name);
           setCompanyEmail(activeCompanyData.email || `${activeCompanyData.name.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
+          
+          if (activeCompanyData.base_currency) {
+            setBaseCurrency(activeCompanyData.base_currency);
+            setCurrency(activeCompanyData.base_currency); // ⭐ Automatic sync state lock load
+            setExchangeRate(1);
+          }
         }
       } catch (err) {
         console.error("Branding database reactive tracking read error:", err);
@@ -332,7 +339,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   return (
     <div className="max-w-7xl mx-auto">
       
-      {/* ⚠️ FORCE-WIPE BROWSER AUTO HEADERS/FOOTERS */}
       <style>{`
         @media print {
           @page {
@@ -386,16 +392,17 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Currency</label>
-              <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === 'PKR') setExchangeRate(1); }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
-                <option value="PKR">PKR (Base)</option>
-                <option value="USD">USD ($)</option>
-                <option value="AED">AED (AED)</option>
-                <option value="GBP">GBP (£)</option>
+              <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === baseCurrency) setExchangeRate(1); }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
+                <option value={baseCurrency}>{baseCurrency} (Base)</option>
+                {baseCurrency !== 'PKR' && <option value="PKR">PKR</option>}
+                {baseCurrency !== 'USD' && <option value="USD">USD ($)</option>}
+                {baseCurrency !== 'AED' && <option value="AED">AED (AED)</option>}
+                {baseCurrency !== 'GBP' && <option value="GBP">GBP (£)</option>}
               </select>
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate</label>
-              <input type="number" value={exchangeRate} disabled={currency === 'PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === 'PKR' ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-indigo-200 text-indigo-600 ring-2 ring-indigo-50/50'}`} min="0.01" step="any" />
+              <input type="number" value={exchangeRate} disabled={currency === baseCurrency} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === baseCurrency ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-indigo-200 text-indigo-600 ring-2 ring-indigo-50/50'}`} min="0.01" step="any" />
             </div>
           </div>
         </div>
@@ -414,7 +421,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                   <th className="p-4 w-[10%] text-right">Price</th>
                   <th className="p-4 w-[12%]">Tax Type</th>
                   <th className="p-4 w-[6%] text-center">Tax %</th>
-                  {/* ⭐ Tax Amt Column Added Here */}
                   <th className="p-4 w-[10%] text-right">Tax Amt</th>
                   <th className="p-4 w-[11%] text-right pr-6">Line Total</th>
                 </tr>
@@ -472,7 +478,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
                     <td className="p-3"><input type="number" value={line.taxRate} onChange={e => handleRowMetricChange(idx, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-mono" /></td>
                     
-                    {/* ⭐ Tax Amt UI Input Layout block added */}
                     <td className="p-3">
                       <input type="text" readOnly value={line.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} className="w-full p-2 bg-slate-50 border border-gray-100 rounded-xl text-right font-mono text-gray-500 outline-none" />
                     </td>
@@ -487,10 +492,10 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                   <td colSpan={8} className="p-4 text-right uppercase tracking-wider text-slate-400 text-[10px]">Grand Total ({currency}):</td>
                   <td colSpan={2} className="p-4 text-right font-mono text-sm text-gray-900 pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
-                {currency !== 'PKR' && (
+                {currency !== baseCurrency && (
                   <tr className="bg-indigo-50/30 text-xs text-indigo-900 font-bold">
                     <td colSpan={8} className="p-3 text-right uppercase text-[10px] tracking-wider text-indigo-400">Equivalent Base Total:</td>
-                    <td colSpan={2} className="p-3 text-right font-mono pr-6">PKR {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td colSpan={2} className="p-3 text-right font-mono pr-6">{baseCurrency} {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
                 )}
               </tbody>
@@ -517,7 +522,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* 📄 2. DEDICATED PREMIUM A4 COMMERCIAL INVOICE CANVAS PRINT CARD BLOCK */}
+      {/* 📄 2. PRINT BLOCK */}
       <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
         
         {/* Brand Header */}
@@ -637,7 +642,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* 📦 QUICK ADD CUSTOM TAX BLUEPRINT MODAL */}
+      {/* MODALS */}
       {isTaxModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
@@ -677,7 +682,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       )}
 
-      {/* QUICK POPUPS UNTOUCHED MATRIX */}
       {isProductModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">

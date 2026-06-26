@@ -18,6 +18,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
   const [narration, setNarration] = useState('');
 
   // 🧾 Multi-Currency State Core Variables
+  const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
 
@@ -90,6 +91,20 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     if (d) setDepartments(d);
     if (v) setDivisions(v);
     if (i) setInventoryItems(i);
+
+    if (targetId) {
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('base_currency')
+        .eq('id', targetId)
+        .maybeSingle();
+
+      if (companyData && companyData.base_currency) {
+        setBaseCurrency(companyData.base_currency);
+        setCurrency(companyData.base_currency); // ⭐ Set default screen input currency to company base lock
+        setExchangeRate(1);
+      }
+    }
   };
 
   useEffect(() => { 
@@ -223,7 +238,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         }
       `}</style>
 
-      {/* 👑 Header Action Strip */}
+      {/* Header Strip */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
         <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
           <span className="bg-blue-600 text-white p-2 rounded-xl shadow-xs"><ShoppingBag size={18} /></span>
@@ -237,7 +252,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         </div>
       </div>
 
-      {/* 🏢 Split Meta Layout Section */}
+      {/* Split Meta Layout Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
@@ -261,21 +276,22 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-2 gap-4">
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Billing Currency</label>
-            <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === 'PKR') setExchangeRate(1); }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
-              <option value="PKR">PKR (Base)</option>
-              <option value="USD">USD ($)</option>
-              <option value="AED">AED (AED)</option>
-              <option value="GBP">GBP (£)</option>
+            <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === baseCurrency) setExchangeRate(1); }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
+              <option value={baseCurrency}>{baseCurrency} (Base)</option>
+              {baseCurrency !== 'PKR' && <option value="PKR">PKR</option>}
+              {baseCurrency !== 'USD' && <option value="USD">USD ($)</option>}
+              {baseCurrency !== 'AED' && <option value="AED">AED (AED)</option>}
+              {baseCurrency !== 'GBP' && <option value="GBP">GBP (£)</option>}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate</label>
-            <input type="number" value={exchangeRate} disabled={currency === 'PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === 'PKR' ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-blue-200 text-blue-600 ring-2 ring-blue-50/50'}`} min="0.01" step="any" />
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate (1 {currency} = ? {baseCurrency})</label>
+            <input type="number" value={exchangeRate} disabled={currency === baseCurrency} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === baseCurrency ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-blue-200 text-blue-600 ring-2 ring-blue-50/50'}`} min="0.01" step="any" />
           </div>
         </div>
       </div>
 
-      {/* 📊 High-Density Strict Responsive Scroll Grid */}
+      {/* Responsive Grid */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
         <div className="overflow-x-auto w-full scrollbar-thin">
           <table className="w-full text-left border-collapse table-fixed min-w-[1350px]">
@@ -289,7 +305,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
                 <th className="p-5 w-[10%] text-right">Cost Rate</th>
                 <th className="p-5 w-40">Tax Type</th>
                 <th className="p-5 w-16 text-center">Tax %</th>
-                {/* ⭐ Tax Amt Column Added Here */}
                 <th className="p-5 w-[10%] text-right">Tax Amt</th>
                 <th className="p-5 w-28 text-right pr-6">Ext. Price</th>
               </tr>
@@ -347,7 +362,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
 
                   <td className="p-4"><input type="number" value={line.taxRate} onChange={e => handleRowMetricChange(idx, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-mono" /></td>
 
-                  {/* ⭐ Tax Amt Input box block layout added */}
                   <td className="p-4">
                     <input type="text" readOnly value={line.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} className="w-full p-2 bg-slate-50 border border-gray-100 rounded-xl text-right font-mono text-gray-500 outline-none" />
                   </td>
@@ -362,10 +376,10 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
                 <td colSpan={8} className="p-5 text-right uppercase tracking-wider text-slate-400 text-[10px]">Total Bill Value ({currency}):</td>
                 <td colSpan={2} className="p-5 text-right font-mono text-base pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
               </tr>
-              {currency !== 'PKR' && (
+              {currency !== baseCurrency && (
                 <tr className="bg-blue-50/40 text-xs text-blue-900 font-bold">
                   <td colSpan={8} className="p-3 text-right uppercase text-[10px] tracking-wider text-blue-400">Equivalent Base Value:</td>
-                  <td colSpan={2} className="p-3 text-right font-mono pr-6">PKR {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                  <td colSpan={2} className="p-3 text-right font-mono pr-6">{baseCurrency} {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
               )}
             </tbody>
@@ -391,7 +405,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         </button>
       </div>
 
-      {/* 📦 QUICK ADD CUSTOM TAX BLUEPRINT MODAL */}
+      {/* CUSTOM TAX MODAL */}
       {isTaxModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
@@ -431,7 +445,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         </div>
       )}
 
-      {/* QUICK POPUPS UNTOUCHED MATRIX */}
+      {/* QUICK PRODUCT MODAL */}
       {isProductModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
@@ -460,7 +474,6 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         </div>
       )}
 
-      {/* OTHER POPUPS */}
       {isVendModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">

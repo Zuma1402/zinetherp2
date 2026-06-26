@@ -149,7 +149,7 @@ const App: React.FC = () => {
     try {
       let finalUniqueList: any[] = [];
       
-      const { data: allComps } = await supabase.from('companies').select('id, name');
+      const { data: allComps } = await supabase.from('companies').select('id, name, base_currency');
       const { data: userCompJunction } = await supabase
         .from('user_companies')
         .select('company_id')
@@ -395,6 +395,8 @@ const App: React.FC = () => {
                       setCompanyName(comp.name);
                       localStorage.setItem('supabase_active_company_id', comp.id);
                       localStorage.setItem('active_company_id', comp.id);
+                      // ⭐ Fire custom multi-currency partition listener trigger to force UI state reload
+                      window.dispatchEvent(new CustomEvent('companySwitched', { detail: { id: comp.id, name: comp.name } }));
                     }
                   }
                 }}
@@ -486,7 +488,6 @@ const App: React.FC = () => {
                   </div>
                 )}
             </div>
-            {/* 🛡️ Hide completely if non-admin restricted worker */}
             {user?.role === 'ADMIN' && <SidebarItem view="SETTINGS" icon={SettingsIcon} label="Settings" />}
         </nav>
 

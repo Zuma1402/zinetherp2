@@ -23,7 +23,8 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [narration, setNarration] = useState('');
 
-  // 🧾 Multi-Currency Configuration Matrix
+  // 🧾 Multi-Currency Configuration Matrix Variables
+  const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   
@@ -47,8 +48,35 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
     if (v) setDivisions(v);
   };
 
+  const syncVoucherBaseCurrency = async () => {
+    const activeCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+    if (activeCompanyId) {
+      try {
+        const { data } = await supabase
+          .from('companies')
+          .select('base_currency')
+          .eq('id', activeCompanyId)
+          .maybeSingle();
+
+        if (data && data.base_currency) {
+          setBaseCurrency(data.base_currency);
+          setCurrency(data.base_currency); // ⭐ Force loads form selection node to anchor currency setup
+          setExchangeRate(1);
+        }
+      } catch (err) {
+        console.error("Voucher framework base anchor resolve error:", err);
+      }
+    }
+  };
+
   useEffect(() => { 
-    fetchDimensions(); 
+    fetchDimensions();
+    syncVoucherBaseCurrency();
+
+    // Event listener to trigger real-time currency updates if swapped dynamically
+    const handleGlobalSwitch = () => syncVoucherBaseCurrency();
+    window.addEventListener('companySwitched', handleGlobalSwitch);
+    return () => window.removeEventListener('companySwitched', handleGlobalSwitch);
   }, []);
 
   const updateRow = (index: number, key: keyof RowEntry, value: any) => {
@@ -129,7 +157,6 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       number: voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo,
       type: voucherType,
       narration: narration || `Journal Post (${currency})`,
-      // 🧮 Automatic conversion to system baseline array values
       entries: entries.map(e => ({
         ledgerId: e.ledgerId,
         debit: e.debit * exchangeRate,
@@ -167,7 +194,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
           </div>
         </div>
 
-        {/* CONTROLS EXPANDED TO FIVE COLUMNS TO HOUSE INTER-EXCHANGE DROPDOWNS */}
+        {/* CONTROLS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs font-bold text-gray-700">
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher Type</label>
@@ -187,15 +214,16 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Currency</label>
-            <select value={currency} onChange={e => { const val = e.target.value; setCurrency(val); if(val==='PKR') setExchangeRate(1); }} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
-              <option value="PKR">PKR (Base)</option>
-              <option value="USD">USD ($)</option>
-              <option value="AED">AED (Dirham)</option>
+            <select value={currency} onChange={e => { const val = e.target.value; setCurrency(val); if(val===baseCurrency) setExchangeRate(1); }} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
+              <option value={baseCurrency}>{baseCurrency} (Base)</option>
+              {baseCurrency !== 'PKR' && <option value="PKR">PKR</option>}
+              {baseCurrency !== 'USD' && <option value="USD">USD ($)</option>}
+              {baseCurrency !== 'AED' && <option value="AED">AED (Dirham)</option>}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Rate (1 {currency} = ? PKR)</label>
-            <input type="number" value={exchangeRate} disabled={currency==='PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-indigo-600 font-black text-center text-xs outline-none disabled:bg-gray-50" min="0.01" step="any" />
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Rate (1 {currency} = ? {baseCurrency})</label>
+            <input type="number" value={exchangeRate} disabled={currency===baseCurrency} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-indigo-600 font-black text-center text-xs outline-none disabled:bg-gray-50" min="0.01" step="any" />
           </div>
         </div>
         <div className="mt-4">
@@ -262,9 +290,9 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
                 <td className="p-5 text-right text-indigo-700 text-sm border-t">{totalCreditForeign.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 <td></td>
               </tr>
-              {currency !== 'PKR' && (
+              {currency !== baseCurrency && (
                 <tr className="bg-indigo-50/30 text-indigo-900 font-bold text-xs font-mono">
-                  <td colSpan={4} className="p-3 text-right font-sans text-[10px] text-indigo-400 uppercase tracking-wider">Base Matrix Equivalent (PKR):</td>
+                  <td colSpan={4} className="p-3 text-right font-sans text-[10px] text-indigo-400 uppercase tracking-wider">Base Matrix Equivalent ({baseCurrency}):</td>
                   <td className="p-3 text-right border-t text-indigo-600">{(totalDebitForeign * exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td className="p-3 text-right border-t text-indigo-600">{(totalCreditForeign * exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   <td></td>
@@ -282,7 +310,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
         </div>
       </div>
 
-      {/* QUICK ADD MODALS RESIDENT BLOCKS */}
+      {/* MODALS */}
       {isDeptModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">

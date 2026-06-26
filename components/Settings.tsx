@@ -249,7 +249,7 @@ const Settings: React.FC<SettingsProps> = ({
       await syncEngineData();
     } catch (err: any) {
       alert(`Ledger configuration blueprint crash: ${err.message}`);
-    } finally {
+    } fillal {
       setIsMappingSaving(false);
     }
   };
@@ -321,7 +321,6 @@ const Settings: React.FC<SettingsProps> = ({
       }
 
       const companyId = crypto.randomUUID();
-      // ⭐ Securely map base_currency column on fresh independent corporate inserts row blueprint payload
       const { error: companyError } = await supabase.from('companies').insert([{ 
         id: companyId, 
         name: targetNameClean,
@@ -547,7 +546,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* ⭐ BASE CURRENCY SYSTEM SELECTION MATRIX DROPDOWN PLACED HERE */}
+              {/* ⭐ BASE CURRENCY SYSTEM PLACEMENT SELECTION MATRIX DROPDOWN PLACED HERE */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-indigo-950/50 pt-4">
                 <div>
                   <label className="block text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1.5">Reporting / Base Currency</label>
@@ -602,7 +601,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* 🗺️ THE AUTOMATED DOUBLE-ENTRY LEDGERS MAPPING ROOM CONTROL PANEL */}
+        {/* 🗺️ DOUBLE-ENTRY LEDGERS MAPPING ROOM CONTROL PANEL */}
         {!isMasterZenithScope && currentUser.role === 'ADMIN' && (
           <div className="md:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
             <div className="border-b pb-3">
@@ -653,7 +652,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* 👑 USER MANAGEMENT MATRIX MONITOR TERMINAL */}
+        {/* USER MANAGEMENT MATRIX MONITOR TERMINAL */}
         <div className="md:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
@@ -815,7 +814,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       </div>
 
-      {/* ➕ QUICK ADD LEDGER MODAL COMPONENT */}
+      {/* QUICK ADD LEDGER MODAL */}
       {isQuickLedgerModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full border shadow-2xl animate-in zoom-in-95 duration-150">
