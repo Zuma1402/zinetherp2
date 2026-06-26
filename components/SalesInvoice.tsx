@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer } from 'lucide-react';
+// ⭐ Loader2 ko yahan safe context mein add kar diya hai taake crash na ho
+import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer, Loader2 } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
@@ -19,7 +20,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [customerId, setCustomerId] = useState('');
   const [narration, setNarration] = useState('');
 
-  // 🧾 Dynamic Multi-Currency State (No hardcoded fallback during synchronization)
+  // 🧾 Dynamic Multi-Currency State Framework Variables
   const [baseCurrency, setBaseCurrency] = useState<string>('');
   const [currency, setCurrency] = useState<string>('');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
@@ -29,7 +30,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(items);
 
-  // Mapped Accounts
+  // Mapped Accounts Configuration States
   const [mappedSalesId, setMappedSalesLedgerId] = useState('');
   const [mappedCogsId, setMappedCogsLedgerId] = useState('');
   const [mappedStockId, setMappedStockLedgerId] = useState('');
@@ -40,7 +41,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [taxId, setTaxId] = useState('');
   const [activeCompanyId, setActiveCompanyId] = useState('');
 
-  // Tax Management
+  // Tax Matrix State Framework
   const [taxOptions, setTaxOptions] = useState<{name: string, rate: number}[]>([]);
   const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
   const [newTaxName, setNewTaxName] = useState('');
@@ -108,7 +109,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           setCompanyName(activeCompanyData.name);
           setCompanyEmail(activeCompanyData.email || `${activeCompanyData.name.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
           
-          // ⭐ CRITICAL FIX: Force atomic updates directly onto independent state streams
           const dbCurrency = activeCompanyData.base_currency || 'PKR';
           setBaseCurrency(dbCurrency);
           setCurrency(dbCurrency);
@@ -323,7 +323,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const activeCustomerObj = ledgers.find(l => l.id === customerId);
 
-  // Dynamic overlay barrier spinner layout layer to trap async context lags
   if (isCurrencyLoading || !currency || currency === '') {
     return (
       <div className="w-full h-96 flex items-center justify-center flex-col gap-3">
