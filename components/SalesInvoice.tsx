@@ -118,7 +118,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           
           if (activeCompanyData.base_currency) {
             setBaseCurrency(activeCompanyData.base_currency);
-            setCurrency(activeCompanyData.base_currency); // ⭐ Force state initialization onto active entity settings
+            setCurrency(activeCompanyData.base_currency); // ⭐ Explicit override link fixed!
             setExchangeRate(1);
           }
         }
@@ -128,6 +128,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     }
   };
 
+  // Synchronize on initialization mount context lifecycle loops
   useEffect(() => {
     const initializeInvoice = async () => {
       try {
@@ -141,17 +142,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           localStorage.getItem('supabase_active_company_id') || 
           localStorage.getItem('active_company_id') || 
           localStorage.getItem('company_id') || '';
-
-        if (!companyName || companyName === 'ZinethERP' || companyName === '') {
-          const sessionFallbackName = localStorage.getItem('active_company_name');
-          if (sessionFallbackName) {
-            setCompanyName(sessionFallbackName);
-            setCompanyEmail(`${sessionFallbackName.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
-          } else {
-            setCompanyName(settings.companyName || 'ZinethERP');
-            setCompanyEmail(settings.email || 'billing@zinetherp.app');
-          }
-        }
 
         if (targetId) {
           const { data: mapRecord } = await supabase
@@ -175,6 +165,11 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     initializeInvoice();
     fetchLookups();
     fetchTaxes();
+
+    // Listen to sidebar switching events dynamically
+    const handleSwitch = () => fetchLookups();
+    window.addEventListener('companySwitched', handleSwitch);
+    return () => window.removeEventListener('companySwitched', handleSwitch);
   }, [customerId, ledgers.length, date]);
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
@@ -352,9 +347,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         }
       `}</style>
       
-      {/* 🛡️ 1. SCREEN INPUT FORMS BLOCK CONTAINER */}
       <div className="print:hidden bg-gray-50/50 p-2 md:p-6 rounded-2xl space-y-6 relative">
-        {/* Header Action Strip */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
           <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
             <span className="bg-indigo-600 text-white p-2 rounded-xl shadow-xs"><ShoppingCart size={18} /></span>
@@ -368,7 +361,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
-        {/* Split Meta Layout Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-1">
