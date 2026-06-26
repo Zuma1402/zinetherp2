@@ -19,9 +19,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [customerId, setCustomerId] = useState('');
   const [narration, setNarration] = useState('');
 
-  // 🧾 Dynamic Multi-Currency State Framework Variables
-  const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
-  const [currency, setCurrency] = useState<string>('PKR');
+  // 🧾 Dynamic Multi-Currency State Framework Variables (Initialized blank to prevent hardcoded defaults)
+  const [baseCurrency, setBaseCurrency] = useState<string>('');
+  const [currency, setCurrency] = useState<string>('');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [isCurrencyLoading, setIsCurrencyLoading] = useState<boolean>(true);
 
@@ -110,13 +110,12 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           
           const dbCurrency = activeCompanyData.base_currency || 'PKR';
           setBaseCurrency(dbCurrency);
-          setCurrency(dbCurrency); // ⭐ Synchronizes primary display code element directly
+          setCurrency(dbCurrency); 
           setExchangeRate(1);
         }
       } catch (err) {
         console.error("Critical tracking fallback interceptor trigger error:", err);
       } finally {
-        // ⭐ Ensures loading condition layer is ALWAYS unblocked safely
         setIsCurrencyLoading(false);
       }
     } else {
@@ -323,7 +322,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const activeCustomerObj = ledgers.find(l => l.id === customerId);
 
-  if (isCurrencyLoading) {
+  if (isCurrencyLoading || !currency) {
     return (
       <div className="w-full h-96 flex items-center justify-center flex-col gap-3">
         <Loader2 className="animate-spin text-indigo-600" size={32} />
@@ -334,7 +333,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   return (
     <div className="max-w-7xl mx-auto">
-      
       <style>{`
         @media print {
           @page {
