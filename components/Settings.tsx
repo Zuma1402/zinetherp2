@@ -31,6 +31,9 @@ const Settings: React.FC<SettingsProps> = ({
   const [taxId, setTaxId] = useState('');
   const [invoicePrefix, setInvoicePrefix] = useState('INV-');
   const [nextInvoiceNumber, setNextInvoiceNumber] = useState(1);
+  
+  // ⭐ Active Company Base Currency (For Tenant Reading view Only)
+  const [activeCompanyBaseCurrency, setActiveCompanyBaseCurrency] = useState('PKR');
 
   // ⚙️ STRUCTURAL LEDGER MAPPING CONFIGURATION SYSTEM HOOKS
   const [allCompanyLedgers, setAllCompanyLedgers] = useState<Ledger[]>([]);
@@ -125,6 +128,19 @@ const Settings: React.FC<SettingsProps> = ({
         setDefaultPurchaseLedger(mappings.default_purchase_ledger || '');
         setDefaultStockLedger(mappings.default_stock_ledger || '');
       }
+
+      // ⭐ Fetch and read company real-time base currency setting profile from DB
+      const { data: compProfile } = await supabase
+        .from('companies')
+        .select('base_currency')
+        .eq('id', companyId)
+        .maybeSingle();
+        
+      if (compProfile && compProfile.base_currency) {
+        setActiveCompanyBaseCurrency(compProfile.base_currency);
+      } else {
+        setActiveCompanyBaseCurrency('PKR');
+      }
     } catch (err) {
       console.error("Ledger maps registry reading crash:", err);
     }
@@ -212,7 +228,6 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // 📝 SUBMISSION HANDLER TO COMMIT DEFAULT ACCOUNT CONFIGURATION MAPPINGS
   const handleSaveLedgerMappings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!localActiveId) return;
@@ -239,7 +254,6 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // ➕ QUICK ADD LEDGER SUBMIT WITH AUTOMATIC DROPDOWN BINDING
   const handleQuickLedgerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickLedgerName.trim() || !localActiveId) return;
@@ -307,7 +321,7 @@ const Settings: React.FC<SettingsProps> = ({
       }
 
       const companyId = crypto.randomUUID();
-      // ⭐ Dynamic base_currency field mapped securely directly inside insert database schema row payload
+      // ⭐ Securely map base_currency column on fresh independent corporate inserts row blueprint payload
       const { error: companyError } = await supabase.from('companies').insert([{ 
         id: companyId, 
         name: targetNameClean,
@@ -412,7 +426,7 @@ const Settings: React.FC<SettingsProps> = ({
     } catch (e) {
       console.error(e);
     } finally {
-      boxId: setIsDeletingCompany(false);
+      setIsDeletingCompany(false);
     }
   };
 
@@ -430,7 +444,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* PROFILE BLOCK */}
-        <div className="bg-white p-6 border border-gray-200 rounded-2xl shadow-xs space-y-4">
+        <div className="bg-white p-6 border border-gray-200 rounded-2xl shadow-xs space-y-4 h-fit">
           <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-3">
             <UserIcon size={16} className="text-indigo-600" /> User Profile Node
           </h2>
@@ -449,7 +463,7 @@ const Settings: React.FC<SettingsProps> = ({
           </form>
         </div>
 
-        {/* 🏢 ISOLATED CONFIGURATIONS LAYER */}
+        {/* 🏢 ISOLATED CONFIGURATIONS LAYER (TENANT WORKSPACE ENVIRONMENT) */}
         {!isMasterZenithScope && (
           <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
             <div className="flex items-center gap-3 mb-5">
@@ -478,7 +492,8 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              <div className="bg-slate-50 border p-4 rounded-xl grid grid-cols-2 gap-4">
+              {/* ⭐ Tenant view Base currency view details indicator layout row */}
+              <div className="bg-slate-50 border p-4 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Invoice Generation Prefix</label>
                   <input type="text" value={invoicePrefix} onChange={e => setInvoicePrefix(e.target.value)} className="w-full p-2 border rounded text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none bg-white" />
@@ -486,6 +501,12 @@ const Settings: React.FC<SettingsProps> = ({
                 <div>
                   <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Next Sequential Auto-Index</label>
                   <input type="number" value={nextInvoiceNumber} onChange={e => setNextInvoiceNumber(Number(e.target.value))} className="w-full p-2 border rounded text-sm font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 outline-none bg-white" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-indigo-400 uppercase mb-1">Ecosystem Locked Base Currency</label>
+                  <div className="w-full p-2 bg-indigo-50 border border-indigo-100 rounded text-sm font-black text-indigo-700 text-center uppercase tracking-widest cursor-not-allowed">
+                    {activeCompanyBaseCurrency} (Locked)
+                  </div>
                 </div>
               </div>
 
@@ -497,7 +518,7 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {/* 👑 THE OMNIPOTENT MASTER LAYER */}
+        {/* 👑 THE OMNIPOTENT MASTER LAYER (SUPER-ADMIN CREATION CODES PANEL) */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-2xl shadow-xl p-6 border border-indigo-900/40">
             <div className="flex items-center gap-3 mb-5 border-b border-indigo-900/60 pb-3">
@@ -526,7 +547,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* ⭐ BASE CURRENCY SYSTEM PLACEMENT SELECTION COMPONENT LAYER INJECTED */}
+              {/* ⭐ BASE CURRENCY SYSTEM SELECTION MATRIX DROPDOWN PLACED HERE */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-indigo-950/50 pt-4">
                 <div>
                   <label className="block text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1.5">Reporting / Base Currency</label>
