@@ -110,13 +110,13 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           
           const dbCurrency = activeCompanyData.base_currency || 'PKR';
           setBaseCurrency(dbCurrency);
-          setCurrency(dbCurrency);
+          setCurrency(dbCurrency); // ⭐ Synchronizes primary display code element directly
           setExchangeRate(1);
         }
       } catch (err) {
         console.error("Critical tracking fallback interceptor trigger error:", err);
       } finally {
-        // ⭐ Fixed: Executing outside block boundaries to guarantee release
+        // ⭐ Ensures loading condition layer is ALWAYS unblocked safely
         setIsCurrencyLoading(false);
       }
     } else {
