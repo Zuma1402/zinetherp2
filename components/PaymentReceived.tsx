@@ -27,25 +27,30 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
   const [isAddingPayer, setIsAddingPayer] = useState(false);
   const [newPayerName, setNewPayerName] = useState('');
 
-  // Fetch company base currency dynamic setup
+  // Fetch company base currency dynamic setup room
   const fetchActiveCompanyCurrency = async () => {
     const activeCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
     if (activeCompanyId) {
       const { data } = await supabase.from('companies').select('base_currency').eq('id', activeCompanyId).maybeSingle();
       if (data && data.base_currency) {
         setBaseCurrency(data.base_currency);
-        setCurrency(data.base_currency);
+        setCurrency(data.base_currency); // ⭐ Dynamic mapping synchronization fix
       }
     }
   };
 
   useEffect(() => {
     fetchActiveCompanyCurrency();
+    
+    // Listen to sidebar switching events dynamically without lag execution breaks
+    const handleSwitch = () => fetchActiveCompanyCurrency();
+    window.addEventListener('companySwitched', handleSwitch);
+    return () => window.removeEventListener('companySwitched', handleSwitch);
   }, []);
 
   // Filter ledgers
   const payerAccounts = ledgers.filter(l => l.group.includes('Debtors') || l.type === AccountType.ASSET || l.type === AccountType.INCOME);
-  const depositAccounts = ledgers.filter(l => l.group.includes('Cash') || l.group.includes('Bank') || l.group.includes('Assets'));
+  const depositAccounts = ledgers.filter(l => l.group.includes('Cash') || l.group.includes('Bank') || l.type === AccountType.ASSET);
 
   const handleAddPayer = () => {
     if (!newPayerName) return;
@@ -60,7 +65,6 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
     onAddLedger(newLedger);
     setPayerLedgerId(newLedger.id);
     setIsAddingPayer(false);
-    newPayerName;
     setNewPayerName('');
   };
 
@@ -70,31 +74,20 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
       return;
     }
 
-    // 📊 Value Conversion Engine
-    const amountInBasePKR = amount * paymentExchangeRate; // Value at current payment date
-    const amountInInvoicePKR = amount * invoiceExchangeRate; // Value at past invoice locked date
-    
-    // 🧮 Forex Gain or Loss Calculation Matrix
-    const forexDifference = amountInBasePKR - amountInInvoicePKR;
+    const amountInBaseCurrency = amount * paymentExchangeRate; 
+    const amountInInvoiceCurrency = amount * invoiceExchangeRate; 
+    const forexDifference = amountInBaseCurrency - amountInInvoiceCurrency;
 
-    // Find the Forex Gain/Loss automated account head from system ledgers registry
     const forexLedger = ledgers.find(l => l.name.toLowerCase().includes('exchange gain/loss')) || 
                         ledgers.find(l => l.name.toLowerCase().includes('forex')) || { id: 'FOREX-GAIN-LOSS-HEAD' };
 
     const voucherEntries: any[] = [];
+    voucherEntries.push({ ledgerId: depositLedgerId, debit: amountInBaseCurrency, credit: 0 });
+    voucherEntries.push({ ledgerId: payerLedgerId, debit: 0, credit: amountInInvoiceCurrency });
 
-    // Entry 1: Debit Bank/Cash (with current payment date converted base value)
-    voucherEntries.push({ ledgerId: depositLedgerId, debit: amountInBasePKR, credit: 0 });
-
-    // Entry 2: Credit Customer Ledger (with original calculated invoice base value)
-    voucherEntries.push({ ledgerId: payerLedgerId, debit: 0, credit: amountInInvoicePKR });
-
-    // Entry 3: Automatic Forex Entry Injection to keep double-entry balanced
     if (forexDifference > 0) {
-      // It's a Gain! -> Credit Exchange Gain Account
       voucherEntries.push({ ledgerId: forexLedger.id, debit: 0, credit: Math.abs(forexDifference) });
     } else if (forexDifference < 0) {
-      // It's a Loss! -> Debit Exchange Loss Account
       voucherEntries.push({ ledgerId: forexLedger.id, debit: Math.abs(forexDifference), credit: 0 });
     }
 
@@ -103,7 +96,7 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
       date,
       number: `RCPT-${Math.floor(Math.random() * 10000)}`,
       type: VoucherType.RECEIPT,
-      narration: narration || `Payment Received (${currency}) ${forexDifference !== 0 ? `| Forex Delta: ${forexDifference.toFixed(2)}` : ''}`,
+      narration: narration || `Payment Received (${currency})`,
       entries: voucherEntries,
       currency,
       exchangeRate: paymentExchangeRate,
@@ -112,10 +105,6 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
 
     onSave(voucher);
   };
-
-  // Find dynamic currency details of the selected deposit bank account to track multi-currency wallets
-  const selectedBankLedger = ledgers.find(l => l.id === depositLedgerId);
-  const bankCurrency = (selectedBankLedger as any)?.currency || baseCurrency;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 max-w-xl mx-auto border border-gray-200 mt-10">
@@ -152,7 +141,6 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
                 <button 
                     onClick={() => setIsAddingPayer(true)}
                     className="bg-gray-100 text-gray-600 p-2 rounded border border-gray-300 hover:bg-gray-200"
-                    title="Add New Customer"
                 >
                     <Plus size={20} />
                 </button>
@@ -188,25 +176,22 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
           </div>
         </div>
 
-        {/* 📉 Forex Double Rate Evaluation Panel (Only triggers if transactional currency deviates from company baseline) */}
         {currency !== baseCurrency && (
           <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4 grid grid-cols-2 gap-4 animate-in fade-in duration-300">
             <div>
               <label className="block text-[11px] font-black text-emerald-800 uppercase tracking-wider">1. Locked Invoice Rate</label>
-              <input type="number" value={invoiceExchangeRate} onChange={e => setInvoiceExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-2 bg-white border border-emerald-200 rounded mt-1 font-mono text-center font-bold text-emerald-700 outline-none text-xs" step="any" min="0.001" />
-              <span className="text-[10px] text-emerald-600 font-medium">Rate when invoice was issued</span>
+              <input type="number" value={invoiceExchangeRate} onChange={e => setInvoiceExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-2 bg-white border border-emerald-200 rounded mt-1 font-mono text-center font-bold text-emerald-700 text-xs outline-none" step="any" min="0.001" />
             </div>
             <div>
               <label className="block text-[11px] font-black text-emerald-800 uppercase tracking-wider">2. Current Payment Rate</label>
-              <input type="number" value={paymentExchangeRate} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-2 bg-white border border-emerald-200 rounded mt-1 font-mono text-center font-bold text-emerald-700 outline-none text-xs" step="any" min="0.001" />
-              <span className="text-[10px] text-emerald-600 font-medium">Rate of conversion today</span>
+              <input type="number" value={paymentExchangeRate} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-2 bg-white border border-emerald-200 rounded mt-1 font-mono text-center font-bold text-emerald-700 text-xs outline-none" step="any" min="0.001" />
             </div>
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
             <div>
-                <label className="block text Red-sm font-medium text-gray-700">Amount Received</label>
+                <label className="block text-sm font-medium text-gray-700">Amount</label>
                 <input 
                     type="number" 
                     value={amount} 
@@ -215,7 +200,7 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
                 />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700">Date Received</label>
+                <label className="block text-sm font-medium text-gray-700">Date</label>
                 <input 
                     type="date" 
                     value={date} 
@@ -226,19 +211,19 @@ const PaymentReceived: React.FC<PaymentReceivedProps> = ({ ledgers, onSave, onCa
         </div>
 
         <div>
-            <label className="block text-sm font-medium text-gray-700">Notes / Remittance Info</label>
+            <label className="block text-sm font-medium text-gray-700">Notes</label>
             <textarea 
-                className="w-full p-2 border rounded mt-1 text-xs font-medium"
+                className="w-full p-2 border rounded mt-1 text-xs"
                 rows={2}
                 value={narration}
                 onChange={e => setNarration(e.target.value)}
-                placeholder="e.g. Invoice #1001 payment cleared with forex metrics adjustment"
+                placeholder="e.g. Invoice payment details..."
             ></textarea>
         </div>
 
         <div className="flex gap-3 pt-4">
-          <button onClick={onCancel} className="flex-1 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded font-bold transition-all">Cancel</button>
-          <button onClick={handleSubmit} className="flex-1 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex justify-center items-center gap-2 font-black shadow-sm transition-all">
+          <button onClick={onCancel} className="flex-1 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded font-bold">Cancel</button>
+          <button onClick={handleSubmit} className="flex-1 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex justify-center items-center gap-2 font-black shadow-sm">
             <Save size={18} /> Receive Payment
           </button>
         </div>
