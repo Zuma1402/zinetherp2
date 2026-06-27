@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, AccountType, Department, Division } from '../types';
-import { Save, X, ArrowRight } from 'lucide-react';
+import { Save, X, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 
 interface ExpenseEntryProps {
   ledgers: Ledger[];
   onSave: (voucher: Voucher) => void;
   onCancel: () => void;
-  onAddLedger?: (ledger: Ledger) => void; // Optional prop to support global Chart of Accounts update
+  onAddLedger?: (ledger: Ledger) => void;
 }
 
 const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, onAddLedger }) => {
@@ -18,8 +18,10 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
   const [narration, setNarration] = useState('');
 
   // 🧾 MULTI-CURRENCY EXTRA STATE VARIABLES
+  const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
 
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedDiv, setSelectedDiv] = useState('');
@@ -27,37 +29,70 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
   const [divisions, setDivisions] = useState<Division[]>([]);
 
   // Modals States
+  const [isExpenseAccModalOpen, setIsExpenseAccModalOpen] = useState(false);
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [isDivModalOpen, setIsDivModalOpen] = useState(false);
-  const [isExpenseAccModalOpen, setIsExpenseAccModalOpen] = useState(false); // ⭐ New Expense Account Modal State
 
+  const [newExpenseAccName, setNewExpenseAccName] = useState('');
   const [newDeptName, setNewDeptName] = useState('');
   const [newDivName, setNewDivName] = useState('');
-  const [newExpenseAccName, setNewExpenseAccName] = useState(''); // ⭐ New Expense Account Input State
 
-  // Local state copy to instantly show dynamically created categories without hard refresh
   const [localLedgers, setLocalLedgers] = useState<Ledger[]>(ledgers);
 
-  useEffect(() => { 
-    setLocalLedgers(ledgers); 
-  }, [ledgers]);
-
-  useEffect(() => { fetchDimensions(); }, []);
-
-  const fetchLookups = async () => {
-    const { data: depts } = await supabase.from('departments').select('*').order('name');
-    const { data: divs } = await supabase.from('divisions').select('*').order('name');
-    if (depts) setDepartments(depts);
-    if (divs) setDivisions(divs);
+  // ⭐ Real-Time Automated Forex Exchange Sync Engine
+  const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
+    if (targetCurrency === base) {
+      setExchangeRate(1);
+      return;
+    }
+    setIsRateFetching(true);
+    try {
+      const res = await fetch(`https://open.er-api.com/v6/latest/${targetCurrency}`);
+      const data = await res.json();
+      if (data && data.rates && data.rates[base]) {
+        setExchangeRate(parseFloat(data.rates[base].toFixed(4)));
+      }
+    } catch (err) {
+      console.error("Forex API fallback standard node trigger log:", err);
+    } finally {
+      setIsRateFetching(false);
+    }
   };
 
-  // Keep identity method alias mapped cleanly
-  const fetchDimensions = fetchLookups;
+  const fetchActiveCompanyContext = async () => {
+    const activeCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+    if (activeCompanyId) {
+      const { data } = await supabase.from('companies').select('base_currency').eq('id', activeCompanyId).maybeSingle();
+      if (data && data.base_currency) {
+        setBaseCurrency(data.base_currency);
+        setCurrency(data.base_currency);
+      }
+    }
+  };
+
+  useEffect(() => {
+    setLocalLedgers(ledgers);
+  }, [ledgers]);
+
+  useEffect(() => {
+    const initLookups = async () => {
+      await fetchActiveCompanyContext();
+      const { data: depts } = await supabase.from('departments').select('*').order('name');
+      const { data: divs } = await supabase.from('divisions').select('*').order('name');
+      if (depts) setDepartments(depts);
+      if (divs) setDivisions(divs);
+    };
+    initLookups();
+  }, []);
+
+  // ⭐ Watcher to fetch rates dynamically when user switches currencies
+  useEffect(() => {
+    syncLiveExchangeRate(currency, baseCurrency);
+  }, [currency, baseCurrency]);
 
   const expenseAccounts = localLedgers.filter(l => l.type === AccountType.EXPENSE);
   const paymentAccounts = localLedgers.filter(l => l.group.includes('Cash') || l.group.includes('Bank') || l.id.includes('cash') || l.id.includes('bank'));
 
-  // ⭐ Handler for the new Expense Account select trigger
   const handleExpenseDropdownChange = (val: string) => {
     if (val === 'QUICK_ADD_EXPENSE_ACCOUNT') {
       setIsExpenseAccModalOpen(true);
@@ -67,39 +102,17 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
     }
   };
 
-  // ⭐ Submission for the dynamically created Expense Account
   const handleQuickExpenseAccSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExpenseAccName.trim()) return;
-
     const newId = crypto.randomUUID();
-    const newAccount: Ledger = {
-      id: newId,
-      name: newExpenseAccName.trim(),
-      type: AccountType.EXPENSE,
-      group: 'Operating Expenses',
-      openingBalance: 0
-    };
-
-    // Push to cloud if database sync configuration exists
+    const newAccount: Ledger = { id: newId, name: newExpenseAccName.trim(), type: AccountType.EXPENSE, group: 'Operating Expenses', openingBalance: 0 };
     try {
-      await supabase.from('ledgers').insert([{
-        id: newId,
-        name: newAccount.name,
-        type: newAccount.type,
-        group_name: newAccount.group,
-        opening_balance: 0
-      }]);
-    } catch (err) {
-      console.warn("Database ledger schema bypass or remote sync missing:", err);
-    }
+      await supabase.from('ledgers').insert([{ id: newId, name: newAccount.name, type: newAccount.type, group_name: newAccount.group, opening_balance: 0 }]);
+    } catch (err) { console.warn(err); }
 
-    // Update parent architecture if handler exists, otherwise push inline locally
-    if (onAddLedger) {
-      onAddLedger(newAccount);
-    } else {
-      setLocalLedgers([...localLedgers, newAccount]);
-    }
+    if (onAddLedger) onAddLedger(newAccount);
+    else setLocalLedgers([...localLedgers, newAccount]);
 
     setExpenseLedgerId(newId);
     setNewExpenseAccName('');
@@ -111,7 +124,8 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
     if (!newDeptName.trim()) return;
     const id = newDeptName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('departments').insert([{ id, name: newDeptName.trim() }]);
-    await fetchDimensions();
+    const { data: depts } = await supabase.from('departments').select('*').order('name');
+    if (depts) setDepartments(depts);
     setSelectedDept(id);
     setIsDeptModalOpen(false);
     setNewDeptName('');
@@ -122,13 +136,13 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
     if (!newDivName.trim()) return;
     const id = newDivName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('divisions').insert([{ id, name: newDivName.trim() }]);
-    await fetchDimensions();
+    const { data: divs } = await supabase.from('divisions').select('*').order('name');
+    if (divs) setDivisions(divs);
     setSelectedDiv(id);
     setIsDivModalOpen(false);
     setNewDivName('');
   };
 
-  // 🧮 Multi-Currency Scaled Calculation Matrix
   const amountBasePKR = (amount || 0) * exchangeRate;
 
   const handleSubmit = () => {
@@ -136,14 +150,12 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
       alert("Please fill all details correctly.");
       return;
     }
-
     const voucher: Voucher = {
       id: crypto.randomUUID(),
       date,
       number: `EXP-${Math.floor(Math.random() * 10000)}`,
       type: VoucherType.PAYMENT,
       narration: narration || `Expense Recorded (${currency})`,
-      // 🪙 Entries multiplied cleanly into system PKR standard balances
       entries: [
         { ledgerId: expenseLedgerId, debit: amountBasePKR, credit: 0, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined },
         { ledgerId: paymentLedgerId, debit: 0, credit: amountBasePKR, departmentId: selectedDept || undefined, divisionId: selectedDiv || undefined }
@@ -163,32 +175,25 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
 
       <div className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* ⭐ Modified Expense Category Section with Dropdown Add Trigger */}
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Expense Category</label>
-            <select 
-              className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all" 
-              value={expenseLedgerId} 
-              onChange={e => handleExpenseDropdownChange(e.target.value)}
-            >
+            <select className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 outline-none" value={expenseLedgerId} onChange={e => handleExpenseDropdownChange(e.target.value)}>
               <option value="">Select Account</option>
               {expenseAccounts.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
               <option value="QUICK_ADD_EXPENSE_ACCOUNT" className="text-orange-600 font-black bg-orange-50/70">➕ Add New Expense Account</option>
             </select>
           </div>
-
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Department</label>
-            <select value={selectedDept} onChange={e => e.target.value === 'QUICK_ADD_DEPT' ? setIsDeptModalOpen(true) : setSelectedDept(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+            <select value={selectedDept} onChange={e => e.target.value === 'QUICK_ADD_DEPT' ? setIsDeptModalOpen(true) : setSelectedDept(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 outline-none">
               <option value="">HQ / Central</option>
               {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               <option value="QUICK_ADD_DEPT" className="text-orange-600 font-bold bg-orange-50/50">➕ Add New</option>
             </select>
           </div>
-
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Division</label>
-            <select value={selectedDiv} onChange={e => e.target.value === 'QUICK_ADD_DIV' ? setIsDivModalOpen(true) : setSelectedDiv(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all">
+            <select value={selectedDiv} onChange={e => e.target.value === 'QUICK_ADD_DIV' ? setIsDivModalOpen(true) : setSelectedDiv(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 outline-none">
               <option value="">Enterprise Strategy</option>
               {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               <option value="QUICK_ADD_DIV" className="text-orange-600 font-bold bg-orange-50/50">➕ Add New</option>
@@ -198,51 +203,51 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
 
         <div>
           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Paid From (Cash/Bank Asset)</label>
-          <select className="w-full p-3 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 shadow-sm outline-none transition-all" value={paymentLedgerId} onChange={e => setPaymentLedgerId(e.target.value)}>
+          <select className="w-full p-3 bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-bold text-gray-800 outline-none" value={paymentLedgerId} onChange={e => setPaymentLedgerId(e.target.value)}>
             <option value="">Select Payment Mode (Cash/Bank)</option>
             {paymentAccounts.map(l => <option key={l.id} value={l.id}>{l.name} ({l.group})</option>)}
           </select>
         </div>
 
-        {/* 📑 MULTI-CURRENCY CONVERSION SYSTEM EMBEDDED CARD */}
         <div className="bg-slate-50 border border-gray-200/60 p-4 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4 shadow-inner">
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Expense Currency</label>
-            <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === 'PKR') setExchangeRate(1); }} className="w-full p-2.5 bg-white border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-black text-gray-800 shadow-sm outline-none transition-all">
-              <option value="PKR">PKR (Local Base Currency)</option>
-              <option value="USD">USD (US Dollar - $)</option>
-              <option value="AED">AED (UAE Dirham)</option>
-              <option value="GBP">GBP (British Pound - £)</option>
+            <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full p-2.5 bg-white border border-gray-200 focus:border-orange-500 rounded-xl text-xs font-black text-gray-800 outline-none">
+              <option value={baseCurrency}>{baseCurrency} (Base)</option>
+              {baseCurrency !== 'PKR' && <option value="PKR">PKR</option>}
+              {baseCurrency !== 'USD' && <option value="USD">USD ($)</option>}
+              {baseCurrency !== 'AED' && <option value="AED">AED</option>}
+              {baseCurrency !== 'GBP' && <option value="GBP">GBP (£)</option>}
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-              {currency === 'PKR' ? 'Exchange Rate Override' : `Exchange Rate (1 ${currency} = ? PKR)`}
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+              {currency === baseCurrency ? 'Exchange Rate Fixed' : `Exchange Rate (1 ${currency} = ? ${baseCurrency})`}
+              {isRateFetching && <Loader2 size={10} className="animate-spin text-orange-600" />}
             </label>
-            <input type="number" value={exchangeRate} disabled={currency === 'PKR'} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-sm ${currency === 'PKR' ? 'bg-gray-100/70 border-gray-200 text-gray-400' : 'bg-white border-orange-200 text-orange-600 ring-2 ring-orange-50/50'}`} min="0.01" step="any" />
+            <input type="number" value={exchangeRate} disabled={currency === baseCurrency || isRateFetching} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none shadow-sm ${currency === baseCurrency ? 'bg-gray-100/70 border-gray-200 text-gray-400' : 'bg-white border-orange-200 text-orange-600 ring-2 ring-orange-50/50'}`} min="0.01" step="any" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Amount ({currency})</label>
-            <input type="number" value={amount || ''} onChange={e => setAmount(Number(e.target.value))} className="w-full p-2.5 border border-gray-200 focus:border-orange-500 rounded-xl bg-white font-mono font-black text-xs text-right outline-none shadow-sm transition-all" placeholder="0.00" />
+            <input type="number" value={amount || ''} onChange={e => setAmount(Number(e.target.value))} className="w-full p-2.5 border border-gray-200 focus:border-orange-500 rounded-xl bg-white font-mono font-black text-xs text-right outline-none" placeholder="0.00" />
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2.5 border border-gray-200 focus:border-orange-500 rounded-xl bg-white text-xs font-bold outline-none shadow-sm transition-all" />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2.5 border border-gray-200 focus:border-orange-500 rounded-xl bg-white text-xs font-bold outline-none" />
           </div>
         </div>
 
-        {/* 💵 Visual Conversion Alert Badge Strip */}
-        {currency !== 'PKR' && amount > 0 && (
-          <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center justify-between text-xs text-orange-800 font-bold animate-in zoom-in-95 shadow-sm">
+        {currency !== baseCurrency && amount > 0 && (
+          <div className="bg-orange-50 border border-orange-100 p-3 rounded-xl flex items-center justify-between text-xs text-orange-800 font-bold animate-in zoom-in-95">
             <div className="flex items-center gap-1.5">
               <span>{currency} {amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
               <ArrowRight size={12} className="text-orange-400" />
               <span>Base Ledger Entry Value:</span>
             </div>
-            <span className="font-mono font-black">PKR {amountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="font-mono font-black">{baseCurrency} {amountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
           </div>
         )}
 
@@ -252,26 +257,18 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
         </div>
 
         <div className="flex gap-3 pt-2 no-print-el">
-          <button type="button" onClick={onCancel} className="flex-1 py-2.5 bg-gray-100 text-gray-400 font-bold uppercase tracking-widest rounded-xl text-xs transition-colors hover:text-gray-600">Cancel</button>
-          <button type="button" onClick={handleSubmit} className="flex-1 py-2.5 bg-orange-600 text-white font-black uppercase tracking-widest rounded-xl text-xs shadow-md hover:bg-orange-700 transition-all">Record Expense</button>
+          <button type="button" onClick={onCancel} className="flex-1 py-2.5 bg-gray-100 text-gray-400 font-bold uppercase tracking-widest rounded-xl text-xs hover:text-gray-600">Cancel</button>
+          <button type="button" onClick={handleSubmit} className="flex-1 py-2.5 bg-orange-600 text-white font-black uppercase tracking-widest rounded-xl text-xs shadow-md hover:bg-orange-700">Record Expense</button>
         </div>
       </div>
 
-      {/* ⭐ Quick Add Expense Category Popup Modal Component */}
+      {/* QUICK ADD MODALS UNTOUCHED */}
       {isExpenseAccModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 border animate-in zoom-in-95 duration-150">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Expense Account</h3>
             <form onSubmit={handleQuickExpenseAccSubmit} className="space-y-4">
-              <input 
-                autoFocus 
-                type="text" 
-                value={newExpenseAccName} 
-                onChange={e => setNewExpenseAccName(e.target.value)} 
-                className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-orange-500 font-bold" 
-                placeholder="e.g. Office Entertainment" 
-                required 
-              />
+              <input autoFocus type="text" value={newExpenseAccName} onChange={e => setNewExpenseAccName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-orange-500 font-bold" placeholder="e.g. Office Entertainment" required />
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setIsExpenseAccModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-orange-600 text-white rounded-xl text-xs font-semibold">Save Account</button>
@@ -281,7 +278,6 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
         </div>
       )}
 
-      {/* Department Modal */}
       {isDeptModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-in zoom-in-95 duration-150">
           <div className="bg-white rounded-xl p-5 max-w-sm w-full shadow-xl">
@@ -297,7 +293,6 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
         </div>
       )}
 
-      {/* Division Modal */}
       {isDivModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 animate-in zoom-in-95 duration-150">
           <div className="bg-white rounded-xl p-5 max-w-sm w-full shadow-xl">

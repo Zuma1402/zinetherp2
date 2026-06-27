@@ -66,6 +66,26 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
   ]);
 
+// ⭐ Automated live fetch mechanism hook for sales room (Same as Purchase Invoice)
+  const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
+    if (!targetCurrency || !base || targetCurrency === base) {
+      setExchangeRate(1);
+      return;
+    }
+    setIsRateFetching(true);
+    try {
+      const res = await fetch(`https://open.er-api.com/v6/latest/${targetCurrency}`);
+      const data = await res.json();
+      if (data && data.rates && data.rates[base]) {
+        setExchangeRate(parseFloat(data.rates[base].toFixed(4)));
+      }
+    } catch (err) {
+      console.error("Failed to automatically synchronize real-time currency rates: ", err);
+    } finally {
+      setIsRateFetching(false);
+    }
+  };
+
   const fetchTaxes = async () => {
     try {
       const { data, error } = await supabase.from('company_taxes').select('*').order('name');
@@ -176,6 +196,13 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     fetchLookups();
     fetchTaxes();
   }, [customerId, ledgers.length, date]);
+
+// ⭐ Watcher engine to fetch live exchange rates automatically on currency change
+  useEffect(() => {
+    if (currency && baseCurrency) {
+      syncLiveExchangeRate(currency, baseCurrency);
+    }
+  }, [currency, baseCurrency]);
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 

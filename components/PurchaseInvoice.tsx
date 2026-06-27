@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingBag, Printer } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingBag, Printer, Loader2 } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, Department, Division } from '../types';
 import { supabase } from '../services/supabaseService';
 import { getCompanySettings } from '../services/settingsService';
@@ -21,6 +21,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
   const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -54,6 +55,26 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
   ]);
 
+  // ⭐ Automated dynamic forex calculation fetch hook
+  const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
+    if (!targetCurrency || !base || targetCurrency === base) {
+      setExchangeRate(1);
+      return;
+    }
+    setIsRateFetching(true);
+    try {
+      const res = await fetch(`https://open.er-api.com/v6/latest/${targetCurrency}`);
+      const data = await res.json();
+      if (data && data.rates && data.rates[base]) {
+        setExchangeRate(parseFloat(data.rates[base].toFixed(4)));
+      }
+    } catch (err) {
+      console.error("Forex background fetch failed: ", err);
+    } finally {
+      setIsRateFetching(false);
+    }
+  };
+
   const fetchTaxes = async () => {
     try {
       const { data, error } = await supabase.from('company_taxes').select('*').order('name');
@@ -61,18 +82,12 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         setTaxOptions(data);
       } else {
         setTaxOptions([
-          { name: 'GST', rate: 18 },
-          { name: 'ST', rate: 15 },
-          { name: 'IT', rate: 10 },
-          { name: 'VAT', rate: 5 }
+          { name: 'GST', rate: 18 }, { name: 'ST', rate: 15 }, { name: 'IT', rate: 10 }, { name: 'VAT', rate: 5 }
         ]);
       }
     } catch (e) {
       setTaxOptions([
-        { name: 'GST', rate: 18 },
-        { name: 'ST', rate: 15 },
-        { name: 'IT', rate: 10 },
-        { name: 'VAT', rate: 5 }
+        { name: 'GST', rate: 18 }, { name: 'ST', rate: 15 }, { name: 'IT', rate: 10 }, { name: 'VAT', rate: 5 }
       ]);
     }
   };
@@ -101,7 +116,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
 
       if (companyData && companyData.base_currency) {
         setBaseCurrency(companyData.base_currency);
-        setCurrency(companyData.base_currency); // ⭐ Set default screen input currency to company base lock
+        setCurrency(companyData.base_currency); 
         setExchangeRate(1);
       }
     }
@@ -111,6 +126,11 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     fetchLookups(); 
     fetchTaxes();
   }, [supplierId]);
+
+  // ⭐ Watcher engine to fetch live metrics without breaking user loops
+  useEffect(() => {
+    syncLiveExchangeRate(currency, baseCurrency);
+  }, [currency, baseCurrency]);
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 
@@ -285,8 +305,11 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate (1 {currency} = ? {baseCurrency})</label>
-            <input type="number" value={exchangeRate} disabled={currency === baseCurrency} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === baseCurrency ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-blue-200 text-blue-600 ring-2 ring-blue-50/50'}`} min="0.01" step="any" />
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+              Exchange Rate (1 {currency} = ? {baseCurrency})
+              {isRateFetching && <Loader2 size={10} className="animate-spin text-blue-600" />}
+            </label>
+            <input type="number" value={exchangeRate} disabled={currency === baseCurrency || isRateFetching} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === baseCurrency ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-blue-200 text-blue-600 ring-2 ring-blue-50/50'}`} min="0.01" step="any" />
           </div>
         </div>
       </div>

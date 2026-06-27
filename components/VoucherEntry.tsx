@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, Department, Division } from '../types';
-import { Save, Plus, Trash2 } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 
 interface GeneralVoucherEntryProps {
@@ -27,6 +27,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
   
   const [entries, setEntries] = useState<RowEntry[]>([
     { ledgerId: '', debit: 0, credit: 0, departmentId: '', divisionId: '' },
@@ -41,57 +42,64 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [newDivName, setNewDivName] = useState('');
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
-  const fetchDimensions = async () => {
-    const { data: d } = await supabase.from('departments').select('*').order('name');
-    const { data: v } = await supabase.from('divisions').select('*').order('name');
-    if (d) setDepartments(d);
-    if (v) setDivisions(v);
+  // ⭐ Auto fetch exchange logs dynamically
+  const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
+    if (targetCurrency === base) {
+      setExchangeRate(1);
+      return;
+    }
+    setIsRateFetching(true);
+    try {
+      const res = await fetch(`https://open.er-api.com/v6/latest/${targetCurrency}`);
+      const data = await res.json();
+      if (data && data.rates && data.rates[base]) {
+        setExchangeRate(parseFloat(data.rates[base].toFixed(4)));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRateFetching(false);
+    }
   };
 
   const syncVoucherBaseCurrency = async () => {
     const activeCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
     if (activeCompanyId) {
       try {
-        const { data } = await supabase
-          .from('companies')
-          .select('base_currency')
-          .eq('id', activeCompanyId)
-          .maybeSingle();
-
+        const { data } = await supabase.from('companies').select('base_currency').eq('id', activeCompanyId).maybeSingle();
         if (data && data.base_currency) {
           setBaseCurrency(data.base_currency);
-          setCurrency(data.base_currency); // ⭐ Force loads form selection node to anchor currency setup
-          setExchangeRate(1);
+          setCurrency(data.base_currency);
         }
       } catch (err) {
-        console.error("Voucher framework base anchor resolve error:", err);
+        console.error(err);
       }
     }
   };
 
   useEffect(() => { 
-    fetchDimensions();
-    syncVoucherBaseCurrency();
+    const initData = async () => {
+      const { data: d } = await supabase.from('departments').select('*').order('name');
+      const { data: v } = await supabase.from('divisions').select('*').order('name');
+      if (d) setDepartments(d);
+      if (v) setDivisions(v);
+      await syncVoucherBaseCurrency();
+    };
+    initData();
 
-    // Event listener to trigger real-time currency updates if swapped dynamically
     const handleGlobalSwitch = () => syncVoucherBaseCurrency();
     window.addEventListener('companySwitched', handleGlobalSwitch);
     return () => window.removeEventListener('companySwitched', handleGlobalSwitch);
   }, []);
 
+  useEffect(() => {
+    syncLiveExchangeRate(currency, baseCurrency);
+  }, [currency, baseCurrency]);
+
   const updateRow = (index: number, key: keyof RowEntry, value: any) => {
     const next = [...entries];
-    
-    if (key === 'departmentId' && value === 'QUICK_ADD_ROW_DEPT') {
-      setActiveRowIndex(index);
-      setIsDeptModalOpen(true);
-      return;
-    }
-    if (key === 'divisionId' && value === 'QUICK_ADD_ROW_DIV') {
-      setActiveRowIndex(index);
-      setIsDivModalOpen(true);
-      return;
-    }
+    if (key === 'departmentId' && value === 'QUICK_ADD_ROW_DEPT') { setActiveRowIndex(index); setIsDeptModalOpen(true); return; }
+    if (key === 'divisionId' && value === 'QUICK_ADD_ROW_DIV') { setActiveRowIndex(index); setIsDivModalOpen(true); return; }
     
     if (key === 'debit' || key === 'credit') {
       next[index][key] = value === '' ? 0 : Number(value);
@@ -102,10 +110,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   };
 
   const addLineItem = () => {
-    setEntries([
-      ...entries,
-      { ledgerId: '', debit: 0, credit: 0, departmentId: '', divisionId: '' }
-    ]);
+    setEntries([...entries, { ledgerId: '', debit: 0, credit: 0, departmentId: '', divisionId: '' }]);
   };
 
   const removeLineItem = (index: number) => {
@@ -118,13 +123,10 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
     if (!newDeptName.trim() || activeRowIndex === null) return;
     const id = newDeptName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('departments').insert([{ id, name: newDeptName.trim() }]);
-    await fetchDimensions();
-    
-    const next = [...entries];
-    next[activeRowIndex].departmentId = id;
-    setEntries(next);
-    setIsDeptModalOpen(false);
-    setNewDeptName('');
+    const { data: d } = await supabase.from('departments').select('*').order('name');
+    if (d) setDepartments(d);
+    const next = [...entries]; next[activeRowIndex].departmentId = id; setEntries(next);
+    setIsDeptModalOpen(false); setNewDeptName('');
   };
 
   const handleQuickDivSubmit = async (e: React.FormEvent) => {
@@ -132,13 +134,10 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
     if (!newDivName.trim() || activeRowIndex === null) return;
     const id = newDivName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('divisions').insert([{ id, name: newDivName.trim() }]);
-    await fetchDimensions();
-    
-    const next = [...entries];
-    next[activeRowIndex].divisionId = id;
-    setEntries(next);
-    setIsDivModalOpen(false);
-    setNewDivName('');
+    const { data: v } = await supabase.from('divisions').select('*').order('name');
+    if (v) setDivisions(v);
+    const next = [...entries]; next[activeRowIndex].divisionId = id; setEntries(next);
+    setIsDivModalOpen(false); setNewDivName('');
   };
 
   const totalDebitForeign = entries.reduce((acc, curr) => acc + (curr.debit || 0), 0);
@@ -147,26 +146,16 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const isBalanced = totalDebitForeign === totalCreditForeign && totalDebitForeign > 0;
 
   const handleSubmit = () => {
-    if (!isBalanced) {
-      alert("Voucher is unbalanced.");
-      return;
-    }
+    if (!isBalanced) { alert("Voucher is unbalanced."); return; }
     onSave({
-      id: crypto.randomUUID(),
-      date,
+      id: crypto.randomUUID(), date,
       number: voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo,
-      type: voucherType,
-      narration: narration || `Journal Post (${currency})`,
+      type: voucherType, narration: narration || `Journal Post (${currency})`,
       entries: entries.map(e => ({
-        ledgerId: e.ledgerId,
-        debit: e.debit * exchangeRate,
-        credit: e.credit * exchangeRate,
-        departmentId: e.departmentId || undefined,
-        divisionId: e.divisionId || undefined
+        ledgerId: e.ledgerId, debit: e.debit * exchangeRate, credit: e.credit * exchangeRate,
+        departmentId: e.departmentId || undefined, divisionId: e.divisionId || undefined
       })),
-      currency,
-      exchangeRate,
-      foreignTotal: totalDebitForeign
+      currency, exchangeRate, foreignTotal: totalDebitForeign
     } as any);
   };
 
@@ -181,20 +170,11 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             </span>
           </div>
           <div className="flex gap-3">
-            <button onClick={onCancel} className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors">
-              Cancel
-            </button>
-            <button 
-              onClick={handleSubmit}
-              disabled={!isBalanced}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-            >
-              <Save size={16} /> Save Voucher
-            </button>
+            <button onClick={onCancel} className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
+            <button onClick={handleSubmit} disabled={!isBalanced} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Save size={16} /> Save Voucher</button>
           </div>
         </div>
 
-        {/* CONTROLS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs font-bold text-gray-700">
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher Type</label>
@@ -214,7 +194,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Currency</label>
-            <select value={currency} onChange={e => { const val = e.target.value; setCurrency(val); if(val===baseCurrency) setExchangeRate(1); }} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
+            <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
               <option value={baseCurrency}>{baseCurrency} (Base)</option>
               {baseCurrency !== 'PKR' && <option value="PKR">PKR</option>}
               {baseCurrency !== 'USD' && <option value="USD">USD ($)</option>}
@@ -222,13 +202,16 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Rate (1 {currency} = ? {baseCurrency})</label>
-            <input type="number" value={exchangeRate} disabled={currency===baseCurrency} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-indigo-600 font-black text-center text-xs outline-none disabled:bg-gray-50" min="0.01" step="any" />
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+              Rate (1 {currency} = ? {baseCurrency})
+              {isRateFetching && <Loader2 size={10} className="animate-spin text-indigo-600" />}
+            </label>
+            <input type="number" value={exchangeRate} disabled={currency===baseCurrency || isRateFetching} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-indigo-600 font-black text-center text-xs outline-none disabled:bg-gray-50" min="0.01" step="any" />
           </div>
         </div>
         <div className="mt-4">
           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher Narration</label>
-          <input type="text" placeholder="e.g. Adjustment entry notes..." value={narration} onChange={e => setNarration(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-800 font-medium outline-none placeholder:text-gray-300" />
+          <input type="text" placeholder="e.g. Adjustment entry notes..." value={narration} onChange={e => setNarration(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-800 font-medium outline-none" />
         </div>
       </div>
 
@@ -253,9 +236,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
                   <td className="p-3">
                     <select value={item.ledgerId} onChange={e => updateRow(idx, 'ledgerId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none" >
                       <option value="">Select Ledger...</option>
-                      {ledgers.map(l => (
-                        <option key={l.id} value={l.id}>{l.name} ({l.group})</option>
-                      ))}
+                      {ledgers.map(l => ( <option key={l.id} value={l.id}>{l.name} ({l.group})</option> ))}
                     </select>
                   </td>
                   <td className="p-3">
@@ -272,18 +253,13 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
                       <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Div</option>
                     </select>
                   </td>
-                  <td className="p-3">
-                    <input type="number" placeholder="0.00" value={item.debit || ''} onChange={e => updateRow(idx, 'debit', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none" />
-                  </td>
-                  <td className="p-3">
-                    <input type="number" placeholder="0.00" value={item.credit || ''} onChange={e => updateRow(idx, 'credit', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none" />
-                  </td>
+                  <td className="p-3"><input type="number" placeholder="0.00" value={item.debit || ''} onChange={e => updateRow(idx, 'debit', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none" /></td>
+                  <td className="p-3"><input type="number" placeholder="0.00" value={item.credit || ''} onChange={e => updateRow(idx, 'credit', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none" /></td>
                   <td className="p-3 text-center">
                     <button onClick={() => removeLineItem(idx)} disabled={entries.length <= 2} className={`p-2 rounded-lg transition-colors ${entries.length <= 2 ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:bg-rose-50 hover:text-rose-500'}`}><Trash2 size={14} /></button>
                   </td>
                 </tr>
               ))}
-
               <tr className="bg-slate-50/50 font-mono font-black text-xs text-slate-700">
                 <td colSpan={4} className="p-5 text-right font-sans uppercase tracking-widest text-gray-400 text-[10px]">Total</td>
                 <td className="p-5 text-right text-indigo-700 text-sm border-t">{totalDebitForeign.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -301,35 +277,31 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             </tbody>
           </table>
         </div>
-
         <div className="p-5 bg-gray-50/40 border-t flex justify-between items-center text-xs">
-          <button onClick={addLineItem} className="flex items-center gap-1.5 px-4 py-2 border border-dashed border-indigo-300 text-indigo-600 bg-indigo-50/30 rounded-xl font-bold hover:bg-indigo-50 transition-all shadow-sm" ><Plus size={14} /> Add Line Item</button>
-          {difference > 0 && (
-            <span className="font-mono font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">Difference: {difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-          )}
+          <button onClick={addLineItem} className="flex items-center gap-1.5 px-4 py-2 border border-dashed border-indigo-300 text-indigo-600 bg-indigo-50/30 rounded-xl font-bold hover:bg-indigo-50 shadow-sm" ><Plus size={14} /> Add Line Item</button>
+          {difference > 0 && ( <span className="font-mono font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">Difference: {difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> )}
         </div>
       </div>
 
-      {/* MODALS */}
+      {/* QUICK ADD OVERLAYS UNTOUCHED */}
       {isDeptModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Add Department</h3>
             <form onSubmit={handleQuickDeptSubmit} className="space-y-4">
-              <input autoFocus type="text" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-indigo-500" placeholder="e.g. Marketing" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
+              <input autoFocus type="text" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none" placeholder="e.g. Marketing" required />
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Save</button></div>
             </form>
           </div>
         </div>
       )}
-
       {isDivModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Add Division</h3>
             <form onSubmit={handleQuickDivSubmit} className="space-y-4">
-              <input autoFocus type="text" value={newDivName} onChange={e => setNewDivName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-indigo-500" placeholder="e.g. Northern Region" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
+              <input autoFocus type="text" value={newDivName} onChange={e => setNewDivName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none" placeholder="e.g. Northern Region" required />
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Save</button></div>
             </form>
           </div>
         </div>
