@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer, Loader2 } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
@@ -19,28 +19,27 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [customerId, setCustomerId] = useState('');
   const [narration, setNarration] = useState('');
 
-  // 🧾 Dynamic Multi-Currency State Framework Variables (Initialized blank to prevent hardcoded defaults)
+  // 🧾 Multi-Currency State Framework Variables
   const [baseCurrency, setBaseCurrency] = useState<string>('');
   const [currency, setCurrency] = useState<string>('');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
-  const [isCurrencyLoading, setIsCurrencyLoading] = useState<boolean>(true);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(items);
 
-  // Mapped Accounts Configuration States
+  // ⚙️ Dynamic Mapped Accounts Local Configuration State Hooks
   const [mappedSalesId, setMappedSalesLedgerId] = useState('');
   const [mappedCogsId, setMappedCogsLedgerId] = useState('');
   const [mappedStockId, setMappedStockLedgerId] = useState('');
   
-  // Active Workspace Branding Metadata
+  // Active Tenant Context Information Mappings
   const [companyName, setCompanyName] = useState('');
   const [companyEmail, setCompanyEmail] = useState('');
   const [taxId, setTaxId] = useState('');
   const [activeCompanyId, setActiveCompanyId] = useState('');
 
-  // Tax Matrix State Framework
+  // 📊 Tax Selection Selection Framework States
   const [taxOptions, setTaxOptions] = useState<{name: string, rate: number}[]>([]);
   const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
   const [newTaxName, setNewTaxName] = useState('');
@@ -56,6 +55,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [newDivName, setNewDivName] = useState('');
   const [newCustName, setNewCustName] = useState('');
   
+  // New Product Modal States
   const [newProductName, setNewProductName] = useState('');
   const [newProductCost, setNewProductCost] = useState(0);
   const [newProductRate, setNewProductRate] = useState(0);
@@ -68,20 +68,28 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const fetchTaxes = async () => {
     try {
-      const { data } = await supabase.from('company_taxes').select('*').order('name');
-      if (data && data.length > 0) {
+      const { data, error } = await supabase.from('company_taxes').select('*').order('name');
+      if (data && !error && data.length > 0) {
         setTaxOptions(data);
       } else {
         setTaxOptions([
-          { name: 'GST', rate: 18 }, { name: 'ST', rate: 15 }, { name: 'IT', rate: 10 }, { name: 'VAT', rate: 5 }
+          { name: 'GST', rate: 18 },
+          { name: 'ST', rate: 15 },
+          { name: 'IT', rate: 10 },
+          { name: 'VAT', rate: 5 }
         ]);
       }
     } catch (e) {
-      console.error(e);
+      setTaxOptions([
+        { name: 'GST', rate: 18 },
+        { name: 'ST', rate: 15 },
+        { name: 'IT', rate: 10 },
+        { name: 'VAT', rate: 5 }
+      ]);
     }
   };
 
-  const fetchLookupsAndCurrencyConfig = async () => {
+  const fetchLookups = async () => {
     const targetId = 
       localStorage.getItem('supabase_active_company_id') || 
       localStorage.getItem('active_company_id') || 
@@ -108,23 +116,20 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           setCompanyName(activeCompanyData.name);
           setCompanyEmail(activeCompanyData.email || `${activeCompanyData.name.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
           
-          const dbCurrency = activeCompanyData.base_currency || 'PKR';
-          setBaseCurrency(dbCurrency);
-          setCurrency(dbCurrency); 
-          setExchangeRate(1);
+          if (activeCompanyData.base_currency) {
+            setBaseCurrency(activeCompanyData.base_currency);
+            setCurrency(activeCompanyData.base_currency); // ⭐ Automatic sync state lock load
+            setExchangeRate(1);
+          }
         }
       } catch (err) {
-        console.error("Critical tracking fallback interceptor trigger error:", err);
-      } finally {
-        setIsCurrencyLoading(false);
+        console.error("Branding database reactive tracking read error:", err);
       }
-    } else {
-      setIsCurrencyLoading(false);
     }
   };
 
   useEffect(() => {
-    const initializeInvoiceSetupRoom = async () => {
+    const initializeInvoice = async () => {
       try {
         const settings = await getCompanySettings();
         const prefix = settings.invoicePrefix || 'INV-';
@@ -134,7 +139,19 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
         const targetId = 
           localStorage.getItem('supabase_active_company_id') || 
-          localStorage.getItem('active_company_id') || '';
+          localStorage.getItem('active_company_id') || 
+          localStorage.getItem('company_id') || '';
+
+        if (!companyName || companyName === 'ZinethERP' || companyName === '') {
+          const sessionFallbackName = localStorage.getItem('active_company_name');
+          if (sessionFallbackName) {
+            setCompanyName(sessionFallbackName);
+            setCompanyEmail(`${sessionFallbackName.toLowerCase().replace(/\s+/g, '')}@zinetherp.app`);
+          } else {
+            setCompanyName(settings.companyName || 'ZinethERP');
+            setCompanyEmail(settings.email || 'billing@zinetherp.app');
+          }
+        }
 
         if (targetId) {
           const { data: mapRecord } = await supabase
@@ -150,17 +167,14 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           }
         }
       } catch (error) {
-        console.error(error);
+        console.error("Context initialization error:", error);
+        setInvoiceNo('INV-0001');
       }
     };
 
-    initializeInvoiceSetupRoom();
-    fetchLookupsAndCurrencyConfig();
+    initializeInvoice();
+    fetchLookups();
     fetchTaxes();
-
-    const handleSwitchEventNode = () => fetchLookupsAndCurrencyConfig();
-    window.addEventListener('companySwitched', handleSwitchEventNode);
-    return () => window.removeEventListener('companySwitched', handleSwitchEventNode);
   }, [customerId, ledgers.length, date]);
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
@@ -213,7 +227,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     };
 
     await supabase.from('inventory_items').insert([newRecord]);
-    await fetchLookupsAndCurrencyConfig();
+    await fetchLookups();
     
     const updated = [...lineItems];
     updated[activeRowIndex].itemId = newId;
@@ -235,7 +249,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     if (!newDeptName.trim() || activeRowIndex === null) return;
     const id = newDeptName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('departments').insert([{ id, name: newDeptName.trim(), company_id: activeCompanyId || undefined }]);
-    await fetchLookupsAndCurrencyConfig();
+    await fetchLookups();
     
     const updated = [...lineItems];
     updated[activeRowIndex].departmentId = id;
@@ -249,7 +263,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     if (!newDivName.trim() || activeRowIndex === null) return;
     const id = newDivName.trim().toLowerCase().replace(/\s+/g, '_');
     await supabase.from('divisions').insert([{ id, name: newDivName.trim(), company_id: activeCompanyId || undefined }]);
-    await fetchLookupsAndCurrencyConfig();
+    await fetchLookups();
 
     const updated = [...lineItems];
     updated[activeRowIndex].divisionId = id;
@@ -322,17 +336,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const activeCustomerObj = ledgers.find(l => l.id === customerId);
 
-  if (isCurrencyLoading || !currency) {
-    return (
-      <div className="w-full h-96 flex items-center justify-center flex-col gap-3">
-        <Loader2 className="animate-spin text-indigo-600" size={32} />
-        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest animate-pulse">Syncing Sales Interface Ledger Parity...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-7xl mx-auto">
+      
       <style>{`
         @media print {
           @page {
@@ -346,8 +352,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         }
       `}</style>
       
-      {/* SCREEN INPUT CONTAINER */}
+      {/* 🛡️ 1. SCREEN INPUT FORMS BLOCK CONTAINER */}
       <div className="print:hidden bg-gray-50/50 p-2 md:p-6 rounded-2xl space-y-6 relative">
+        {/* Header Action Strip */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
           <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
             <span className="bg-indigo-600 text-white p-2 rounded-xl shadow-xs"><ShoppingCart size={18} /></span>
@@ -361,6 +368,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
+        {/* Split Meta Layout Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-1">
@@ -368,7 +376,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
               <select value={customerId} onChange={e => e.target.value === 'QUICK_ADD_CUST' ? setIsCustModalOpen(true) : setCustomerId(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold text-gray-800 shadow-xs outline-none transition-all">
                 <option value="">Select Customer Registry...</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                <option value="QUICK_ADD_CUST" className="text-indigo-600 font-black bg-indigo-50">➕ Add New Customer</option>
+                <option value="QUICK_ADD_CUST" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Customer</option>
               </select>
             </div>
             <div>
@@ -393,13 +401,13 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate (1 {currency} = ? {baseCurrency})</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate</label>
               <input type="number" value={exchangeRate} disabled={currency === baseCurrency} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === baseCurrency ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-indigo-200 text-indigo-600 ring-2 ring-indigo-50/50'}`} min="0.01" step="any" />
             </div>
           </div>
         </div>
 
-        {/* Table Display */}
+        {/* High-Density Table Display */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-xs overflow-hidden w-full">
           <div className="overflow-x-auto w-full scrollbar-thin">
             <table className="w-full text-left border-collapse table-fixed min-w-[1350px]">
@@ -514,8 +522,10 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* 📄 PRINT BLOCK */}
+      {/* 📄 2. PRINT BLOCK */}
       <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
+        
+        {/* Brand Header */}
         <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>
             <h1 className="text-3xl font-black tracking-tight uppercase text-gray-900" style={{ fontSize: '28px', fontWeight: '900' }}>
@@ -534,6 +544,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
+        {/* Client Metadata Address Box */}
         <div className="grid grid-cols-2 gap-8 text-xs border-b border-gray-200 pb-6 pt-2">
           <div>
             <h5 className="font-black text-gray-400 uppercase text-[9px] tracking-widest mb-1.5">Billed To / Customer Node:</h5>
@@ -554,6 +565,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
+        {/* Clean Line Items Valuation Table */}
         <div className="w-full pt-2">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-gray-100 border-b-2 border-gray-400 text-gray-700 font-black uppercase text-[9px] tracking-widest">
@@ -592,6 +604,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </table>
         </div>
 
+        {/* Financial Metrics Summary Ledger Row */}
         <div className="flex justify-between items-end pt-6 border-t-2 border-gray-400">
           <div className="text-[10px] text-gray-500 max-w-sm font-medium leading-relaxed">
             <p className="font-black text-gray-700 uppercase tracking-wider mb-1" style={{ fontSize: '9px' }}>Terms & Regulatory Statements:</p>
@@ -618,6 +631,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
 
+        {/* Sign Ledger Line */}
         <div className="pt-20 flex justify-between items-center text-xs">
           <div className="text-gray-400 font-mono text-[10px]">
             System Node Hash ID: {activeCompanyId?.substring(0,8)}
