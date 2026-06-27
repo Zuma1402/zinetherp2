@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer, Loader2 } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
@@ -23,6 +23,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
+  const [isRateFetching, setIsRateFetching] = useState<boolean>(false); // ⭐ Fixed missing state token row link
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -66,7 +67,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
   ]);
 
-// ⭐ Automated live fetch mechanism hook for sales room (Same as Purchase Invoice)
+  // ⭐ Automated live fetch mechanism hook for sales room (Same as Purchase Invoice)
   const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
     if (!targetCurrency || !base || targetCurrency === base) {
       setExchangeRate(1);
@@ -197,7 +198,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     fetchTaxes();
   }, [customerId, ledgers.length, date]);
 
-// ⭐ Watcher engine to fetch live exchange rates automatically on currency change
+  // ⭐ Watcher engine to fetch live exchange rates automatically on currency change
   useEffect(() => {
     if (currency && baseCurrency) {
       syncLiveExchangeRate(currency, baseCurrency);
@@ -428,8 +429,11 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Exchange Rate</label>
-              <input type="number" value={exchangeRate} disabled={currency === baseCurrency} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === baseCurrency ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-indigo-200 text-indigo-600 ring-2 ring-indigo-50/50'}`} min="0.01" step="any" />
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                Exchange Rate (1 = ? {baseCurrency})
+                {isRateFetching && <Loader2 size={10} className="animate-spin text-indigo-600" />}
+              </label>
+              <input type="number" value={exchangeRate} disabled={currency === baseCurrency || isRateFetching} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none transition-all shadow-xs ${currency === baseCurrency ? 'bg-slate-100 text-slate-400 border-gray-200' : 'bg-white border-indigo-200 text-indigo-600 ring-2 ring-indigo-50/50'}`} min="0.01" step="any" />
             </div>
           </div>
         </div>
@@ -479,7 +483,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                     <td className="p-3"><input type="number" value={line.qty} onChange={e => handleRowMetricChange(idx, 'qty', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-black" /></td>
                     <td className="p-3 text-center"><span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[11px] font-black uppercase tracking-wider">{currency}</span></td>
                     <td className="p-3"><input type="number" value={line.rate} onChange={e => handleRowMetricChange(idx, 'rate', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-right font-mono font-bold" /></td>
-                    
                     <td className="p-3">
                       <select value={line.taxType || ''} onChange={e => {
                         const val = e.target.value;
@@ -502,14 +505,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                         <option value="QUICK_ADD_CUSTOM_TAX" className="text-indigo-600 font-black bg-indigo-50">➕ Add Custom Tax</option>
                       </select>
                     </td>
-
-                    <td className="p-3"><input type="number" value={line.taxRate} onChange={e => handleRowMetricChange(idx, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-mono" /></td>
-                    
-                    <td className="p-3">
-                      <input type="text" readOnly value={line.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} className="w-full p-2 bg-slate-50 border border-gray-100 rounded-xl text-right font-mono text-gray-500 outline-none" />
-                    </td>
-
-                    <td className="p-3 text-right font-mono text-gray-900 pr-6 text-xs flex items-center justify-end gap-3 h-[52px]">
+                    <td className="p-3"><input type="number" value={line.taxRate} onChange={e => handleRowMetricChange(idx, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full p-2 border border-gray-200 rounded-xl text-center" /></td>
+                    <td className="p-3"><input type="text" readOnly value={line.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} className="w-full p-2 bg-slate-50 border rounded-xl text-right" /></td>
+                    <td className="p-3 text-right font-mono pr-6 text-xs flex items-center justify-end gap-3 h-[52px]">
                       <span>{line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500 transition-colors disabled:opacity-30"><Trash2 size={14}/></button>
                     </td>
@@ -520,7 +518,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                   <td colSpan={2} className="p-4 text-right font-mono text-sm text-gray-900 pr-6">{currency} {foreignTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 </tr>
                 {currency !== baseCurrency && (
-                  <tr className="bg-indigo-50/30 text-xs text-indigo-900 font-bold">
+                  <tr className="bg-indigo-50/30 text-xs font-bold">
                     <td colSpan={8} className="p-3 text-right uppercase text-[10px] tracking-wider text-indigo-400">Equivalent Base Total:</td>
                     <td colSpan={2} className="p-3 text-right font-mono pr-6">{baseCurrency} {totalAmountBasePKR.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                   </tr>
