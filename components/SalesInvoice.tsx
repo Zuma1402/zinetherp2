@@ -19,9 +19,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [customerId, setCustomerId] = useState('');
   const [narration, setNarration] = useState('');
 
-  // 🧾 Multi-Currency State Framework Variables
-  const [baseCurrency, setBaseCurrency] = useState<string>('');
-  const [currency, setCurrency] = useState<string>('');
+  // 🧾 Multi-Currency State Core Variables
+  const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
+  const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
 
   const [departments, setDepartments] = useState<Department[]>([]);
