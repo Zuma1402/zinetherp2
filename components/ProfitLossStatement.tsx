@@ -129,7 +129,7 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
     const tableData = [
          // REVENUE HEADER
          [{ content: `REVENUE (${displayCurrency})`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }, { content: '', styles: { fillColor: [240, 240, 240] } }],
-         ...incomeRows.map(r => [r.ledgerName, r.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}]),
+         ...incomeRows.map(r => [r.ledgerName, r.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })]),
          [{ content: 'Total Revenue', styles: { fontStyle: 'bold', halign: 'right' } }, { content: totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 }), styles: { fontStyle: 'bold', halign: 'right', lineWidth: { top: 0.1 } } }],
          
          // SPACER
@@ -137,7 +137,7 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
 
          // EXPENSE HEADER
          [{ content: `EXPENSES (${displayCurrency})`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }, { content: '', styles: { fillColor: [240, 240, 240] } }],
-         ...expenseRows.map(r => [r.ledgerName, r.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}]),
+         ...expenseRows.map(r => [r.ledgerName, r.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })]),
          [{ content: 'Total Operating Expense', styles: { fontStyle: 'bold', halign: 'right' } }, { content: totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2 }), styles: { fontStyle: 'bold', halign: 'right', lineWidth: { top: 0.1 } } }],
          
          // SPACER
