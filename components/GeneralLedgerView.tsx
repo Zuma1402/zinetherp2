@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Ledger, Voucher, AccountType, Department, Division } from '../types';
-import { calculateTrialBalance } from '../services/accountingService';
 import { Calendar, Info, TrendingUp, Clock, Layers, Compass, Download } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 
@@ -92,17 +91,13 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
     return { transactionsWithRunningBalance: list, periodTotalDr: pDr, periodTotalCr: pCr, openingBalForPeriod: historicalNet };
   }, [selectedLedgerId, selectedLedger, vouchers, startDate, endDate, filterDept, filterDiv]);
 
-  // ⭐ QuickBooks VIP Feature: Export Master Analytical Ledger Matrix to clean structured Excel File
   const handleExportLedgerToExcel = () => {
     if (!selectedLedger) return;
 
     let excelContent = `Date\tVoucher #\tParticulars / Narration Head\tDebit\tCredit\tRunning Balance\n`;
-    
-    // 1. Append Mapped Opening Balance Matrix Row Line
     const openType = openingBalForPeriod >= 0 ? 'Dr' : 'Cr';
     excelContent += `${startDate}\tOPENING\tBalance brought forward\t${openingBalForPeriod >= 0 ? Math.abs(openingBalForPeriod) : 0}\t${openingBalForPeriod < 0 ? Math.abs(openingBalForPeriod) : 0}\t${Math.abs(openingBalForPeriod)} ${openType}\n`;
 
-    // 2. Loop Through All Dynamic Transactions Lines Mappings cleanly
     transactionsWithRunningBalance.forEach(tx => {
       const txType = tx.runningBalance >= 0 ? 'Dr' : 'Cr';
       excelContent += `${tx.date}\t${tx.voucherNo}\t${tx.narration || ''}\t${tx.debit}\t${tx.credit}\t${Math.abs(tx.runningBalance)} ${txType}\n`;
@@ -176,9 +171,9 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
             <span className="font-black text-gray-900 block text-2xl tracking-tight">{selectedLedger?.name}</span>
             <span className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em]">{selectedLedger?.group}</span>
           </div>
-          {/* ⭐ QuickBooks Style Excel Download Trigger Button element control */}
-          <button onClick={handleExportLedgerToExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all">
-            <Download size={15} /> QuickBooks Excel Download
+          {/* ✅ Fixed Label: Clean Corporate Name */}
+          <button onClick={handleExportLedgerToExcel} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all">
+            <Download size={15} /> Download Excel
           </button>
         </div>
         <table className="w-full text-left text-sm">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, Department, Division } from '../types';
-import { Save, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, ClipboardPaste, Download } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 
 interface GeneralVoucherEntryProps {
@@ -23,12 +23,14 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [narration, setNarration] = useState('');
 
-  // 🧾 Multi-Currency Configuration Matrix Variables
   const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
   
+  const [clipboardData, setClipboardData] = useState('');
+  const [showPasteBox, setShowPasteBox] = useState(false);
+
   const [entries, setEntries] = useState<RowEntry[]>([
     { ledgerId: '', debit: 0, credit: 0, departmentId: '', divisionId: '' },
     { ledgerId: '', debit: 0, credit: 0, departmentId: '', divisionId: '' }
@@ -42,7 +44,6 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [newDivName, setNewDivName] = useState('');
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
-  // ⭐ Auto fetch exchange logs dynamically
   const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
     if (targetCurrency === base) {
       setExchangeRate(1);
@@ -86,15 +87,66 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       await syncVoucherBaseCurrency();
     };
     initData();
-
-    const handleGlobalSwitch = () => syncVoucherBaseCurrency();
-    window.addEventListener('companySwitched', handleGlobalSwitch);
-    return () => window.removeEventListener('companySwitched', handleGlobalSwitch);
   }, []);
 
   useEffect(() => {
     syncLiveExchangeRate(currency, baseCurrency);
   }, [currency, baseCurrency]);
+
+  const handleExcelPasteLogic = () => {
+    if (!clipboardData.trim()) return;
+
+    const rows = clipboardData.split('\n');
+    const parsedEntries: RowEntry[] = [];
+
+    rows.forEach(row => {
+      if (!row.trim()) return;
+      const cells = row.split('\t');
+      
+      const accountNameInput = cells[0]?.trim() || '';
+      const debitValue = parseFloat(cells[1]?.replace(/,/g, '')) || 0;
+      const creditValue = parseFloat(cells[2]?.replace(/,/g, '')) || 0;
+
+      const matchedLedger = ledgers.find(l => 
+        l.name.toLowerCase() === accountNameInput.toLowerCase() ||
+        l.name.toLowerCase().includes(accountNameInput.toLowerCase())
+      );
+
+      parsedEntries.push({
+        ledgerId: matchedLedger ? matchedLedger.id : '',
+        debit: debitValue,
+        credit: creditValue,
+        departmentId: '',
+        divisionId: ''
+      });
+    });
+
+    if (parsedEntries.length > 0) {
+      setEntries(parsedEntries);
+      setShowPasteBox(false);
+      setClipboardData('');
+    }
+  };
+
+  const exportVoucherTemplateToExcel = () => {
+    let excelContent = `Account Name\tDebit (${currency})\tCredit (${currency})\tCost Center\tSegment\n`;
+    
+    entries.forEach((e) => {
+      const accountName = ledgers.find(l => l.id === e.ledgerId)?.name || 'Select Account';
+      const deptName = departments.find(d => d.id === e.departmentId)?.name || '';
+      const divName = divisions.find(d => d.id === e.divisionId)?.name || '';
+      excelContent += `${accountName}\t${e.debit}\t${e.credit}\t${deptName}\t${divName}\n`;
+    });
+
+    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Voucher_${voucherNo}_Template.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const updateRow = (index: number, key: keyof RowEntry, value: any) => {
     const next = [...entries];
@@ -162,20 +214,46 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto p-2">
       <div className="bg-white p-6 rounded-2xl border border-gray-200/60 shadow-sm">
-        <div className="flex justify-between items-center mb-6">
+        {/* ✅ Fixed Header Control Block layout structure */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-black text-gray-900 tracking-tight">New Voucher</h2>
             <span className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider ${isBalanced ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
               {isBalanced ? 'Balanced' : 'Unbalanced'}
             </span>
           </div>
-          <div className="flex gap-3">
+          
+          {/* ✅ Always visible custom functional button sets */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-start md:justify-end">
+            <button onClick={() => setShowPasteBox(!showPasteBox)} className="flex items-center gap-2 px-3 py-2 border rounded-xl font-bold text-xs bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 transition-all shadow-xs">
+              <ClipboardPaste size={14} /> Paste from Excel
+            </button>
+            <button onClick={exportVoucherTemplateToExcel} className="flex items-center gap-2 px-3 py-2 border rounded-xl font-bold text-xs bg-slate-50 text-slate-700 border-gray-200 hover:bg-slate-100 transition-all">
+              <Download size={14} /> Download Grid Template
+            </button>
             <button onClick={onCancel} className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
             <button onClick={handleSubmit} disabled={!isBalanced} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Save size={16} /> Save Voucher</button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs font-bold text-gray-700">
+        {showPasteBox && (
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-4 mb-6 animate-in slide-in-from-top duration-300">
+            <h4 className="text-xs font-black text-orange-900 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+              🚀 Direct Excel Data Clipboard Engine
+            </h4>
+            <p className="text-[11px] text-orange-700 font-bold mb-3">
+              Excel sheet se columns copy karein: **[Account Title | Debit | Credit]** aur neeche paste kar dein:
+            </p>
+            <textarea value={clipboardData} onChange={e => setClipboardData(e.target.value)} placeholder="Excel rows ko yahan Direct Paste (Ctrl + V) maren..." rows={4} className="w-full border border-orange-200 rounded-xl p-3 text-xs font-mono outline-none bg-white focus:ring-2 ring-orange-200 text-gray-800" />
+            <div className="flex justify-end gap-2 mt-3">
+              <button onClick={() => setShowPasteBox(false)} className="px-3 py-1.5 text-xs font-bold text-gray-500">Cancel</button>
+              <button onClick={handleExcelPasteLogic} disabled={!clipboardData.trim()} className="px-4 py-1.5 bg-orange-600 text-white font-black text-xs rounded-xl shadow-xs">Inject Excel Rows</button>
+            </div>
+          </div>
+        )}
+
+        {/* CONTROLS GRID */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-xs font-bold text-gray-700">
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher Type</label>
             <select value={voucherType} onChange={e => setVoucherType(e.target.value as VoucherType)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
@@ -194,7 +272,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Currency</label>
-            <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
+            <select value={currency} onChange={e => { const val = e.target.value; setCurrency(val); if(val===baseCurrency) setExchangeRate(1); }} className="w-full p-3 border border-gray-200 rounded-xl bg-white text-gray-900 font-bold outline-none" >
               <option value={baseCurrency}>{baseCurrency} (Base)</option>
               {baseCurrency !== 'PKR' && <option value="PKR">PKR</option>}
               {baseCurrency !== 'USD' && <option value="USD">USD ($)</option>}
@@ -260,6 +338,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
                   </td>
                 </tr>
               ))}
+
               <tr className="bg-slate-50/50 font-mono font-black text-xs text-slate-700">
                 <td colSpan={4} className="p-5 text-right font-sans uppercase tracking-widest text-gray-400 text-[10px]">Total</td>
                 <td className="p-5 text-right text-indigo-700 text-sm border-t">{totalDebitForeign.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -277,31 +356,32 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             </tbody>
           </table>
         </div>
+
         <div className="p-5 bg-gray-50/40 border-t flex justify-between items-center text-xs">
           <button onClick={addLineItem} className="flex items-center gap-1.5 px-4 py-2 border border-dashed border-indigo-300 text-indigo-600 bg-indigo-50/30 rounded-xl font-bold hover:bg-indigo-50 shadow-sm" ><Plus size={14} /> Add Line Item</button>
           {difference > 0 && ( <span className="font-mono font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">Difference: {difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> )}
         </div>
       </div>
 
-      {/* QUICK ADD OVERLAYS UNTOUCHED */}
       {isDeptModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Add Department</h3>
             <form onSubmit={handleQuickDeptSubmit} className="space-y-4">
               <input autoFocus type="text" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none" placeholder="e.g. Marketing" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Save</button></div>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
             </form>
           </div>
         </div>
       )}
+
       {isDivModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Add Division</h3>
             <form onSubmit={handleQuickDivSubmit} className="space-y-4">
               <input autoFocus type="text" value={newDivName} onChange={e => setNewDivName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none" placeholder="e.g. Northern Region" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold">Save</button></div>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
             </form>
           </div>
         </div>
