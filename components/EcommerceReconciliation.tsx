@@ -131,16 +131,29 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold text-gray-700">
-        {/* ✅ Converted from Row Buttons to Pro Dropdown Selector */}
+        {/* ✅ Standard Web Compatible Dropdown Engine with Safe Trigger Mechanics */}
         <div className="bg-white p-4 border rounded-xl space-y-3">
           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Select Marketplace Node</label>
           <select 
             value={platform} 
-            onChange={e => e.target.value === 'QUICK_ADD_ECOM_PLATFORM' ? setIsModalOpen(true) : setPlatform(e.target.value)} 
-            className="w-full p-2.5 bg-gray-50 border rounded-xl font-black text-gray-800 outline-none"
+            onChange={e => {
+              if (e.target.value === 'QUICK_ADD_ECOM_PLATFORM') {
+                setIsModalOpen(true);
+              } else {
+                setPlatform(e.target.value);
+              }
+            }} 
+            className="w-full p-2.5 bg-gray-50 border border-gray-200 text-gray-800 rounded-xl font-bold outline-none cursor-pointer hover:bg-gray-100/70 transition-colors"
           >
-            {platformsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            <option value="QUICK_ADD_ECOM_PLATFORM" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Platform</option>
+            {platformsList.map(p => (
+              <option key={p.id} value={p.id} className="text-gray-900 font-semibold bg-white">
+                {p.name}
+              </option>
+            ))}
+            <option disabled className="text-gray-300 bg-white">────────────────────</option>
+            <option value="QUICK_ADD_ECOM_PLATFORM" className="text-indigo-600 font-extrabold bg-indigo-50/50">
+              + Add Custom Platform
+            </option>
           </select>
         </div>
 
