@@ -107,7 +107,7 @@ const App: React.FC = () => {
   // Data State
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(items => []);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [stockTransactions, setStockTransactions] = useState<StockTransaction[]>([]);
   
@@ -120,6 +120,9 @@ const App: React.FC = () => {
   const [activeCompanyId, setActiveCompanyId] = useState<string>(
     localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
   );
+
+  // ⭐ ACTIVE MODULE RESILIENT STATE (Pristine Addition)
+  const [activeModules, setActiveModules] = useState<string[]>(['core_accounting']);
 
   // Menu State
   const [salesMenuOpen, setSalesMenuOpen] = useState(false);
@@ -142,6 +145,20 @@ const App: React.FC = () => {
       } else {
         setSelectedLedgerForView('');
       }
+
+      // Fetch dynamic active workspace capabilities module string sets
+      const { data: currentComp } = await supabase
+        .from('companies')
+        .select('enabled_modules')
+        .eq('id', targetCompanyId)
+        .maybeSingle();
+
+      if (currentComp && currentComp.enabled_modules) {
+        setActiveModules(currentComp.enabled_modules);
+      } else {
+        setActiveModules(['core_accounting']);
+      }
+
       setSyncStatus('synced');
     } catch (error) {
       console.error("Cloud reload failed", error);
@@ -211,6 +228,15 @@ const App: React.FC = () => {
         setIsLoading(false);
     };
     init();
+
+    // Context workspace modules live payload refresh sync triggers listeners
+    const handleWorkspaceSwitch = (e: any) => {
+      if (e.detail && e.detail.id) {
+        reloadCloudData(e.detail.id);
+      }
+    };
+    window.addEventListener('companySwitched', handleWorkspaceSwitch);
+    return () => window.removeEventListener('companySwitched', handleWorkspaceSwitch);
   }, []); 
 
   useEffect(() => {
@@ -477,8 +503,10 @@ const App: React.FC = () => {
             <SidebarItem view="INVENTORY" icon={Package} label="Inventory" badge={lowStockCount} />
             <SidebarItem view="EXPENSES" icon={Wallet} label="Expenses" />
             
-            {/* ⭐ Registered new E-Commerce Payout automation panel inside standard layout */}
-            <SidebarItem view="ECOM_RECONCILIATION" icon={Radio} label="E-Commerce Payouts" />
+            {/* ⭐ DYNAMIC MULTI-TENANT GATE ENFORCEMENT: Only shows if module is explicitly enabled on the active company metadata node */}
+            {activeModules.includes('ecommerce_reconciliation') && (
+              <SidebarItem view="ECOM_RECONCILIATION" icon={Radio} label="E-Commerce Payouts" />
+            )}
 
             <div className="pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">System</div>
             <div>

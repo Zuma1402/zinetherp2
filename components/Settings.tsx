@@ -65,6 +65,10 @@ const Settings: React.FC<SettingsProps> = ({
   // New Base Currency Settle State Field Variable
   const [newCorpBaseCurrency, setNewCorpBaseCurrency] = useState('PKR');
 
+  // ⭐ NEW MODULE TOGGLE STATES (Pristine Additions)
+  const [newCorpEcomEnabled, setNewCorpEcomEnabled] = useState(true);
+  const [activeCorpEcomEnabled, setActiveCorpEcomEnabled] = useState(false);
+
   const [staffName, setStaffName] = useState('');
   const [staffUsername, setStaffUsername] = useState('');
   const [staffPassword, setStaffPassword] = useState('');
@@ -131,14 +135,18 @@ const Settings: React.FC<SettingsProps> = ({
 
       const { data: compProfile } = await supabase
         .from('companies')
-        .select('base_currency')
+        .select('base_currency, enabled_modules')
         .eq('id', companyId)
         .maybeSingle();
         
-      if (compProfile && compProfile.base_currency) {
-        setActiveCompanyBaseCurrency(compProfile.base_currency);
+      if (compProfile) {
+        if (compProfile.base_currency) setActiveCompanyBaseCurrency(compProfile.base_currency);
+        // Sync active workspace view module arrays
+        const modules = compProfile.enabled_modules || ['core_accounting'];
+        setActiveCorpEcomEnabled(modules.includes('ecommerce_reconciliation'));
       } else {
         setActiveCompanyBaseCurrency('PKR');
+        setActiveCorpEcomEnabled(false);
       }
     } catch (err) {
       console.error("Ledger maps registry reading crash:", err);
@@ -219,6 +227,20 @@ const Settings: React.FC<SettingsProps> = ({
           invoicePrefix,
           nextInvoiceNumber: Number(nextInvoiceNumber)
       });
+
+      // ✅ Update current active workspace enabled modules array toggle settings
+      if (localActiveId) {
+        const updatedModules = ['core_accounting'];
+        if (activeCorpEcomEnabled) updatedModules.push('ecommerce_reconciliation');
+        
+        await supabase
+          .from('companies')
+          .update({ enabled_modules: updatedModules })
+          .eq('id', localActiveId);
+          
+        window.dispatchEvent(new CustomEvent('companySwitched', { detail: { id: localActiveId, name: companyName } }));
+      }
+
       if (onUpdateCompany) onUpdateCompany(companyName);
       setMessage('Configurations committed successfully!');
       setTimeout(() => setMessage(''), 3000);
@@ -248,8 +270,7 @@ const Settings: React.FC<SettingsProps> = ({
       await syncEngineData();
     } catch (err: any) {
       alert(`Ledger configuration blueprint crash: ${err.message}`);
-    } finally {
-      // ⭐ Fixed from fillal to finally
+    } companions: {
       setIsMappingSaving(false);
     }
   };
@@ -320,11 +341,16 @@ const Settings: React.FC<SettingsProps> = ({
         return;
       }
 
+      // ✅ Setup dynamic enabling module strings array list
+      const modulesArray = ['core_accounting'];
+      if (newCorpEcomEnabled) modulesArray.push('ecommerce_reconciliation');
+
       const companyId = crypto.randomUUID();
       const { error: companyError } = await supabase.from('companies').insert([{ 
         id: companyId, 
         name: targetNameClean,
-        base_currency: newCorpBaseCurrency 
+        base_currency: newCorpBaseCurrency,
+        enabled_modules: modulesArray // Save modules
       }]);
       if (companyError) throw companyError;
 
@@ -352,6 +378,7 @@ const Settings: React.FC<SettingsProps> = ({
       setStaffName('');
       setStaffUsername('');
       setStaffPassword('');
+      setNewCorpEcomEnabled(true);
       
       alert("Independent Corporate Entity deployed successfully!");
       await syncEngineData();
@@ -508,6 +535,22 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
+              {/* ✅ LIVE TENANT PROFILE LEVEL CAPABILITIES TOGGLE PANEL */}
+              {currentUser.role === 'ADMIN' && (
+                <div className="p-4 border rounded-xl bg-indigo-50/20 border-indigo-100 space-y-2">
+                  <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Active Workspace Capability Enforcements</h4>
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
+                    <input 
+                      type="checkbox" 
+                      checked={activeCorpEcomEnabled} 
+                      onChange={e => setActiveCorpEcomEnabled(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" 
+                    />
+                    Enable One-Click E-Commerce Reconciliation Portal
+                  </label>
+                </div>
+              )}
+
               {message && message.includes('Configurations') && <div className="text-emerald-600 text-xs font-bold">{message}</div>}
               <button type="submit" className="bg-blue-600 text-white font-bold text-xs py-2 px-5 rounded-lg hover:bg-blue-700 transition flex items-center gap-1.5 shadow-sm">
                 <Save size={13} /> Save Workspace Changes
@@ -564,6 +607,20 @@ const Settings: React.FC<SettingsProps> = ({
                   <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Initial Next Index Sequence</label>
                   <input type="number" value={newCorpNextNumber} onChange={e => setNewCorpNextNumber(Number(e.target.value))} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white outline-none" required />
                 </div>
+              </div>
+
+              {/* ✅ COMPACT ONBOARDING MATRIX MODULE SELECTION CHECKBOX (Pristine Addition) */}
+              <div className="p-4 bg-indigo-950/40 border border-indigo-500/20 rounded-xl space-y-3">
+                <h4 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Ecosystem Capabilities Allocations Configuration</h4>
+                <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={newCorpEcomEnabled} 
+                    onChange={e => setNewCorpEcomEnabled(e.target.checked)}
+                    className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
+                  />
+                  Provision One-Click E-Commerce Payout Splitter Reconciliation Module
+                </label>
               </div>
 
               <div className="bg-indigo-950/30 border border-indigo-900/30 p-4 rounded-xl space-y-4 shadow-inner">
