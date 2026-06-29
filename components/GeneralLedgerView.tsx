@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Ledger, Voucher, AccountType, Department, Division } from '../types';
-import { Calendar, Info, TrendingUp, TrendingDown, Clock, Layers, Compass } from 'lucide-react';
+import { calculateTrialBalance } from '../services/accountingService';
+import { Calendar, Info, TrendingUp, Clock, Layers, Compass, Download } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 
 interface GeneralLedgerViewProps {
@@ -91,6 +92,32 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
     return { transactionsWithRunningBalance: list, periodTotalDr: pDr, periodTotalCr: pCr, openingBalForPeriod: historicalNet };
   }, [selectedLedgerId, selectedLedger, vouchers, startDate, endDate, filterDept, filterDiv]);
 
+  // ⭐ QuickBooks VIP Feature: Export Master Analytical Ledger Matrix to clean structured Excel File
+  const handleExportLedgerToExcel = () => {
+    if (!selectedLedger) return;
+
+    let excelContent = `Date\tVoucher #\tParticulars / Narration Head\tDebit\tCredit\tRunning Balance\n`;
+    
+    // 1. Append Mapped Opening Balance Matrix Row Line
+    const openType = openingBalForPeriod >= 0 ? 'Dr' : 'Cr';
+    excelContent += `${startDate}\tOPENING\tBalance brought forward\t${openingBalForPeriod >= 0 ? Math.abs(openingBalForPeriod) : 0}\t${openingBalForPeriod < 0 ? Math.abs(openingBalForPeriod) : 0}\t${Math.abs(openingBalForPeriod)} ${openType}\n`;
+
+    // 2. Loop Through All Dynamic Transactions Lines Mappings cleanly
+    transactionsWithRunningBalance.forEach(tx => {
+      const txType = tx.runningBalance >= 0 ? 'Dr' : 'Cr';
+      excelContent += `${tx.date}\t${tx.voucherNo}\t${tx.narration || ''}\t${tx.debit}\t${tx.credit}\t${Math.abs(tx.runningBalance)} ${txType}\n`;
+    });
+
+    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Ledger_${selectedLedger.name.replace(/\s+/g, '_')}_Statement.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6 bg-slate-50 p-6 rounded-2xl border border-gray-200/60">
@@ -144,7 +171,16 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
       </div>
 
       <div className="bg-white rounded-[2.5rem] shadow-2xl border overflow-hidden">
-        <div className="p-8 bg-gray-50/50 border-b flex justify-between items-center"><div><span className="font-black text-gray-900 block text-2xl tracking-tight">{selectedLedger?.name}</span><span className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em]">{selectedLedger?.group}</span></div></div>
+        <div className="p-8 bg-gray-50/50 border-b flex justify-between items-center">
+          <div>
+            <span className="font-black text-gray-900 block text-2xl tracking-tight">{selectedLedger?.name}</span>
+            <span className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em]">{selectedLedger?.group}</span>
+          </div>
+          {/* ⭐ QuickBooks Style Excel Download Trigger Button element control */}
+          <button onClick={handleExportLedgerToExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all">
+            <Download size={15} /> QuickBooks Excel Download
+          </button>
+        </div>
         <table className="w-full text-left text-sm">
             <thead className="bg-white text-gray-400 border-b font-black uppercase text-[10px] tracking-widest">
                 <tr><th className="p-6">Date</th><th className="p-6">Voucher #</th><th className="p-6">Particulars</th><th className="p-6 text-right">Debit</th><th className="p-6 text-right">Credit</th><th className="p-6 text-right bg-gray-50/50">Running Balance</th></tr>
