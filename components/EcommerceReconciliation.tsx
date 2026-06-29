@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Upload, HelpCircle, CheckCircle2, FileSpreadsheet, Layers, Compass, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, CheckCircle2, FileSpreadsheet, Save, Plus, X } from 'lucide-react';
+import { supabase } from '../services/supabaseService';
 import { Ledger, Voucher, VoucherType } from '../types';
 
 interface EcommerceReconciliationProps {
@@ -8,11 +9,16 @@ interface EcommerceReconciliationProps {
 }
 
 const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledgers, onSave }) => {
-  const [platform, setPlatform] = useState<'STRIPE' | 'AMAZON'>('STRIPE');
+  const [platform, setPlatform] = useState<string>('STRIPE');
+  const [platformsList, setPlatformsList] = useState<{ id: string; name: string }[]>([]);
   const [csvText, setCsvContent] = useState('');
   const [isParsed, setIsParsed] = useState(false);
 
-  // Computed Voucher posting heads states
+  // Modal State for Adding New Platform
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newPlatformName, setNewPlatformName] = useState('');
+
+  // Computed Voucher Posting States
   const [grossRevenue, setGrossRevenue] = useState(0);
   const [gatewayFees, setGatewayFees] = useState(0);
   const [refunds, setRefunds] = useState(0);
@@ -25,6 +31,32 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
   const bankAccounts = ledgers.filter(l => l.group.includes('Bank') || l.group.includes('Cash'));
   const debtorAccounts = ledgers.filter(l => l.group.includes('Debtors') || l.group.includes('Sales') || l.type === 'ASSET');
 
+  const fetchPlatforms = async () => {
+    const { data } = await supabase.from('ecommerce_platforms').select('id, name').order('name');
+    if (data) setPlatformsList(data);
+  };
+
+  useEffect(() => {
+    fetchPlatforms();
+  }, []);
+
+  const handleAddPlatformSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPlatformName.trim()) return;
+
+    const id = newPlatformName.trim().toUpperCase().replace(/\s+/g, '_');
+    const targetCompanyId = localStorage.getItem('supabase_active_company_id') || '';
+
+    await supabase.from('ecommerce_platforms').insert([
+      { id, name: newPlatformName.trim(), company_id: targetCompanyId || null }
+    ]);
+
+    await fetchPlatforms();
+    setPlatform(id);
+    setIsModalOpen(false);
+    setNewPlatformName('');
+  };
+
   const handleCsvParsingLogic = () => {
     if (!csvText.trim()) return;
 
@@ -34,26 +66,25 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
     let totalRefunds = 0;
 
     rows.forEach((row, idx) => {
-      if (idx === 0 || !row.trim()) return; // Skip headers
+      if (idx === 0 || !row.trim()) return;
       const columns = row.split(',');
 
-      if (platform === 'STRIPE') {
-        // Stripe Standard Columns: [Amount, Fee, Refund]
-        const amt = parseFloat(columns[0]) || 0;
-        const fee = parseFloat(columns[1]) || 0;
-        const isRefund = columns[2]?.trim().toLowerCase() === 'true';
+      // Flexible parser fallback logic across dynamic columns
+      const amt = parseFloat(columns[0]) || 0;
+      const fee = parseFloat(columns[1]) || 0;
+      const refOrCost = parseFloat(columns[2]) || 0;
 
-        if (isRefund) {
+      if (platform === 'STRIPE') {
+        if (columns[2]?.trim().toLowerCase() === 'true') {
           totalRefunds += Math.abs(amt);
         } else {
           totalGross += amt;
           totalFees += Math.abs(fee);
         }
       } else {
-        // Amazon Standard Columns: [Gross Sales, Marketplace Fee, Return Cost]
-        totalGross += parseFloat(columns[0]) || 0;
-        totalFees += Math.abs(parseFloat(columns[1]) || 0);
-        totalRefunds += Math.abs(parseFloat(columns[2]) || 0);
+        totalGross += amt;
+        totalFees += Math.abs(fee);
+        totalRefunds += Math.abs(refOrCost);
       }
     });
 
@@ -66,7 +97,7 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
 
   const handlePostSplitVoucher = () => {
     if (!bankLedgerId || !debtorLedgerId || netPayout <= 0) {
-      alert("Please map target layout bank/debtor accounts properly.");
+      alert("Please map target bank and receivable accounts properly.");
       return;
     }
 
@@ -75,23 +106,23 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
       date,
       number: `ECOM-${platform}-${Math.floor(Math.random() * 100000)}`,
       type: VoucherType.JOURNAL,
-      narration: `Automated E-Commerce ${platform} Clearing Settlement Payout`,
+      narration: `Automated E-Commerce Settlement Payout Grid Allocation`,
       entries: [
-        { ledgerId: bankLedgerId, debit: netPayout, credit: 0 }, // Net money landed in bank
-        { ledgerId: 'e000ffee-1b2c-3d4e-5f6a-7b8c9d0e1f2a', debit: gatewayFees, credit: 0 }, // Fees head from SQL
-        { ledgerId: 'f000eedd-2c3d-4e5f-6a7b-8c9d0e1f2a3b', debit: refunds, credit: 0 }, // Refunds head from SQL
-        { ledgerId: debtorLedgerId, debit: 0, credit: grossRevenue } // Decrease receivable counter asset
+        { ledgerId: bankLedgerId, debit: netPayout, credit: 0 },
+        { ledgerId: 'e000ffee-1b2c-3d4e-5f6a-7b8c9d0e1f2a', debit: gatewayFees, credit: 0 },
+        { ledgerId: 'f000eedd-2c3d-4e5f-6a7b-8c9d0e1f2a3b', debit: refunds, credit: 0 },
+        { ledgerId: debtorLedgerId, debit: 0, credit: grossRevenue }
       ]
     } as any;
 
     onSave(voucherPayload);
     setIsParsed(false);
     setCsvContent('');
-    alert("Payout voucher entries posted into double-entry matrix system seamlessly!");
+    alert("Reconciliation posted successfully!");
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto p-2 animate-in fade-in duration-300">
+    <div className="space-y-6 max-w-4xl mx-auto p-2 animate-in fade-in duration-300 relative">
       <div className="bg-white p-6 rounded-2xl border shadow-sm">
         <h2 className="text-xl font-black text-gray-900 mb-2 flex items-center gap-2">
           <FileSpreadsheet className="text-indigo-600" /> One-Click E-Commerce Reconciliation
@@ -100,17 +131,22 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold text-gray-700">
+        {/* ✅ Converted from Row Buttons to Pro Dropdown Selector */}
         <div className="bg-white p-4 border rounded-xl space-y-3">
           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Select Marketplace Node</label>
-          <div className="flex gap-2">
-            <button onClick={() => { setPlatform('STRIPE'); setIsParsed(false); }} className={`flex-1 py-2 rounded-xl border text-center font-black ${platform === 'STRIPE' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-700'}`}>Stripe API</button>
-            <button onClick={() => { setPlatform('AMAZON'); setIsParsed(false); }} className={`flex-1 py-2 rounded-xl border text-center font-black ${platform === 'AMAZON' ? 'bg-orange-500 text-white border-orange-500' : 'bg-gray-50 text-gray-700'}`}>Amazon Seller</button>
-          </div>
+          <select 
+            value={platform} 
+            onChange={e => e.target.value === 'QUICK_ADD_ECOM_PLATFORM' ? setIsModalOpen(true) : setPlatform(e.target.value)} 
+            className="w-full p-2.5 bg-gray-50 border rounded-xl font-black text-gray-800 outline-none"
+          >
+            {platformsList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <option value="QUICK_ADD_ECOM_PLATFORM" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Platform</option>
+          </select>
         </div>
 
         <div className="bg-white p-4 border rounded-xl space-y-3">
           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Bank Account</label>
-          <select value={bankLedgerId} onChange={e => setBankLedgerId(e.target.value)} className="w-full p-2 border rounded-xl bg-white outline-none">
+          <select value={bankLedgerId} onChange={e => setBankLedgerId(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl outline-none">
             <option value="">Select Destination Bank Account</option>
             {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
@@ -118,7 +154,7 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
 
         <div className="bg-white p-4 border rounded-xl space-y-3">
           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Clearing Receivable Head</label>
-          <select value={debtorLedgerId} onChange={e => setDebtorLedgerId(e.target.value)} className="w-full p-2 border rounded-xl bg-white outline-none">
+          <select value={debtorLedgerId} onChange={e => setDebtorLedgerId(e.target.value)} className="w-full p-2.5 bg-gray-50 border rounded-xl outline-none">
             <option value="">Select Accounts Receivable / Sales</option>
             {debtorAccounts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
@@ -127,7 +163,7 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
 
       <div className="bg-white p-6 border rounded-2xl space-y-4">
         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Drop Statement CSV Raw String Logs</label>
-        <textarea value={csvText} onChange={e => setCsvContent(e.target.value)} placeholder={platform === 'STRIPE' ? "Amount,Fee,IsRefund\n100,3.5,false\n200,4.2,false\n-50,0,true" : "GrossSales,MarketplaceFee,ReturnCost\n500,45,20\n1200,110,0"} rows={5} className="w-full border p-3 rounded-xl font-mono text-xs outline-none bg-gray-50/40 focus:bg-white focus:border-indigo-500" />
+        <textarea value={csvText} onChange={e => setCsvContent(e.target.value)} placeholder="Amount,Fee,IsRefund\n100,3.5,false\n200,4.2,false" rows={5} className="w-full border p-3 rounded-xl font-mono text-xs outline-none bg-gray-50/40 focus:bg-white focus:border-indigo-500" />
         <button onClick={handleCsvParsingLogic} disabled={!csvText.trim()} className="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-md">Analyze & Parse Payouts</button>
       </div>
 
@@ -146,6 +182,33 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
           <div className="p-4 bg-gray-50 border-t flex justify-between items-center gap-4">
             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="p-2 border rounded-xl text-xs font-bold outline-none bg-white" />
             <button onClick={handlePostSplitVoucher} className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md"><Save size={14} /> Post Reconciled Split Voucher</button>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Add New Platform Modal Dialog Overlay */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center border-b pb-3 mb-4">
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Add E-Commerce Platform</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleAddPlatformSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Platform Name</label>
+                <input 
+                  autoFocus 
+                  type="text" 
+                  value={newPlatformName} 
+                  onChange={e => setNewPlatformName(e.target.value)} 
+                  className="w-full border p-2.5 rounded-xl text-xs font-bold outline-none focus:border-indigo-500" 
+                  placeholder="e.g. Shopify Store, Daraz, eBay" 
+                  required 
+                />
+              </div>
+              <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-md uppercase tracking-wider">Save Platform</button>
+            </form>
           </div>
         </div>
       )}
