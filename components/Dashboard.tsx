@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -10,7 +10,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Globe,
+  Sliders,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -37,6 +40,9 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inventory, onNavigate }) => {
   
+  // ⭐ PRISTINE FOREX SIMULATOR ENGINE STATES (Additive Additions Only)
+  const [exchangeFluctuation, setExchangeFluctuation] = useState<number>(0);
+
   const recentVouchers = useMemo(() => {
     return [...vouchers]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -161,6 +167,29 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
           return sum + l.openingBalance; 
       }, 0);
   }, [ledgers]);
+
+  // ⭐ DYNAMIC FOREX SIMULATION CALCULATOR BLUEPRINT (Additive Additions)
+  const forexCalculations = useMemo(() => {
+    // Isolate foreign exposure items inside debtors/creditors groups
+    const foreignReceivables = ledgers
+      .filter(l => l.group.includes('Debtors') || l.group.includes('Receivable'))
+      .reduce((sum, l) => sum + (l.openingBalance || 0), 0) * 0.25; // Assumption: 25% foreign pipeline index
+
+    const foreignPayables = ledgers
+      .filter(l => l.group.includes('Creditors') || l.group.includes('Payable') || l.group.includes('Suppliers'))
+      .reduce((sum, l) => sum + (l.openingBalance || 0), 0) * 0.40; // Assumption: 40% material core import index
+
+    const grossExposure = foreignReceivables - foreignPayables;
+    const impactBuffer = (grossExposure * (exchangeFluctuation / 100));
+    const simulatedProfit = summary.netProfit + impactBuffer;
+
+    return {
+      foreignReceivables,
+      foreignPayables,
+      impactBuffer,
+      simulatedProfit
+    };
+  }, [ledgers, exchangeFluctuation, summary.netProfit]);
 
   const KpiCard = ({ title, value, icon: Icon, color, trend }: any) => (
     <div className="bg-white p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] shadow-xl shadow-gray-200/50 border border-gray-100 relative overflow-hidden group transition-all hover:scale-[1.02]">
@@ -305,7 +334,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
       </div>
 
       {/* Bottom Grid: Quick Actions & Extended Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 pb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
          <div className="bg-gray-900 p-8 md:p-10 rounded-2xl md:rounded-[3rem] text-white flex flex-col justify-between shadow-2xl shadow-gray-900/20">
             <div>
                <h4 className="text-xl font-black mb-2">Automate Billing</h4>
@@ -340,6 +369,95 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
             </div>
          </div>
       </div>
+
+      {/* ⭐ 100% BRAND NEW ADDITIVE: PREDICTIVE FOREX RISK BUFFER MATRIX PANEL */}
+      <div className="bg-white p-6 md:p-10 rounded-2xl md:rounded-[3rem] border border-gray-100 shadow-2xl shadow-gray-200/40 grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
+        <div className="lg:col-span-1 space-y-4">
+          <div className="flex items-center gap-2 text-indigo-600">
+            <Globe size={22} className="animate-spin-slow" />
+            <h4 className="text-lg font-black tracking-tight text-gray-900">Predictive Forex Risk Buffer</h4>
+          </div>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Cross-Border Valuation Sensitivity Matrix</p>
+          <p className="text-xs text-gray-500 font-medium leading-relaxed">
+            Aapke current accounts ledger exposure ke mutabiq foreign liabilities (imports/procurement) ka shock index calculate ho raha hai. Slider ko tilt karke potential margin risk analyze karein:
+          </p>
+          
+          <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-2">
+            <div className="flex justify-between items-center text-[10px] font-black text-gray-400 tracking-widest">
+              <span>EXCHANGE FLUCTUATION RISK</span>
+              <span className={`font-mono text-xs ${exchangeFluctuation >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>
+                {exchangeFluctuation > 0 ? `+${exchangeFluctuation}` : exchangeFluctuation}%
+              </span>
+            </div>
+            <input 
+              type="range" 
+              min="-15" 
+              max="15" 
+              step="0.5"
+              value={exchangeFluctuation}
+              onChange={e => setExchangeFluctuation(parseFloat(e.target.value))}
+              className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-gray-200 rounded-lg"
+            />
+            <div className="flex justify-between text-[9px] font-black text-gray-400">
+              <span>-15% DEVALUATION</span>
+              <button onClick={() => setExchangeFluctuation(0)} className="hover:text-indigo-600 text-indigo-500">RESET (BASE)</button>
+              <span>+15% APPRECIATION</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+          {/* Risk Alert Callouts */}
+          <div className="space-y-3">
+            <div className="p-4 bg-gray-50 border rounded-2xl flex justify-between items-center">
+              <div>
+                <div className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Foreign Asset Exposure</div>
+                <div className="text-md font-black text-gray-800 font-mono mt-0.5">${forexCalculations.foreignReceivables.toLocaleString(undefined, {maximumFractionDigits:0})}</div>
+              </div>
+              <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md border border-emerald-200">Receivables</span>
+            </div>
+
+            <div className="p-4 bg-gray-50 border rounded-2xl flex justify-between items-center">
+              <div>
+                <div className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Foreign Debt Exposure</div>
+                <div className="text-md font-black text-gray-800 font-mono mt-0.5">${forexCalculations.foreignPayables.toLocaleString(undefined, {maximumFractionDigits:0})}</div>
+              </div>
+              <span className="text-[10px] font-black bg-rose-50 text-rose-600 px-2 py-1 rounded-md border border-rose-200">Payables</span>
+            </div>
+
+            {/* Dynamic Real-time Condition Card Trigger */}
+            {forexCalculations.impactBuffer !== 0 && (
+              <div className={`p-4 rounded-2xl border flex items-start gap-3 animate-in fade-in duration-200 ${forexCalculations.impactBuffer < 0 ? 'bg-rose-50/50 border-rose-100 text-rose-900' : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'}`}>
+                <ShieldAlert size={18} className={`shrink-0 mt-0.5 ${forexCalculations.impactBuffer < 0 ? 'text-rose-600' : 'text-emerald-600'}`} />
+                <div>
+                  <h5 className="text-xs font-black uppercase tracking-wider">Estimated Margin Buffer Impact</h5>
+                  <p className="text-[11px] font-medium opacity-80 mt-0.5">
+                    Currency rate fluctuation ki wajah se aapki ledger value par pratical buffer impact <span className="font-bold font-mono">{forexCalculations.impactBuffer.toLocaleString(undefined, {maximumFractionDigits:0})}</span> parh sakta hai.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Simulated Impact Gauge Meter Card */}
+          <div className="p-6 bg-slate-900 text-white rounded-3xl md:rounded-[2rem] border border-slate-800 shadow-xl flex flex-col justify-between h-full min-h-[180px]">
+            <div>
+              <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase flex items-center gap-1.5">
+                <Sliders size={12} className="text-indigo-400" /> Simulated Net Profit
+              </div>
+              <div className="text-3xl font-black font-mono tracking-tighter mt-2 text-indigo-300">
+                {forexCalculations.simulatedProfit.toLocaleString(undefined, {minimumFractionDigits: 0})}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-800 pt-4 mt-4 flex justify-between items-center text-[11px] font-bold">
+              <span className="text-slate-400 font-medium">Standard Real Base:</span>
+              <span className="font-mono text-slate-200">{summary.netProfit.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 };
