@@ -17,7 +17,8 @@ import {
   LayoutDashboard,
   Menu,
   X,
-  Building2 
+  Building2,
+  Radio
 } from 'lucide-react';
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
@@ -53,6 +54,9 @@ import PurchaseRefundEntry from './components/purchase/PurchaseRefundEntry';
 
 // Aging Component Import
 import { AgingReports } from './components/AgingReports';
+
+// New E-Commerce Reconciliation Component Import
+import EcommerceReconciliation from './components/EcommerceReconciliation';
 
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
 import { calculateTrialBalance, calculateFinancialSummary } from './services/accountingService';
@@ -90,6 +94,7 @@ type View =
   | 'REPORT_PL'
   | 'REPORT_BS'
   | 'REPORT_AGING' 
+  | 'ECOM_RECONCILIATION'
   | 'SETTINGS';
 
 const App: React.FC = () => {
@@ -102,7 +107,7 @@ const App: React.FC = () => {
   // Data State
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(items => []);
   const [units, setUnits] = useState<Unit[]>([]);
   const [stockTransactions, setStockTransactions] = useState<StockTransaction[]>([]);
   
@@ -234,7 +239,6 @@ const App: React.FC = () => {
   };
 
   const handleCloudOperation = async (operation: () => Promise<any>) => {
-    // 🛡️ ROLE SECURITY GUARDRAIL: Strict dynamic read-only blocker
     if (user?.role === 'VIEWER') {
       alert("Security Enforcement Matrix: Your read-only profile cannot commit database mutations!");
       return;
@@ -395,7 +399,6 @@ const App: React.FC = () => {
                       setCompanyName(comp.name);
                       localStorage.setItem('supabase_active_company_id', comp.id);
                       localStorage.setItem('active_company_id', comp.id);
-                      // ⭐ Fire custom multi-currency partition listener trigger to force UI state reload without lag
                       window.dispatchEvent(new CustomEvent('companySwitched', { detail: { id: comp.id, name: comp.name } }));
                     }
                   }
@@ -474,6 +477,9 @@ const App: React.FC = () => {
             <SidebarItem view="INVENTORY" icon={Package} label="Inventory" badge={lowStockCount} />
             <SidebarItem view="EXPENSES" icon={Wallet} label="Expenses" />
             
+            {/* ⭐ Registered new E-Commerce Payout automation panel inside standard layout */}
+            <SidebarItem view="ECOM_RECONCILIATION" icon={Radio} label="E-Commerce Payouts" />
+
             <div className="pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">System</div>
             <div>
                 <button onClick={() => setReportsMenuOpen(!reportsMenuOpen)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-lg transition">
@@ -598,6 +604,12 @@ const App: React.FC = () => {
                 {currentView === 'EXPENSES' && (
                   <TransactionManager title="Expenses" type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={ExpenseEntry} formProps={{ ledgers, trialBalance }} />
                 )}
+                
+                {/* ⭐ Injected state wrapper view mapping container for E-Commerce uploads */}
+                {currentView === 'ECOM_RECONCILIATION' && (
+                  <EcommerceReconciliation ledgers={ledgers} onSave={handleSaveVoucher} />
+                )}
+
                 {currentView === 'REPORT_PL' && (
                     <ProfitLossStatement vouchers={vouchers} ledgers={ledgers} companyName={companyName} />
                 )}
