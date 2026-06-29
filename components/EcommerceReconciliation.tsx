@@ -32,8 +32,30 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
   const debtorAccounts = ledgers.filter(l => l.group.includes('Debtors') || l.group.includes('Sales') || l.type === 'ASSET');
 
   const fetchPlatforms = async () => {
-    const { data } = await supabase.from('ecommerce_platforms').select('id, name').order('name');
-    if (data) setPlatformsList(data);
+    try {
+      const { data, error } = await supabase.from('ecommerce_platforms').select('id, name').order('name');
+      
+      // ✅ Self-Healing Fallback Strategy: Agar DB seed khali ho ya network lag ho, toh static items load ho jayein
+      if (!data || data.length === 0) {
+        const defaultSeeds = [
+          { id: 'STRIPE', name: 'Stripe API' },
+          { id: 'AMAZON', name: 'Amazon Seller' },
+          { id: 'WOOCOMMERCE', name: 'WooCommerce' },
+          { id: 'PAYPAL', name: 'PayPal Checkout' },
+          { id: 'EBAY', name: 'eBay Marketplace' },
+          { id: 'DARAZ', name: 'Daraz Mall' },
+          { id: 'SHOPIFY', name: 'Shopify Store' }
+        ];
+        setPlatformsList(defaultSeeds);
+        
+        // Background async database entry
+        await supabase.from('ecommerce_platforms').insert(defaultSeeds);
+      } else {
+        setPlatformsList(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => {
@@ -47,14 +69,18 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
     const id = newPlatformName.trim().toUpperCase().replace(/\s+/g, '_');
     const targetCompanyId = localStorage.getItem('supabase_active_company_id') || '';
 
+    // Optimistic UI Update
+    const newObj = { id, name: newPlatformName.trim() };
+    setPlatformsList(prev => [newObj, ...prev]);
+    setPlatform(id);
+
     await supabase.from('ecommerce_platforms').insert([
       { id, name: newPlatformName.trim(), company_id: targetCompanyId || null }
     ]);
 
-    await fetchPlatforms();
-    setPlatform(id);
     setIsModalOpen(false);
     setNewPlatformName('');
+    await fetchPlatforms();
   };
 
   const handleCsvParsingLogic = () => {
@@ -69,7 +95,6 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
       if (idx === 0 || !row.trim()) return;
       const columns = row.split(',');
 
-      // Flexible parser fallback logic across dynamic columns
       const amt = parseFloat(columns[0]) || 0;
       const fee = parseFloat(columns[1]) || 0;
       const refOrCost = parseFloat(columns[2]) || 0;
@@ -131,7 +156,6 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-bold text-gray-700">
-        {/* ✅ Standard Web Compatible Dropdown Engine with Safe Trigger Mechanics */}
         <div className="bg-white p-4 border rounded-xl space-y-3">
           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">Select Marketplace Node</label>
           <select 
@@ -151,7 +175,7 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
               </option>
             ))}
             <option disabled className="text-gray-300 bg-white">────────────────────</option>
-            <option value="QUICK_ADD_ECOM_PLATFORM" className="text-indigo-600 font-extrabold bg-indigo-50/50">
+            <option value="QUICK_ADD_ECOM_PLATFORM" className="text-indigo-600 font-extrabold bg-indigo-50">
               + Add Custom Platform
             </option>
           </select>
@@ -205,7 +229,7 @@ const EcommerceReconciliation: React.FC<EcommerceReconciliationProps> = ({ ledge
           <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center border-b pb-3 mb-4">
               <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Add E-Commerce Platform</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <form onSubmit={handleAddPlatformSubmit} className="space-y-4">
               <div>
