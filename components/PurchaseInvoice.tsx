@@ -3,15 +3,20 @@ import { Save, Plus, Trash2, ShoppingBag, Printer, Loader2, Globe, X } from 'luc
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, Department, Division } from '../types';
 import { supabase } from '../services/supabaseService';
 import { getCompanySettings } from '../services/settingsService';
+import { ForensicTimeline } from './ForensicTimeline'; // ⭐ REGISTERED AUDIT SENTINEL TRACK
 
 interface PurchaseInvoiceProps {
   ledgers: Ledger[];
   items: InventoryItem[];
   onSave: (voucher: Voucher, stockUpdates: StockTransaction[]) => void;
   onCancel: () => void;
+  initialData?: Voucher | null; // ⭐ INJECTED DRILL-DOWN PROPS
+  initialSnapshot?: Voucher | null;
 }
 
-const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSave, onCancel }) => {
+const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSave, onCancel, initialData, initialSnapshot }) => {
+  const recordSnapshot = initialData || initialSnapshot || null;
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [invoiceNo, setInvoiceNo] = useState(`PUR-${Math.floor(Math.random() * 10000)}`);
   const [supplierId, setSupplierId] = useState('');
@@ -61,6 +66,20 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
   const [lineItems, setLineItems] = useState([
     { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
   ]);
+
+  // 🚀 ⭐ RE-HYDRATION EFFECT HOOK FOR PHYSICAL PROCUREMENT RECORDS
+  useEffect(() => {
+    if (recordSnapshot) {
+      setDate(recordSnapshot.date || new Date().toISOString().split('T')[0]);
+      setInvoiceNo(recordSnapshot.number || '');
+      setNarration(recordSnapshot.narration || '');
+      if (recordSnapshot.currency) setCurrency(recordSnapshot.currency);
+      if (recordSnapshot.exchangeRate) setExchangeRate(recordSnapshot.exchangeRate);
+
+      const mainCreditorRow = recordSnapshot.entries.find((e: any) => e.credit > 0);
+      if (mainCreditorRow) setSupplierId(mainCreditorRow.ledgerId);
+    }
+  }, [recordSnapshot]);
 
   // ⭐ Automated dynamic forex calculation fetch hook
   const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
@@ -140,8 +159,10 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
 
       if (companyData && companyData.base_currency) {
         setBaseCurrency(companyData.base_currency);
-        setCurrency(companyData.base_currency); 
-        setExchangeRate(1);
+        if (!recordSnapshot) {
+          setCurrency(companyData.base_currency); 
+          setExchangeRate(1);
+        }
       }
     }
   };
@@ -153,7 +174,9 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
 
   // ⭐ Watcher engine to fetch live metrics without breaking user loops
   useEffect(() => {
-    syncLiveExchangeRate(currency, baseCurrency);
+    if (!recordSnapshot) {
+      syncLiveExchangeRate(currency, baseCurrency);
+    }
   }, [currency, baseCurrency, customCurrencies.length]);
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
@@ -291,7 +314,8 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
       return;
     }
     onSave({
-      id: crypto.randomUUID(), date, number: invoiceNo, type: VoucherType.PURCHASE, narration,
+      id: recordSnapshot ? recordSnapshot.id : crypto.randomUUID(), 
+      date, number: invoiceNo, type: VoucherType.PURCHASE, narration,
       entries: [{ ledgerId: supplierId, debit: 0, credit: totalAmountBasePKR, currency, exchangeRate, foreignTotal: foreignTotalAmount } as any]
     }, lineItems.map(line => ({ itemId: line.itemId, qty: line.qty, rate: line.rate * exchangeRate, voucherId: '' })));
   };
@@ -311,7 +335,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
         <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
           <span className="bg-blue-600 text-white p-2 rounded-xl shadow-xs"><ShoppingBag size={18} /></span>
-          New Purchase Bill
+          {recordSnapshot ? `Edit Purchase Bill [${invoiceNo}]` : 'New Purchase Bill'}
         </h2>
         <div className="flex flex-wrap items-center gap-2.5 no-print-el w-full sm:w-auto justify-end">
           <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
@@ -374,7 +398,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
           <table className="w-full text-left border-collapse table-fixed min-w-[1350px]">
             <thead className="bg-blue-50/30 border-b text-gray-400 font-black text-[10px] uppercase tracking-widest">
               <tr>
-                <th className="p-5 pl-6 w-[22%]">Procured Item / Notes</th>
+                <th className="p-5 w-[22%] pl-6">Procured Item / Notes</th>
                 <th className="p-5 w-36">Cost Center (Dept)</th>
                 <th className="p-5 w-36">Segment (Div)</th>
                 <th className="p-5 w-16 text-center">Qty</th>
@@ -475,10 +499,17 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         <textarea rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Purchase notes..." className="w-full border p-3 rounded-xl text-xs outline-none bg-white font-medium" />
       </div>
 
+      {/* ⭐ LIVE AUDIT SENTINEL TIMELINE LINK */}
+      {recordSnapshot && (
+        <div className="mt-6 print:hidden">
+          <ForensicTimeline recordId={recordSnapshot.id} />
+        </div>
+      )}
+
       <div className="flex justify-end gap-3 pt-4 border-t no-print-el">
         <button onClick={onCancel} className="px-6 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-700">Abort Post</button>
         <button onClick={handleSubmit} className="px-12 py-3.5 bg-blue-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-blue-700 flex items-center gap-2 shadow-md">
-          <Save size={16} /> Record Purchase Bill
+          <Save size={16} /> {recordSnapshot ? 'Update Purchase Bill' : 'Record Purchase Bill'}
         </button>
       </div>
 
@@ -569,11 +600,11 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Exchange Rate (Relative to {baseCurrency})</label>
-                <input type="number" step="any" value={newCurrencyRate} onChange={e => setNewCurrencyRate(parseFloat(e.target.value) || 1)} className="w-full border p-2.5 rounded-xl text-xs font-mono font-bold text-blue-600" required />
+                <input type="number" step="any" value={newCurrencyRate} onChange={e => setNewCurrencyRate(parseFloat(e.target.value) || 1)} className="w-full border p-2.5 rounded-xl text-xs font-mono font-bold text-indigo-600" required />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setIsCurrencyModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
-                <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Add Currency</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Add Currency</button>
               </div>
             </form>
           </div>

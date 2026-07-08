@@ -2,15 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, AccountType, Department, Division } from '../types';
 import { Save, X, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
+import { ForensicTimeline } from './ForensicTimeline'; // ⭐ REGISTERED AUDIT SENTINEL TIMELINE
 
 interface ExpenseEntryProps {
   ledgers: Ledger[];
   onSave: (voucher: Voucher) => void;
   onCancel: () => void;
   onAddLedger?: (ledger: Ledger) => void;
+  initialData?: Voucher | null; // ⭐ INJECTED DRILL-DOWN PROPS
+  initialSnapshot?: Voucher | null;
 }
 
-const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, onAddLedger }) => {
+const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, onAddLedger, initialData, initialSnapshot }) => {
+  const recordSnapshot = initialData || initialSnapshot || null;
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [expenseLedgerId, setExpenseLedgerId] = useState('');
   const [paymentLedgerId, setPaymentLedgerId] = useState('');
@@ -39,6 +44,28 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
 
   const [localLedgers, setLocalLedgers] = useState<Ledger[]>(ledgers);
 
+  // 🚀 ⭐ RE-HYDRATION HOOK ENGINE FOR HISTORICAL DISBURSEMENT SLIPS
+  useEffect(() => {
+    if (recordSnapshot) {
+      setDate(recordSnapshot.date || new Date().toISOString().split('T')[0]);
+      setNarration(recordSnapshot.narration || '');
+      if (recordSnapshot.currency) setCurrency(recordSnapshot.currency);
+      if (recordSnapshot.exchangeRate) setExchangeRate(recordSnapshot.exchangeRate);
+      if (recordSnapshot.foreignTotal) setAmount(recordSnapshot.foreignTotal);
+
+      // Extract respective balance registers splits references
+      const debitorRow = recordSnapshot.entries.find((e: any) => e.debit > 0);
+      const creditorRow = recordSnapshot.entries.find((e: any) => e.credit > 0);
+
+      if (debitorRow) {
+        setExpenseLedgerId(debitorRow.ledgerId);
+        setSelectedDept(debitorRow.departmentId || '');
+        setSelectedDiv(debitorRow.divisionId || '');
+      }
+      if (creditorRow) setPaymentLedgerId(creditorRow.ledgerId);
+    }
+  }, [recordSnapshot]);
+
   // ⭐ Real-Time Automated Forex Exchange Sync Engine
   const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
     if (targetCurrency === base) {
@@ -65,7 +92,7 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
       const { data } = await supabase.from('companies').select('base_currency').eq('id', activeCompanyId).maybeSingle();
       if (data && data.base_currency) {
         setBaseCurrency(data.base_currency);
-        setCurrency(data.base_currency);
+        if (!recordSnapshot) setCurrency(data.base_currency);
       }
     }
   };
@@ -83,11 +110,13 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
       if (divs) setDivisions(divs);
     };
     initLookups();
-  }, []);
+  }, [recordSnapshot]);
 
   // ⭐ Watcher to fetch rates dynamically when user switches currencies
   useEffect(() => {
-    syncLiveExchangeRate(currency, baseCurrency);
+    if (!recordSnapshot) {
+      syncLiveExchangeRate(currency, baseCurrency);
+    }
   }, [currency, baseCurrency]);
 
   const expenseAccounts = localLedgers.filter(l => l.type === AccountType.EXPENSE);
@@ -128,7 +157,7 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
     if (depts) setDepartments(depts);
     setSelectedDept(id);
     setIsDeptModalOpen(false);
-    setNewDeptName('');
+    newDeptName('');
   };
 
   const handleQuickDivSubmit = async (e: React.FormEvent) => {
@@ -151,9 +180,9 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
       return;
     }
     const voucher: Voucher = {
-      id: crypto.randomUUID(),
+      id: recordSnapshot ? recordSnapshot.id : crypto.randomUUID(),
       date,
-      number: `EXP-${Math.floor(Math.random() * 10000)}`,
+      number: recordSnapshot ? recordSnapshot.number : `EXP-${Math.floor(Math.random() * 10000)}`,
       type: VoucherType.PAYMENT,
       narration: narration || `Expense Recorded (${currency})`,
       entries: [
@@ -170,7 +199,9 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 max-w-3xl mx-auto border border-gray-100 mt-6 relative animate-in fade-in">
       <h2 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
-        <span className="bg-orange-500 text-white px-3 py-1.5 rounded-xl text-sm font-black uppercase tracking-wider">Record Expense</span>
+        <span className="bg-orange-500 text-white px-3 py-1.5 rounded-xl text-sm font-black uppercase tracking-wider">
+          {recordSnapshot ? `Modify Expense Entry [${recordSnapshot.number}]` : 'Record Expense'}
+        </span>
       </h2>
 
       <div className="space-y-5">
@@ -222,7 +253,7 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-              {currency === baseCurrency ? 'Exchange Rate Fixed' : `Exchange Rate (1 ${currency} = ? ${baseCurrency})`}
+              {currency === baseCurrency ? 'Exchange Rate Fixed' : `Exchange Rate (1 {currency} = ? {baseCurrency})`}
               {isRateFetching && <Loader2 size={10} className="animate-spin text-orange-600" />}
             </label>
             <input type="number" value={exchangeRate} disabled={currency === baseCurrency || isRateFetching} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none shadow-sm ${currency === baseCurrency ? 'bg-gray-100/70 border-gray-200 text-gray-400' : 'bg-white border-orange-200 text-orange-600 ring-2 ring-orange-50/50'}`} min="0.01" step="any" />
@@ -256,9 +287,16 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
           <textarea className="w-full border border-gray-200 p-3 rounded-xl text-xs outline-none bg-gray-50/50 focus:bg-white focus:border-orange-500 font-medium transition-all" rows={2} value={narration} onChange={e => setNarration(e.target.value)} placeholder="Paid office rent, servers subscription billing reference..."></textarea>
         </div>
 
+        {/* ⭐ LIVE AUDIT SENTINEL TIMELINE */}
+        {recordSnapshot && (
+          <div className="mt-6 print:hidden">
+            <ForensicTimeline recordId={recordSnapshot.id} />
+          </div>
+        )}
+
         <div className="flex gap-3 pt-2 no-print-el">
           <button type="button" onClick={onCancel} className="flex-1 py-2.5 bg-gray-100 text-gray-400 font-bold uppercase tracking-widest rounded-xl text-xs hover:text-gray-600">Cancel</button>
-          <button type="button" onClick={handleSubmit} className="flex-1 py-2.5 bg-orange-600 text-white font-black uppercase tracking-widest rounded-xl text-xs shadow-md hover:bg-orange-700">Record Expense</button>
+          <button type="button" onClick={handleSubmit} className="flex-1 py-2.5 bg-orange-600 text-white font-black uppercase tracking-widest rounded-xl text-xs shadow-md hover:bg-orange-700">{recordSnapshot ? 'Update Expense' : 'Record Expense'}</button>
         </div>
       </div>
 

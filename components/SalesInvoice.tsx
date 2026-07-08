@@ -3,6 +3,7 @@ import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer, Loader2, G
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
+import { ForensicTimeline } from './ForensicTimeline'; // ⭐ REGISTERED AUDIT ENGINE LINK
 
 interface SalesInvoiceProps {
   ledgers: Ledger[];
@@ -11,9 +12,13 @@ interface SalesInvoiceProps {
   onSave: (voucher: Voucher, stockUpdates: StockTransaction[]) => void;
   onCancel: () => void;
   onAddLedger: (ledger: Ledger) => void;
+  initialData?: Voucher | null; // ⭐ INJECTED DRILL-DOWN PROPS
+  initialSnapshot?: Voucher | null;
 }
 
-const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalance, onSave, onCancel, onAddLedger }) => {
+const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalance, onSave, onCancel, onAddLedger, initialData, initialSnapshot }) => {
+  const recordSnapshot = initialData || initialSnapshot || null;
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [invoiceNo, setInvoiceNo] = useState('');
   const [customerId, setCustomerId] = useState('');
@@ -73,6 +78,39 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [lineItems, setLineItems] = useState([
     { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
   ]);
+
+  // 🚀 ⭐ RE-HYDRATION HOOK EFFECT ENGINE FOR HISTORICAL SALES INVOICES
+  useEffect(() => {
+    if (recordSnapshot) {
+      setDate(recordSnapshot.date || new Date().toISOString().split('T')[0]);
+      setInvoiceNo(recordSnapshot.number || '');
+      setNarration(recordSnapshot.narration || '');
+      if (recordSnapshot.currency) setCurrency(recordSnapshot.currency);
+      if (recordSnapshot.exchangeRate) setExchangeRate(recordSnapshot.exchangeRate);
+      
+      // Map out debtor account from entries array sequence 
+      const mainDebtorRow = recordSnapshot.entries.find((e: any) => e.debit > 0);
+      if (mainDebtorRow) setCustomerId(mainDebtorRow.ledgerId);
+
+      // Re-hydrate multi currency rows entries tracking matching
+      if (recordSnapshot.entries && recordSnapshot.entries.length > 1) {
+        const salesRows = recordSnapshot.entries.filter((e: any) => e.credit > 0);
+        if (salesRows.length > 0) {
+          setLineItems(salesRows.map((s: any) => ({
+            itemId: s.itemId || '',
+            qty: s.qty ? Math.abs(s.qty) : 1,
+            rate: s.foreignTotal ? (s.foreignTotal / (s.qty || 1)) : (s.credit / (recordSnapshot.exchangeRate || 1)),
+            taxType: s.taxType || '',
+            taxRate: s.taxRate || 0,
+            taxAmount: s.taxAmount || 0,
+            amount: s.foreignTotal || (s.credit / (recordSnapshot.exchangeRate || 1)),
+            departmentId: s.departmentId || '',
+            divisionId: s.divisionId || ''
+          })));
+        }
+      }
+    }
+  }, [recordSnapshot]);
 
   // ⭐ Watcher engine to fetch live exchange rates automatically on currency change
   const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
@@ -162,8 +200,10 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           
           if (activeCompanyData.base_currency) {
             setBaseCurrency(activeCompanyData.base_currency);
-            setCurrency(activeCompanyData.base_currency); 
-            setExchangeRate(1);
+            if (!recordSnapshot) {
+              setCurrency(activeCompanyData.base_currency); 
+              setExchangeRate(1);
+            }
           }
         }
       } catch (err) {
@@ -178,7 +218,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         const settings = await getCompanySettings();
         const prefix = settings.invoicePrefix || 'INV-';
         const nextNum = settings.nextInvoiceNumber || 1;
-        setInvoiceNo(`${prefix}${nextNum.toString().padStart(4, '0')}`);
+        if (!recordSnapshot) setInvoiceNo(`${prefix}${nextNum.toString().padStart(4, '0')}`);
         setTaxId(settings.taxId || '');
 
         const targetId = 
@@ -212,18 +252,18 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         }
       } catch (error) {
         console.error("Context initialization error:", error);
-        setInvoiceNo('INV-0001');
+        if (!recordSnapshot) setInvoiceNo('INV-0001');
       }
     };
 
     initializeInvoice();
     fetchLookups();
     fetchTaxes();
-  }, [customerId, ledgers.length, date]);
+  }, [customerId, ledgers.length, date, recordSnapshot]);
 
   // ⭐ Watcher engine to fetch live exchange rates automatically on currency change
   useEffect(() => {
-    if (currency && baseCurrency) {
+    if (currency && baseCurrency && !recordSnapshot) {
       syncLiveExchangeRate(currency, baseCurrency);
     }
   }, [currency, baseCurrency, customCurrencies.length]);
@@ -341,7 +381,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const handleQuickCurrencySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Reused identical structural addition context from setup selector
     alert("Currency provision link context locked successfully.");
   };
 
@@ -359,7 +398,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       return;
     }
 
-    const voucherId = crypto.randomUUID();
+    const voucherId = recordSnapshot ? recordSnapshot.id : crypto.randomUUID();
     const finalEntries: any[] = [
       { ledgerId: customerId, debit: totalAmountBasePKR, credit: 0, departmentId: lineItems[0]?.departmentId || undefined, divisionId: lineItems[0]?.divisionId || undefined }
     ];
@@ -381,14 +420,16 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       entries: finalEntries, currency, exchangeRate, foreignTotal: foreignTotalAmount
     } as any, lineItems.map(l => ({ itemId: l.itemId, qty: -Math.abs(l.qty), rate: l.rate * exchangeRate, voucherId: voucherId })));
 
-    (async () => {
-      try {
-        const currentSettings = await getCompanySettings();
-        await saveCompanySettings({ ...currentSettings, nextInvoiceNumber: (currentSettings.nextInvoiceNumber || 1) + 1 });
-      } catch (error) {
-        console.error(error);
-      }
-    })();
+    if (!recordSnapshot) {
+      (async () => {
+        try {
+          const currentSettings = await getCompanySettings();
+          await saveCompanySettings({ ...currentSettings, nextInvoiceNumber: (currentSettings.nextInvoiceNumber || 1) + 1 });
+        } catch (error) {
+          console.error(error);
+        }
+      })();
+    }
   };
 
   const activeCustomerObj = ledgers.find(l => l.id === customerId);
@@ -413,9 +454,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       <div className="print:hidden bg-gray-50/50 p-2 md:p-6 rounded-2xl space-y-6 relative">
         {/* Header Action Strip */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200/70 shadow-xs">
-          <h2 className="text-xl font-black text-gray-900 flex items-center gap-2.5">
+          <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2.5">
             <span className="bg-indigo-600 text-white p-2 rounded-xl shadow-xs"><ShoppingCart size={18} /></span>
-            Create Sales Invoice
+            {recordSnapshot ? `Edit Sales Invoice [${invoiceNo}]` : 'Create Sales Invoice'}
           </h2>
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
             <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
@@ -576,14 +617,20 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         <div className="flex justify-end gap-3">
           <button onClick={onCancel} className="px-5 py-2.5 text-xs font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">Discard Draft</button>
           <button onClick={handleSubmit} className="px-10 py-3 bg-gray-900 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-black flex items-center gap-2 shadow-md transition-all">
-            <Save size={15} /> Post Invoice Ledger
+            <Save size={15} /> {recordSnapshot ? 'Update Invoice' : 'Post Invoice Ledger'}
           </button>
         </div>
       </div>
 
+      {/* ⭐ LIVE AUDIT SENTINEL TIMELINE LINK */}
+      {recordSnapshot && (
+        <div className="mt-6 print:hidden">
+          <ForensicTimeline recordId={recordSnapshot.id} />
+        </div>
+      )}
+
       {/* 📄 2. PRINT BLOCK */}
       <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
-        
         {/* Brand Header */}
         <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>

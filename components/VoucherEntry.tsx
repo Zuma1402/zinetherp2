@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, Department, Division } from '../types';
 import { Save, Plus, Trash2, Loader2, ClipboardPaste, Download, X } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
-import { ForensicTimeline } from './ForensicTimeline'; // ⭐ REGISTERED NEW AUDIT TRAIL TIMELINE ELEMENT PANEL
 
 interface GeneralVoucherEntryProps {
   ledgers: Ledger[];
   onSave: (voucher: Voucher) => void;
   onCancel: () => void;
+  initialData?: Voucher | null; // ⭐ Prop matrix fallback links bound cleanly
+  initialSnapshot?: Voucher | null;
 }
 
 interface RowEntry {
@@ -18,7 +19,10 @@ interface RowEntry {
   divisionId: string;
 }
 
-const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSave, onCancel }) => {
+const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSave, onCancel, initialData, initialSnapshot }) => {
+  // Resolve target incoming historical voucher snapshot token safely
+  const recordSnapshot = initialData || initialSnapshot || null;
+
   const [voucherType, setVoucherType] = useState<VoucherType>(VoucherType.JOURNAL);
   const [voucherNo, setVoucherNo] = useState('VCH-AUTO');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -29,7 +33,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
 
-  // ⭐ NEW ACTIVE LISTENER MULTI-CURRENCY POOL STATES
+  // NEW ACTIVE LISTENER MULTI-CURRENCY POOL STATES
   const [customCurrencies, setCustomCurrencies] = useState<{code: string; symbol: string; rate: number}[]>([]);
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [newCurrencyCode, setNewCurrencyCode] = useState('');
@@ -55,6 +59,28 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
 
   // Local state refresh controller link for forensic updates
   const [auditRefreshKey, setAuditRefreshKey] = useState(0);
+
+  // 🚀 ⭐ AUTOMATED CRITICAL STATE HYDRATION ENGINE (Pristine Additive Integration)
+  useEffect(() => {
+    if (recordSnapshot) {
+      setVoucherType(recordSnapshot.type || VoucherType.JOURNAL);
+      setVoucherNo(recordSnapshot.number || 'VCH-AUTO');
+      setDate(recordSnapshot.date || new Date().toISOString().split('T')[0]);
+      setNarration(recordSnapshot.narration || '');
+      if (recordSnapshot.currency) setCurrency(recordSnapshot.currency);
+      if (recordSnapshot.exchangeRate) setExchangeRate(recordSnapshot.exchangeRate);
+      
+      if (recordSnapshot.entries && recordSnapshot.entries.length > 0) {
+        setEntries(recordSnapshot.entries.map((e: any) => ({
+          ledgerId: e.ledgerId || '',
+          debit: e.debit ? Number(e.debit) : 0,
+          credit: e.credit ? Number(e.credit) : 0,
+          departmentId: e.departmentId || '',
+          divisionId: e.divisionId || ''
+        })));
+      }
+    }
+  }, [recordSnapshot]);
 
   const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
     if (targetCurrency === base) {
@@ -99,7 +125,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
         const { data } = await supabase.from('companies').select('base_currency').eq('id', activeCompanyId).maybeSingle();
         if (data && data.base_currency) {
           setBaseCurrency(data.base_currency);
-          setCurrency(data.base_currency);
+          if (!recordSnapshot) setCurrency(data.base_currency);
         }
       } catch (err) {
         console.error(err);
@@ -116,10 +142,12 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       await syncVoucherBaseCurrency();
     };
     initData();
-  }, []);
+  }, [recordSnapshot]);
 
   useEffect(() => {
-    syncLiveExchangeRate(currency, baseCurrency);
+    if (!recordSnapshot) {
+      syncLiveExchangeRate(currency, baseCurrency);
+    }
   }, [currency, baseCurrency]);
 
   const handleExcelPasteLogic = () => {
@@ -253,9 +281,9 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
 
   const handleSubmit = () => {
     if (!isBalanced) { alert("Voucher is unbalanced."); return; }
-    const generatedVchId = crypto.randomUUID();
     onSave({
-      id: generatedVchId, date,
+      id: recordSnapshot ? recordSnapshot.id : crypto.randomUUID(), // Updates explicit matching target node
+      date,
       number: voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo,
       type: voucherType, narration: narration || `Journal Post (${currency})`,
       entries: entries.map(e => ({
@@ -265,12 +293,10 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       currency, exchangeRate, foreignTotal: totalDebitForeign
     } as any);
     
-    // Auto-update timeline stream values smoothly
     setAuditRefreshKey(prev => prev + 1);
   };
 
-  // Safe validation fallback parameter mapping key
-  const activeVoucherLogId = voucherNo !== 'VCH-AUTO' ? voucherNo : '';
+  const activeVoucherLogId = recordSnapshot ? recordSnapshot.id : '';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto p-2">
@@ -278,7 +304,9 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
         {/* Fixed Header Control Block layout structure */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">New Voucher</h2>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+              {recordSnapshot ? `Edit Voucher [${voucherNo}]` : 'New Voucher'}
+            </h2>
             <span className={`text-[10px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider ${isBalanced ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
               {isBalanced ? 'Balanced' : 'Unbalanced'}
             </span>
@@ -293,7 +321,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
               <Download size={14} /> Download Grid Template
             </button>
             <button onClick={onCancel} className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
-            <button onClick={handleSubmit} disabled={!isBalanced} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Save size={16} /> Save Voucher</button>
+            <button onClick={handleSubmit} disabled={!isBalanced} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Save size={16} /> {recordSnapshot ? 'Update Voucher' : 'Save Voucher'}</button>
           </div>
         </div>
 
@@ -429,7 +457,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
         </div>
       </div>
 
-      {/* ⭐ LIVE AUDIT SENTINEL TIMELINE INJECTION HOOK SPLIT */}
+      {/* ⭐ DYNAMIC LIVE AUDIT SENTINEL TIMELINE LINK INSIDE RE-HYDRATED VIEW */}
       {activeVoucherLogId && (
         <div className="mt-6">
           <ForensicTimeline recordId={activeVoucherLogId} refreshTrigger={auditRefreshKey} />

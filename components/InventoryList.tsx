@@ -402,9 +402,9 @@ const InventoryList: React.FC<InventoryListProps> = ({
                                         onClick={() => handleDeleteClick(item.id)}
                                         className="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors" 
                                         title="De-list SKU"
-                                    >
+                                      >
                                         <Trash2 size={18} />
-                                    </button>
+                                      </button>
                                 </div>
                             </td>
                         </tr>
