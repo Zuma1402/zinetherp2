@@ -4,10 +4,10 @@ import { Plus, Search, Calendar, ArrowLeft, Trash2 } from 'lucide-react';
 
 interface TransactionManagerProps {
   title: string;
-  type: VoucherType | 'ALL'; // 'ALL' for General Ledger view or similar
+  type: VoucherType | string;
   vouchers: Voucher[];
-  ledgers: Ledger[]; // For displaying names
-  onSave: (data: any, secondaryData?: any) => void;
+  ledgers: Ledger[];
+  onSave: (voucher: Voucher, extraPayload?: any) => void;
   onDelete?: (id: string) => void;
   FormComponent: React.FC<any>;
   formProps: any;
@@ -25,6 +25,9 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
 }) => {
   const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
   
+  // ⭐ NEW INJECTED DRILL-DOWN CONTAINER DATA SEED STATE (Additive Modification)
+  const [selectedSnapshotRecord, setSelectedSnapshotRecord] = useState<Voucher | null>(null);
+  
   // Filters - Using en-CA for YYYY-MM-DD format in Local Time
   const [startDate, setStartDate] = useState(() => {
       const date = new Date();
@@ -32,6 +35,12 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
   });
   const [endDate, setEndDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [search, setSearch] = useState('');
+
+  const recentVouchers = React.useMemo(() => {
+    return [...vouchers]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 5);
+  }, [vouchers]);
 
   // Filter Vouchers
   const filteredVouchers = vouchers
@@ -68,19 +77,35 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
     }
   };
 
+  // ⭐ DYNAMIC SEED DRILL-DOWN LAUNCH ROW CLICK CONTROLLER (Pristine Addition)
+  const executeForensicFormLoad = (targetVoucher: Voucher) => {
+    setSelectedSnapshotRecord(targetVoucher);
+    setView('FORM');
+  };
+
+  // ⭐ ADDITIVE CLEAN INTERCEPT TRIGGER: Extends the form view mapping props inject cleanly
   if (view === 'FORM') {
     return (
       <div>
-        <button onClick={() => setView('LIST')} className="mb-4 flex items-center gap-2 text-gray-500 hover:text-gray-800 transition">
+        <button 
+          onClick={() => { setView('LIST'); setSelectedSnapshotRecord(null); }} 
+          className="mb-4 flex items-center gap-2 text-gray-500 hover:text-gray-800 transition font-bold text-xs uppercase tracking-wider"
+        >
           <ArrowLeft size={18} /> Back to {title} List
         </button>
         <FormComponent 
           {...formProps} 
+          initialData={selectedSnapshotRecord} // Streams full old snapshot schema arrays to form hydration state
+          initialSnapshot={selectedSnapshotRecord} // Dual safety key registry token binding mapping
           onSave={(data: any, sec: any) => {
             onSave(data, sec);
             setView('LIST');
+            setSelectedSnapshotRecord(null);
           }} 
-          onCancel={() => setView('LIST')} 
+          onCancel={() => {
+            setView('LIST');
+            setSelectedSnapshotRecord(null);
+          }} 
         />
       </div>
     );
@@ -94,8 +119,8 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
           <p className="text-gray-500 text-sm">Manage and track your {title.toLowerCase()}</p>
         </div>
         <button 
-          onClick={() => setView('FORM')}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm"
+          onClick={() => { setSelectedSnapshotRecord(null); setView('FORM'); }}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm font-bold text-xs uppercase tracking-wider"
         >
           <Plus size={18} /> Create New
         </button>
@@ -153,7 +178,18 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
                         return (
                             <tr key={v.id} className="hover:bg-gray-50 group">
                                 <td className="p-4 text-gray-600 whitespace-nowrap">{v.date}</td>
-                                <td className="p-4 font-medium text-indigo-600">{v.number}</td>
+                                
+                                {/* ⭐ INTERACTIVE DRILL-DOWN BUTTON ANCHOR LINK (Pristine Functional Addition) */}
+                                <td className="p-4">
+                                  <button 
+                                    type="button"
+                                    onClick={() => executeForensicFormLoad(v)}
+                                    className="font-mono font-bold text-indigo-600 hover:text-indigo-900 hover:underline cursor-pointer text-left focus:outline-none"
+                                  >
+                                    {v.number}
+                                  </button>
+                                </td>
+
                                 <td className="p-4 text-gray-700 max-w-md truncate">{v.narration}</td>
                                 <td className="p-4 text-right font-semibold text-gray-900">{amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                 <td className="p-4 text-center">
