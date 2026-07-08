@@ -157,7 +157,7 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
     if (depts) setDepartments(depts);
     setSelectedDept(id);
     setIsDeptModalOpen(false);
-    newDeptName('');
+    setNewDeptName(''); // ✅ FIXED TYPO COMPONENT CONTEXT
   };
 
   const handleQuickDivSubmit = async (e: React.FormEvent) => {
@@ -253,7 +253,7 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
           </div>
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-              {currency === baseCurrency ? 'Exchange Rate Fixed' : `Exchange Rate (1 {currency} = ? {baseCurrency})`}
+              {currency === baseCurrency ? 'Exchange Rate Fixed' : `Exchange Rate (1 ${currency} = ? ${baseCurrency})`}
               {isRateFetching && <Loader2 size={10} className="animate-spin text-orange-600" />}
             </label>
             <input type="number" value={exchangeRate} disabled={currency === baseCurrency || isRateFetching} onChange={e => setExchangeRate(parseFloat(e.target.value) || 1)} className={`w-full p-2.5 border rounded-xl font-black text-xs text-center outline-none shadow-sm ${currency === baseCurrency ? 'bg-gray-100/70 border-gray-200 text-gray-400' : 'bg-white border-orange-200 text-orange-600 ring-2 ring-orange-50/50'}`} min="0.01" step="any" />
@@ -306,7 +306,7 @@ const ExpenseEntry: React.FC<ExpenseEntryProps> = ({ ledgers, onSave, onCancel, 
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 border animate-in zoom-in-95 duration-150">
             <h3 className="text-sm font-bold text-gray-900 mb-4">Add New Expense Account</h3>
             <form onSubmit={handleQuickExpenseAccSubmit} className="space-y-4">
-              <input autoFocus type="text" value={newExpenseAccName} onChange={e => setNewExpenseAccName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-orange-500 font-bold" placeholder="e.g. Office Entertainment" required />
+              <input autoFocus type="text" value={newExpenseAccName} onChange={e => setNewExpenseAccName(e.target.value)} className="w-full p-2.5 rounded-xl text-xs outline-none focus:border-orange-500 font-bold" placeholder="e.g. Office Entertainment" required />
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={() => setIsExpenseAccModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button>
                 <button type="submit" className="px-4 py-2 bg-orange-600 text-white rounded-xl text-xs font-semibold">Save Account</button>
