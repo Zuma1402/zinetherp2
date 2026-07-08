@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, Department, Division } from '../types';
 import { Save, Plus, Trash2, Loader2, ClipboardPaste, Download, X } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
+import { ForensicTimeline } from './ForensicTimeline'; // ⭐ REGISTERED NEW AUDIT TRAIL TIMELINE ELEMENT PANEL
 
 interface GeneralVoucherEntryProps {
   ledgers: Ledger[];
@@ -29,7 +30,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
 
   // ⭐ NEW ACTIVE LISTENER MULTI-CURRENCY POOL STATES
-  const [customCurrencies, setCustomCurrencies] = useState<{code: string, symbol: string, rate: number}[]>([]);
+  const [customCurrencies, setCustomCurrencies] = useState<{code: string; symbol: string; rate: number}[]>([]);
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [newCurrencyCode, setNewCurrencyCode] = useState('');
   const [newCurrencySymbol, setNewCurrencySymbol] = useState('');
@@ -51,6 +52,9 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [newDivName, setNewDivName] = useState('');
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [activeCompanyId, setActiveCompanyId] = useState('');
+
+  // Local state refresh controller link for forensic updates
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
   const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
     if (targetCurrency === base) {
@@ -249,8 +253,9 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
 
   const handleSubmit = () => {
     if (!isBalanced) { alert("Voucher is unbalanced."); return; }
+    const generatedVchId = crypto.randomUUID();
     onSave({
-      id: crypto.randomUUID(), date,
+      id: generatedVchId, date,
       number: voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo,
       type: voucherType, narration: narration || `Journal Post (${currency})`,
       entries: entries.map(e => ({
@@ -259,7 +264,13 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       })),
       currency, exchangeRate, foreignTotal: totalDebitForeign
     } as any);
+    
+    // Auto-update timeline stream values smoothly
+    setAuditRefreshKey(prev => prev + 1);
   };
+
+  // Safe validation fallback parameter mapping key
+  const activeVoucherLogId = voucherNo !== 'VCH-AUTO' ? voucherNo : '';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto p-2">
@@ -417,6 +428,13 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
           {difference > 0 && ( <span className="font-mono font-bold text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100">Difference: {difference.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> )}
         </div>
       </div>
+
+      {/* ⭐ LIVE AUDIT SENTINEL TIMELINE INJECTION HOOK SPLIT */}
+      {activeVoucherLogId && (
+        <div className="mt-6">
+          <ForensicTimeline recordId={activeVoucherLogId} refreshTrigger={auditRefreshKey} />
+        </div>
+      )}
 
       {/* QUICK ADD CURRENCY MODAL */}
       {isCurrencyModalOpen && (

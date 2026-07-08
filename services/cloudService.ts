@@ -1,5 +1,6 @@
 import { Ledger, Voucher, InventoryItem, Unit, StockTransaction, User } from '../types';
 import { supabase, handleSupabaseError } from './supabaseService';
+import { AuditService } from './auditService'; // ⭐ INJECTED PRISTINE LOG COUPLING ENGINE
 
 export const CloudService = {
   // --- Fetching Data Safely with Strict Parameter Casting ---
@@ -120,6 +121,17 @@ export const CloudService = {
         .single();
 
       if (error) throw error;
+
+      // ⭐ FORENSIC TRACK LOG INSTANT INJECTION
+      AuditService.logAction({
+        companyId: payload.company_id || '',
+        action: 'INSERT',
+        recordType: 'LEDGER',
+        recordId: data.id,
+        recordNumber: data.name,
+        metaChanges: { before: null, after: payload }
+      });
+
       return {
         id: data.id,
         name: data.name,
@@ -175,6 +187,15 @@ export const CloudService = {
 
   async saveVoucher(voucher: any) {
     try {
+      // Check if updating an existing voucher node to extract state comparison matrix changes
+      const isUpdate = !!voucher.id;
+      let previousSnapshot = null;
+      
+      if (isUpdate) {
+        const { data: oldVch } = await supabase.from('vouchers').select('*, voucher_entries(*)').eq('id', voucher.id).maybeSingle();
+        if (oldVch) previousSnapshot = oldVch;
+      }
+
       const { data: voucherData, error: voucherError } = await supabase
         .from('vouchers')
         .insert([{
@@ -203,6 +224,17 @@ export const CloudService = {
         .insert(entries);
 
       if (entriesError) throw entriesError;
+
+      // ⭐ RECORD HIGH INTENSITY SYSTEM FORENSIC AUDIT TRAILS LOG DATA PAYLOAD
+      AuditService.logAction({
+        companyId: voucher.company_id || localStorage.getItem('supabase_active_company_id') || '',
+        action: previousSnapshot ? 'UPDATE' : 'INSERT',
+        recordType: voucher.type === 'SALES' || voucher.type === 'PURCHASE' ? 'INVOICE' : 'VOUCHER',
+        recordId: voucher.id,
+        recordNumber: voucher.number,
+        metaChanges: { before: previousSnapshot, after: voucher }
+      });
+
       return voucherData;
     } catch (error) {
       throw new Error(handleSupabaseError(error));
@@ -211,11 +243,25 @@ export const CloudService = {
 
   async deleteVoucher(id: string) {
     try {
+      const { data: oldVch } = await supabase.from('vouchers').select('*').eq('id', id).maybeSingle();
+      
       const { error: entriesError } = await supabase.from('voucher_entries').delete().eq('voucher_id', id);
       if (entriesError) throw entriesError;
 
       const { error } = await supabase.from('vouchers').delete().eq('id', id);
       if (error) throw error;
+
+      // ⭐ RECORD EXPLICIT DELETION AUDIT SENTINEL ENTRIES
+      if (oldVch) {
+        AuditService.logAction({
+          companyId: oldVch.company_id || '',
+          action: 'DELETE',
+          recordType: 'VOUCHER',
+          recordId: id,
+          recordNumber: oldVch.number,
+          metaChanges: { before: oldVch, after: null }
+        });
+      }
     } catch (error) {
       throw new Error(handleSupabaseError(error));
     }
