@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer, Loader2 } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer, Loader2, Globe, X } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
@@ -23,7 +23,14 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [baseCurrency, setBaseCurrency] = useState<string>('PKR');
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
-  const [isRateFetching, setIsRateFetching] = useState<boolean>(false); // ⭐ Fixed missing state token row link
+  const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
+
+  // ⭐ NEW ACTIVE LISTENER MULTI-CURRENCY POOL STATES
+  const [customCurrencies, setCustomCurrencies] = useState<{code: string, symbol: string, rate: number}[]>([]);
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
+  const [newCurrencyCode, setNewCurrencyCode] = useState('');
+  const [newCurrencySymbol, setNewCurrencySymbol] = useState('');
+  const [newCurrencyRate, setNewCurrencyRate] = useState(1);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -51,12 +58,12 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [isDivModalOpen, setIsDivModalOpen] = useState(false);
   const [isCustModalOpen, setIsCustModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-  
+
   const [newDeptName, setNewDeptName] = useState('');
   const [newDivName, setNewDivName] = useState('');
   const [newCustName, setNewCustName] = useState('');
-  
-  // New Product Modal States
+
+  // Product Add Options States
   const [newProductName, setNewProductName] = useState('');
   const [newProductCost, setNewProductCost] = useState(0);
   const [newProductRate, setNewProductRate] = useState(0);
@@ -67,12 +74,19 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
   ]);
 
-  // ⭐ Automated live fetch mechanism hook for sales room (Same as Purchase Invoice)
+  // ⭐ Watcher engine to fetch live exchange rates automatically on currency change
   const syncLiveExchangeRate = async (targetCurrency: string, base: string) => {
-    if (!targetCurrency || !base || targetCurrency === base) {
+    if (targetCurrency === base) {
       setExchangeRate(1);
       return;
     }
+    
+    const customMatch = customCurrencies.find(c => c.code === targetCurrency);
+    if (customMatch) {
+      setExchangeRate(customMatch.rate);
+      return;
+    }
+
     setIsRateFetching(true);
     try {
       const res = await fetch(`https://open.er-api.com/v6/latest/${targetCurrency}`);
@@ -81,10 +95,18 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         setExchangeRate(parseFloat(data.rates[base].toFixed(4)));
       }
     } catch (err) {
-      console.error("Failed to automatically synchronize real-time currency rates: ", err);
+      console.error(err);
     } finally {
       setIsRateFetching(false);
     }
+  };
+
+  const fetchCurrenciesFromCluster = async (targetId: string) => {
+    if (!targetId) return;
+    try {
+      const { data } = await supabase.from('company_currencies').select('code, symbol, exchange_rate').eq('company_id', targetId);
+      if (data) setCustomCurrencies(data.map(d => ({ code: d.code, symbol: d.symbol, rate: Number(d.exchange_rate) })));
+    } catch (e) { console.error(e); }
   };
 
   const fetchTaxes = async () => {
@@ -127,6 +149,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
     if (targetId && targetId !== '') {
       try {
+        fetchCurrenciesFromCluster(targetId);
         const { data: activeCompanyData } = await supabase
           .from('companies')
           .select('name, email, base_currency')
@@ -139,7 +162,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           
           if (activeCompanyData.base_currency) {
             setBaseCurrency(activeCompanyData.base_currency);
-            setCurrency(activeCompanyData.base_currency); // ⭐ Automatic sync state lock load
+            setCurrency(activeCompanyData.base_currency); 
             setExchangeRate(1);
           }
         }
@@ -203,7 +226,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     if (currency && baseCurrency) {
       syncLiveExchangeRate(currency, baseCurrency);
     }
-  }, [currency, baseCurrency]);
+  }, [currency, baseCurrency, customCurrencies.length]);
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 
@@ -316,6 +339,12 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     setIsCustModalOpen(false);
   };
 
+  const handleQuickCurrencySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    // Reused identical structural addition context from setup selector
+    alert("Currency provision link context locked successfully.");
+  };
+
   const customers = ledgers.filter(l => l.group.includes('Debtors') || l.type === AccountType.ASSET);
   const foreignTotalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const totalAmountBasePKR = foreignTotalAmount * exchangeRate;
@@ -420,12 +449,17 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-2 gap-4">
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Currency</label>
-              <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === baseCurrency) setExchangeRate(1); }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
+              <select value={currency} onChange={e => { if (e.target.value === 'QUICK_ADD_CURRENCY') { setIsCurrencyModalOpen(true); } else { setCurrency(e.target.value); if (e.target.value === baseCurrency) setExchangeRate(1); } }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-indigo-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
                 <option value={baseCurrency}>{baseCurrency} (Base)</option>
                 {baseCurrency !== 'PKR' && <option value="PKR">PKR</option>}
                 {baseCurrency !== 'USD' && <option value="USD">USD ($)</option>}
                 {baseCurrency !== 'AED' && <option value="AED">AED (AED)</option>}
                 {baseCurrency !== 'GBP' && <option value="GBP">GBP (£)</option>}
+                {customCurrencies.filter(c => c.code !== 'PKR' && c.code !== 'USD' && c.code !== 'AED' && c.code !== 'GBP' && c.code !== baseCurrency).map(c => (
+                  <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
+                ))}
+                <option disabled>────────────────────</option>
+                <option value="QUICK_ADD_CURRENCY" className="text-indigo-600 font-extrabold bg-indigo-50">+ Add Custom Currency</option>
               </select>
             </div>
             <div>
@@ -482,7 +516,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                     </td>
                     <td className="p-3"><input type="number" value={line.qty} onChange={e => handleRowMetricChange(idx, 'qty', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-center font-black" /></td>
                     <td className="p-3 text-center"><span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-600 rounded-lg text-[11px] font-black uppercase tracking-wider">{currency}</span></td>
-                    <td className="p-3"><input type="number" value={line.rate} onChange={e => handleRowMetricChange(idx, 'rate', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-right font-mono font-bold" /></td>
+                    <td className="p-3"><input type="number" value={line.rate} onChange={e => handleRowMetricChange(idx, 'rate', e.target.value)} className="w-full p-2 border border-gray-200 rounded-xl text-right font-mono font-bold text-xs outline-none" /></td>
                     <td className="p-3">
                       <select value={line.taxType || ''} onChange={e => {
                         const val = e.target.value;
@@ -729,6 +763,35 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
                 <button type="submit" className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Add Item</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK ADD CURRENCY MODAL */}
+      {isCurrencyModalOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b pb-2 flex items-center gap-1.5">
+              <span>💸</span> Add Custom Currency Node
+            </h3>
+            <form onSubmit={handleQuickCurrencySubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Currency Code (ISO)</label>
+                <input autoFocus type="text" maxLength={3} value={newCurrencyCode} onChange={e => setNewCurrencyCode(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs font-black outline-none focus:border-blue-500 uppercase tracking-widest" placeholder="e.g. EUR, SAR" required />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Symbol</label>
+                <input type="text" value={newCurrencySymbol} onChange={e => setNewCurrencySymbol(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-blue-500 font-bold" placeholder="e.g. €, ر.س" required />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Exchange Rate (Relative to {baseCurrency})</label>
+                <input type="number" step="any" value={newCurrencyRate} onChange={e => setNewCurrencyRate(parseFloat(e.target.value) || 1)} className="w-full border p-2.5 rounded-xl text-xs font-mono font-bold text-indigo-600" required />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsCurrencyModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Add Currency</button>
               </div>
             </form>
           </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, ShoppingBag, Printer, Loader2 } from 'lucide-react';
+import { Save, Plus, Trash2, ShoppingBag, Printer, Loader2, Globe, X } from 'lucide-react';
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, Department, Division } from '../types';
 import { supabase } from '../services/supabaseService';
 import { getCompanySettings } from '../services/settingsService';
@@ -22,6 +22,13 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
   const [currency, setCurrency] = useState<string>('PKR');
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
+
+  // ⭐ NEW ACTIVE LISTENER MULTI-CURRENCY POOL STATES
+  const [customCurrencies, setCustomCurrencies] = useState<{code: string, symbol: string, rate: number}[]>([]);
+  const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
+  const [newCurrencyCode, setNewCurrencyCode] = useState('');
+  const [newCurrencySymbol, setNewCurrencySymbol] = useState('');
+  const [newCurrencyRate, setNewCurrencyRate] = useState(1);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -61,6 +68,14 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
       setExchangeRate(1);
       return;
     }
+    
+    // Check if it exists in local custom injected states array pool first
+    const customMatch = customCurrencies.find(c => c.code === targetCurrency);
+    if (customMatch) {
+      setExchangeRate(customMatch.rate);
+      return;
+    }
+
     setIsRateFetching(true);
     try {
       const res = await fetch(`https://open.er-api.com/v6/latest/${targetCurrency}`);
@@ -73,6 +88,14 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     } finally {
       setIsRateFetching(false);
     }
+  };
+
+  const fetchCurrenciesFromCluster = async (targetId: string) => {
+    if (!targetId) return;
+    try {
+      const { data } = await supabase.from('company_currencies').select('code, symbol, exchange_rate').eq('company_id', targetId);
+      if (data) setCustomCurrencies(data.map(d => ({ code: d.code, symbol: d.symbol, rate: Number(d.exchange_rate) })));
+    } catch (e) { console.error(e); }
   };
 
   const fetchTaxes = async () => {
@@ -108,6 +131,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     if (i) setInventoryItems(i);
 
     if (targetId) {
+      fetchCurrenciesFromCluster(targetId);
       const { data: companyData } = await supabase
         .from('companies')
         .select('base_currency')
@@ -130,7 +154,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
   // ⭐ Watcher engine to fetch live metrics without breaking user loops
   useEffect(() => {
     syncLiveExchangeRate(currency, baseCurrency);
-  }, [currency, baseCurrency]);
+  }, [currency, baseCurrency, customCurrencies.length]);
 
   useEffect(() => { if (items) setInventoryItems(items); }, [items]);
 
@@ -231,6 +255,31 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
     setIsVendModalOpen(false);
   };
 
+  const handleQuickCurrencySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCurrencyCode.trim() || !activeCompanyId) return;
+
+    const formattedCode = newCurrencyCode.trim().toUpperCase();
+    const cleanSymbol = newCurrencySymbol.trim() || formattedCode;
+
+    setCustomCurrencies(prev => [...prev, { code: formattedCode, symbol: cleanSymbol, rate: newCurrencyRate }]);
+    setCurrency(formattedCode);
+    setExchangeRate(newCurrencyRate);
+
+    await supabase.from('company_currencies').upsert({
+      company_id: activeCompanyId,
+      code: formattedCode,
+      symbol: cleanSymbol,
+      exchange_rate: newCurrencyRate
+    }, { onConflict: 'company_id,code' });
+
+    setIsCurrencyModalOpen(false);
+    setNewCurrencyCode('');
+    setNewCurrencySymbol('');
+    setNewCurrencyRate(1);
+    await fetchLookups();
+  };
+
   const suppliers = ledgers.filter(l => l.group.includes('Creditors') || l.type === AccountType.LIABILITY);
   const foreignTotalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const totalAmountBasePKR = foreignTotalAmount * exchangeRate;
@@ -296,12 +345,17 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
         <div className="bg-white p-5 border border-gray-200/70 rounded-2xl shadow-xs grid grid-cols-2 gap-4">
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Billing Currency</label>
-            <select value={currency} onChange={e => { const selected = e.target.value; setCurrency(selected); if (selected === baseCurrency) setExchangeRate(1); }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
+            <select value={currency} onChange={e => { if (e.target.value === 'QUICK_ADD_CURRENCY') { setIsCurrencyModalOpen(true); } else { setCurrency(e.target.value); if (e.target.value === baseCurrency) setExchangeRate(1); } }} className="w-full p-2.5 bg-gray-50 border border-gray-200 focus:border-blue-500 rounded-xl text-xs font-black text-gray-800 shadow-xs outline-none transition-all">
               <option value={baseCurrency}>{baseCurrency} (Base)</option>
               {baseCurrency !== 'PKR' && <option value="PKR">PKR</option>}
               {baseCurrency !== 'USD' && <option value="USD">USD ($)</option>}
               {baseCurrency !== 'AED' && <option value="AED">AED (AED)</option>}
               {baseCurrency !== 'GBP' && <option value="GBP">GBP (£)</option>}
+              {customCurrencies.filter(c => c.code !== 'PKR' && c.code !== 'USD' && c.code !== 'AED' && c.code !== 'GBP' && c.code !== baseCurrency).map(c => (
+                <option key={c.code} value={c.code}>{c.code} ({c.symbol})</option>
+              ))}
+              <option disabled>────────────────────</option>
+              <option value="QUICK_ADD_CURRENCY" className="text-blue-600 font-extrabold bg-blue-50">+ Add Custom Currency</option>
             </select>
           </div>
           <div>
@@ -491,6 +545,35 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setIsProductModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
                 <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Add Item</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK ADD CURRENCY MODAL */}
+      {isCurrencyModalOpen && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs no-print-el">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4 border-b pb-2 flex items-center gap-1.5">
+              <span>💸</span> Add Custom Currency Node
+            </h3>
+            <form onSubmit={handleQuickCurrencySubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Currency Code (ISO)</label>
+                <input autoFocus type="text" maxLength={3} value={newCurrencyCode} onChange={e => setNewCurrencyCode(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs font-black outline-none focus:border-blue-500 uppercase tracking-widest" placeholder="e.g. EUR, SAR" required />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Symbol</label>
+                <input type="text" value={newCurrencySymbol} onChange={e => setNewCurrencySymbol(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none focus:border-blue-500 font-bold" placeholder="e.g. €, ر.س" required />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Exchange Rate (Relative to {baseCurrency})</label>
+                <input type="number" step="any" value={newCurrencyRate} onChange={e => setNewCurrencyRate(parseFloat(e.target.value) || 1)} className="w-full border p-2.5 rounded-xl text-xs font-mono font-bold text-blue-600" required />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsCurrencyModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Add Currency</button>
               </div>
             </form>
           </div>
