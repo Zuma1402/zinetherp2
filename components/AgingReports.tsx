@@ -13,12 +13,6 @@ export const AgingReports: React.FC<AgingReportsProps> = ({ ledgers, vouchers })
   const agingData = useMemo(() => {
     const today = new Date();
     
-    // 1. Filter ledgers based on type (ASSET/Customer for AR, LIABILITY/Vendor for AP)
-    // Note: Adjust group logic if your system uses explicit tags, otherwise we check relevant vouchers
-    const targetGroup = reportType === 'CUSTOMER' ? 'ASSET' : 'LIABILITY';
-    const relevantLedgers = ledgers.filter(l => l.group === targetGroup || l.group === 'INCOME' || l.group === 'EXPENSE'); 
-    
-    // To make it fully bulletproof, let's find ledgers that actually have Sales/Purchase activity
     const partyBalances = ledgers.map(party => {
       let totalInvoiced = 0;
       let totalCleared = 0;
@@ -36,7 +30,6 @@ export const AgingReports: React.FC<AgingReportsProps> = ({ ledgers, vouchers })
       );
 
       partyVouchers.forEach(vime => {
-        // Find entry for this party
         const entry = vime.entries.find(e => e.ledgerId === party.id);
         if (!entry) return;
 
@@ -45,11 +38,9 @@ export const AgingReports: React.FC<AgingReportsProps> = ({ ledgers, vouchers })
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         if (reportType === 'CUSTOMER') {
-          // For Customers: SALES increase receivable, RECEIPTS decrease it
           if (vime.type === VoucherType.SALES) {
             totalInvoiced += entry.debit || 0;
             
-            // Sort into buckets based on age
             if (diffDays <= 30) buckets.current += (entry.debit || 0);
             else if (diffDays <= 60) buckets.thirtyToSixty += (entry.debit || 0);
             else if (diffDays <= 90) buckets.sixtyToNinety += (entry.debit || 0);
@@ -59,7 +50,6 @@ export const AgingReports: React.FC<AgingReportsProps> = ({ ledgers, vouchers })
             totalCleared += entry.credit || 0;
           }
         } else {
-          // For Vendors: PURCHASES increase payable, PAYMENTS decrease it
           if (vime.type === VoucherType.PURCHASE) {
             totalInvoiced += entry.credit || 0;
 
@@ -76,11 +66,9 @@ export const AgingReports: React.FC<AgingReportsProps> = ({ ledgers, vouchers })
 
       const totalOutstanding = totalInvoiced - totalCleared;
 
-      // Adjust buckets proportionally if some payments have been made (FIFO approximation)
       let remainingPayment = totalCleared;
       const adjustedBuckets = { ...buckets };
 
-      // Deduct payments from oldest buckets first
       ['ninetyPlus', 'sixtyToNinety', 'thirtyToSixty', 'current'].forEach((b) => {
         const key = b as keyof typeof buckets;
         if (remainingPayment >= adjustedBuckets[key]) {
@@ -100,7 +88,7 @@ export const AgingReports: React.FC<AgingReportsProps> = ({ ledgers, vouchers })
         totalOutstanding: totalOutstanding > 0 ? totalOutstanding : 0,
         buckets: totalOutstanding > 0 ? adjustedBuckets : { current: 0, thirtyToSixty: 0, sixtyToNinety: 0, ninetyPlus: 0 }
       };
-    }).filter(p => p.totalInvoiced > 0); // Only show parties with billing history
+    }).filter(p => p.totalInvoiced > 0);
 
     return partyBalances;
   }, [ledgers, vouchers, reportType]);

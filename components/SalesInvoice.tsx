@@ -3,7 +3,7 @@ import { Save, Plus, Trash2, ShoppingCart, Link as LinkIcon, Printer, Loader2, G
 import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransaction, TrialBalanceRow, Department, Division } from '../types';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
-import { ForensicTimeline } from './ForensicTimeline'; // ⭐ REGISTERED AUDIT ENGINE LINK
+import { ForensicTimeline } from './ForensicTimeline'; // ⭐ REGISTERED AUDIT SENTINEL TIMELINE
 
 interface SalesInvoiceProps {
   ledgers: Ledger[];
@@ -79,7 +79,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
     { itemId: '', qty: 1, rate: 0, taxType: '', taxRate: 0, taxAmount: 0, amount: 0, departmentId: '', divisionId: '' }
   ]);
 
-  // 🚀 ⭐ RE-HYDRATION HOOK EFFECT ENGINE FOR HISTORICAL SALES INVOICES
+  // 🚀 ⭐ RE-HYDRATION HOOK EFFECT ENGINE FOR HISTORICAL SALES INVOICES (Pristine Integration)
   useEffect(() => {
     if (recordSnapshot) {
       setDate(recordSnapshot.date || new Date().toISOString().split('T')[0]);
@@ -88,11 +88,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       if (recordSnapshot.currency) setCurrency(recordSnapshot.currency);
       if (recordSnapshot.exchangeRate) setExchangeRate(recordSnapshot.exchangeRate);
       
-      // Map out debtor account from entries array sequence 
       const mainDebtorRow = recordSnapshot.entries.find((e: any) => e.debit > 0);
       if (mainDebtorRow) setCustomerId(mainDebtorRow.ledgerId);
 
-      // Re-hydrate multi currency rows entries tracking matching
       if (recordSnapshot.entries && recordSnapshot.entries.length > 1) {
         const salesRows = recordSnapshot.entries.filter((e: any) => e.credit > 0);
         if (salesRows.length > 0) {
@@ -381,7 +379,27 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const handleQuickCurrencySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Currency provision link context locked successfully.");
+    if (!newCurrencyCode.trim() || !activeCompanyId) return;
+
+    const formattedCode = newCurrencyCode.trim().toUpperCase();
+    const cleanSymbol = newCurrencySymbol.trim() || formattedCode;
+
+    setCustomCurrencies(prev => [...prev, { code: formattedCode, symbol: cleanSymbol, rate: newCurrencyRate }]);
+    setCurrency(formattedCode);
+    setExchangeRate(newCurrencyRate);
+
+    await supabase.from('company_currencies').upsert({
+      company_id: activeCompanyId,
+      code: formattedCode,
+      symbol: cleanSymbol,
+      exchange_rate: newCurrencyRate
+    }, { onConflict: 'company_id,code' });
+
+    setIsCurrencyModalOpen(false);
+    setNewCurrencyCode('');
+    setNewCurrencySymbol('');
+    setNewCurrencyRate(1);
+    await fetchLookups();
   };
 
   const customers = ledgers.filter(l => l.group.includes('Debtors') || l.type === AccountType.ASSET);
@@ -459,7 +477,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             {recordSnapshot ? `Edit Sales Invoice [${invoiceNo}]` : 'Create Sales Invoice'}
           </h2>
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
-            <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
+            <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
               <Printer size={14} /> Export / Print
             </button>
             <span className="text-[10px] bg-green-50 text-green-600 px-3 py-1.5 rounded-full font-black uppercase tracking-widest border border-green-100 flex items-center gap-1"><LinkIcon size={10}/>Live Sync</span>
@@ -631,6 +649,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
       {/* 📄 2. PRINT BLOCK */}
       <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
+        
         {/* Brand Header */}
         <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>
