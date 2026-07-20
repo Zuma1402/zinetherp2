@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, Department, Division } from '../types';
 import { Save, Plus, Trash2, Loader2, ClipboardPaste, Download, X } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
-import { ForensicTimeline } from './ForensicTimeline'; // ⭐ NEW ADDITION ONLY
+import { ForensicTimeline } from './ForensicTimeline';
+import { useLanguage } from '../context/LanguageContext'; // ⭐ ACTIVE LANGUAGE ENGINE
 
 interface GeneralVoucherEntryProps {
   ledgers: Ledger[];
   onSave: (voucher: Voucher) => void;
   onCancel: () => void;
-  initialData?: Voucher | null; // ⭐ NEW PROP ADDED
-  initialSnapshot?: Voucher | null; // ⭐ NEW PROP ADDED
+  initialData?: Voucher | null;
+  initialSnapshot?: Voucher | null;
 }
 
 interface RowEntry {
@@ -21,7 +22,7 @@ interface RowEntry {
 }
 
 const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSave, onCancel, initialData, initialSnapshot }) => {
-  // Resolve target incoming historical voucher snapshot token safely
+  const { t } = useLanguage(); // ⭐ ACTIVE TRANSLATION HOOK
   const recordSnapshot = initialData || initialSnapshot || null;
 
   const [voucherType, setVoucherType] = useState<VoucherType>(VoucherType.JOURNAL);
@@ -34,7 +35,6 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [exchangeRate, setExchangeRate] = useState<number>(1);
   const [isRateFetching, setIsRateFetching] = useState<boolean>(false);
 
-  // NEW ACTIVE LISTENER MULTI-CURRENCY POOL STATES
   const [customCurrencies, setCustomCurrencies] = useState<{code: string; symbol: string; rate: number}[]>([]);
   const [isCurrencyModalOpen, setIsCurrencyModalOpen] = useState(false);
   const [newCurrencyCode, setNewCurrencyCode] = useState('');
@@ -58,10 +58,8 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [activeCompanyId, setActiveCompanyId] = useState('');
 
-  // Local state refresh controller link for forensic updates
   const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
-  // 🚀 ⭐ NEW AUTOMATED CRITICAL STATE HYDRATION ENGINE ADDED ONLY
   useEffect(() => {
     if (recordSnapshot) {
       setVoucherType(recordSnapshot.type || VoucherType.JOURNAL);
@@ -104,7 +102,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       }
     } catch (err) {
       console.error(err);
-    } finally { // Fixed typo syntax here
+    } finally {
       setIsRateFetching(false);
     }
   };
@@ -283,7 +281,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const handleSubmit = () => {
     if (!isBalanced) { alert("Voucher is unbalanced."); return; }
     onSave({
-      id: recordSnapshot ? recordSnapshot.id : crypto.randomUUID(),
+      id: recordSnapshot ? (recordSnapshot.id || (recordSnapshot as any)._id) : crypto.randomUUID(),
       date,
       number: voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo,
       type: voucherType, narration: narration || `Journal Post (${currency})`,
@@ -297,12 +295,12 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
     setAuditRefreshKey(prev => prev + 1);
   };
 
-  const activeVoucherLogId = recordSnapshot ? recordSnapshot.id : '';
+  // ⭐ BULLETPROOF MULTI-FALLBACK ID RESOLVER FOR FORENSIC TIMELINE
+  const targetRecordId = recordSnapshot?.id || (recordSnapshot as any)?._id || (recordSnapshot as any)?.voucher_id || initialData?.id || initialSnapshot?.id || '';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto p-2">
       <div className="bg-white p-6 rounded-2xl border border-gray-200/60 shadow-sm">
-        {/* Fixed Header Control Block layout structure */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-black text-gray-900 tracking-tight">
@@ -313,7 +311,6 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             </span>
           </div>
           
-          {/* Always visible custom functional button sets */}
           <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-start md:justify-end">
             <button onClick={() => setShowPasteBox(!showPasteBox)} className="flex items-center gap-2 px-3 py-2 border rounded-xl font-bold text-xs bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 transition-all shadow-xs">
               <ClipboardPaste size={14} /> Paste from Excel
@@ -321,23 +318,30 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             <button onClick={exportVoucherTemplateToExcel} className="flex items-center gap-2 px-3 py-2 border rounded-xl font-bold text-xs bg-slate-50 text-slate-700 border-gray-200 hover:bg-slate-100 transition-all">
               <Download size={14} /> Download Grid Template
             </button>
-            <button onClick={onCancel} className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
-            <button onClick={handleSubmit} disabled={!isBalanced} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Save size={16} /> Save Voucher</button>
+            <button onClick={onCancel} className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors">{t('cancel')}</button>
+            <button onClick={handleSubmit} disabled={!isBalanced} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Save size={16} /> {recordSnapshot ? t('update_voucher') : t('save_voucher')}</button>
           </div>
         </div>
 
+        {/* Dynamic Multi-Language Excel Box Banner */}
         {showPasteBox && (
           <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-4 mb-6 animate-in slide-in-from-top duration-300">
             <h4 className="text-xs font-black text-orange-900 uppercase tracking-widest mb-1.5 flex items-center gap-2">
               🚀 Direct Excel Data Clipboard Engine
             </h4>
             <p className="text-[11px] text-orange-700 font-bold mb-3">
-              Excel sheet se columns copy karein: **[Account Title | Debit | Credit]** aur neeche paste kar dein:
+              {t('excel_copy_instruction')}
             </p>
-            <textarea value={clipboardData} onChange={e => setClipboardData(e.target.value)} placeholder="Excel rows ko yahan Direct Paste (Ctrl + V) maren..." rows={4} className="w-full border border-orange-200 rounded-xl p-3 text-xs font-mono outline-none bg-white focus:ring-2 ring-orange-200 text-gray-800" />
+            <textarea 
+              value={clipboardData} 
+              onChange={e => setClipboardData(e.target.value)} 
+              placeholder={t('excel_paste_placeholder')} 
+              rows={4} 
+              className="w-full border border-orange-200 rounded-xl p-3 text-xs font-mono outline-none bg-white focus:ring-2 ring-orange-200 text-gray-800" 
+            />
             <div className="flex justify-end gap-2 mt-3">
-              <button onClick={() => setShowPasteBox(false)} className="px-3 py-1.5 text-xs font-bold text-gray-500">Cancel</button>
-              <button onClick={handleExcelPasteLogic} disabled={!clipboardData.trim()} className="px-4 py-1.5 bg-orange-600 text-white font-black text-xs rounded-xl shadow-xs">Inject Excel Rows</button>
+              <button onClick={() => setShowPasteBox(false)} className="px-3 py-1.5 text-xs font-bold text-gray-500">{t('cancel')}</button>
+              <button onClick={handleExcelPasteLogic} disabled={!clipboardData.trim()} className="px-4 py-1.5 bg-orange-600 text-white font-black text-xs rounded-xl shadow-xs">{t('inject_rows')}</button>
             </div>
           </div>
         )}
@@ -458,14 +462,13 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
         </div>
       </div>
 
-      {/* ⭐ DYNAMIC LIVE AUDIT SENTINEL TIMELINE LINK INSIDE RE-HYDRATED VIEW */}
-      {activeVoucherLogId && (
+      {/* ⭐ FORENSIC TIMELINE ACTIVATION NODE */}
+      {targetRecordId ? (
         <div className="mt-6">
-          <ForensicTimeline recordId={activeVoucherLogId} refreshTrigger={auditRefreshKey} />
+          <ForensicTimeline recordId={targetRecordId} refreshTrigger={auditRefreshKey} />
         </div>
-      )}
+      ) : null}
 
-      {/* QUICK ADD CURRENCY MODAL */}
       {isCurrencyModalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
@@ -486,7 +489,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
                 <input type="number" step="any" value={newCurrencyRate} onChange={e => setNewCurrencyRate(parseFloat(e.target.value) || 1)} className="w-full border p-2.5 rounded-xl text-xs font-mono font-bold text-indigo-600" required />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsCurrencyModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button>
+                <button type="button" onClick={() => setIsCurrencyModalOpen(false)} className="px-4 py-2 text-xs font-bold text-gray-400">{t('cancel')}</button>
                 <button type="submit" className="px-5 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-md">Add Currency</button>
               </div>
             </form>
@@ -500,7 +503,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Add Department</h3>
             <form onSubmit={handleQuickDeptSubmit} className="space-y-4">
               <input autoFocus type="text" value={newDeptName} onChange={e => setNewDeptName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none" placeholder="e.g. Marketing" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDeptModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">{t('cancel')}</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
             </form>
           </div>
         </div>
@@ -512,7 +515,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
             <h3 className="text-sm font-bold text-gray-900 mb-4">Quick Add Division</h3>
             <form onSubmit={handleQuickDivSubmit} className="space-y-4">
               <input autoFocus type="text" value={newDivName} onChange={e => setNewDivName(e.target.value)} className="w-full border p-2.5 rounded-xl text-xs outline-none" placeholder="e.g. Northern Region" required />
-              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">Cancel</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
+              <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsDivModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-gray-500">{t('cancel')}</button><button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-semibold shadow-sm">Save</button></div>
             </form>
           </div>
         </div>
