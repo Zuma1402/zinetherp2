@@ -9,17 +9,7 @@ interface ForensicTimelineProps {
 }
 
 export const ForensicTimeline: React.FC<ForensicTimelineProps> = ({ recordId, refreshTrigger }) => {
-  // ⭐ NEW ADDITION ONLY: Safe Hook Context Interceptor (Bina kisi code logic ko touch kiye)
-  let t = (key: string) => key === 'forensic_audit_trail' ? 'Forensic Audit Trail' : 'No audit trail generated for this transaction yet (Legacy record entry).';
-  try {
-    const langContext = useLanguage();
-    if (langContext && langContext.t) {
-      t = langContext.t;
-    }
-  } catch (err) {
-    // Context fallback quiet mode
-  }
-
+  const { t } = useLanguage();
   const [logs, setLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
