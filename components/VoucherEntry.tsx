@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, Department, Division } from '../types';
-import { Save, Plus, Trash2, Loader2, ClipboardPaste, Download, X } from 'lucide-react';
+import { Save, Plus, Trash2, Loader2, ClipboardPaste, Download } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 import { ForensicTimeline } from './ForensicTimeline';
-import { useLanguage } from '../context/LanguageContext'; // ⭐ ACTIVE LANGUAGE ENGINE
+import { AuditService } from '../services/auditService'; // ⭐ AUDIT SERVICE LINKED
+import { useLanguage } from '../context/LanguageContext';
 
 interface GeneralVoucherEntryProps {
   ledgers: Ledger[];
@@ -22,7 +23,7 @@ interface RowEntry {
 }
 
 const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSave, onCancel, initialData, initialSnapshot }) => {
-  const { t } = useLanguage(); // ⭐ ACTIVE TRANSLATION HOOK
+  const { t } = useLanguage();
   const recordSnapshot = initialData || initialSnapshot || null;
 
   const [voucherType, setVoucherType] = useState<VoucherType>(VoucherType.JOURNAL);
@@ -116,12 +117,12 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   };
 
   const syncVoucherBaseCurrency = async () => {
-    const activeCompanyId = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
-    setActiveCompanyId(activeCompanyId);
-    if (activeCompanyId) {
+    const cid = localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || '';
+    setActiveCompanyId(cid);
+    if (cid) {
       try {
-        fetchCurrenciesFromCluster(activeCompanyId);
-        const { data } = await supabase.from('companies').select('base_currency').eq('id', activeCompanyId).maybeSingle();
+        fetchCurrenciesFromCluster(cid);
+        const { data } = await supabase.from('companies').select('base_currency').eq('id', cid).maybeSingle();
         if (data && data.base_currency) {
           setBaseCurrency(data.base_currency);
           if (!recordSnapshot) setCurrency(data.base_currency);
@@ -278,24 +279,51 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const difference = Math.abs(totalDebitForeign - totalCreditForeign);
   const isBalanced = totalDebitForeign === totalCreditForeign && totalDebitForeign > 0;
 
-  const handleSubmit = () => {
+  // ⭐ SUBMIT & AUTOMATIC FORENSIC LOG ENGINE TRIGGER
+  const handleSubmit = async () => {
     if (!isBalanced) { alert("Voucher is unbalanced."); return; }
-    onSave({
-      id: recordSnapshot ? (recordSnapshot.id || (recordSnapshot as any)._id) : crypto.randomUUID(),
+
+    const finalRecordId = recordSnapshot ? (recordSnapshot.id || (recordSnapshot as any)._id) : crypto.randomUUID();
+    const finalVoucherNo = voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo;
+
+    const voucherPayload: Voucher = {
+      id: finalRecordId,
       date,
-      number: voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo,
-      type: voucherType, narration: narration || `Journal Post (${currency})`,
+      number: finalVoucherNo,
+      type: voucherType,
+      narration: narration || `Journal Post (${currency})`,
       entries: entries.map(e => ({
-        ledgerId: e.ledgerId, debit: e.debit * exchangeRate, credit: e.credit * exchangeRate,
-        departmentId: e.departmentId || undefined, divisionId: e.divisionId || undefined
+        ledgerId: e.ledgerId,
+        debit: e.debit * exchangeRate,
+        credit: e.credit * exchangeRate,
+        departmentId: e.departmentId || undefined,
+        divisionId: e.divisionId || undefined
       })),
-      currency, exchangeRate, foreignTotal: totalDebitForeign
-    } as any);
-    
+      currency,
+      exchangeRate,
+      foreignTotal: totalDebitForeign
+    } as any;
+
+    // 1. App State / Database Persistence
+    onSave(voucherPayload);
+
+    // 2. ⭐ FORENSIC LOG WRITE
+    await AuditService.logAction({
+      companyId: activeCompanyId || 'default_company',
+      action: recordSnapshot ? 'UPDATE' : 'INSERT',
+      recordType: 'VOUCHER',
+      recordId: finalRecordId,
+      recordNumber: finalVoucherNo,
+      metaChanges: {
+        before: recordSnapshot ? { narration: recordSnapshot.narration, entries: recordSnapshot.entries } : null,
+        after: { narration: voucherPayload.narration, entries: voucherPayload.entries }
+      }
+    });
+
+    // 3. UI Auto Reload Trigger
     setAuditRefreshKey(prev => prev + 1);
   };
 
-  // ⭐ BULLETPROOF MULTI-FALLBACK ID RESOLVER FOR FORENSIC TIMELINE
   const targetRecordId = recordSnapshot?.id || (recordSnapshot as any)?._id || (recordSnapshot as any)?.voucher_id || initialData?.id || initialSnapshot?.id || '';
 
   return (
@@ -323,7 +351,6 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
           </div>
         </div>
 
-        {/* Dynamic Multi-Language Excel Box Banner */}
         {showPasteBox && (
           <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-4 mb-6 animate-in slide-in-from-top duration-300">
             <h4 className="text-xs font-black text-orange-900 uppercase tracking-widest mb-1.5 flex items-center gap-2">
@@ -346,7 +373,6 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
           </div>
         )}
 
-        {/* CONTROLS GRID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 text-xs font-bold text-gray-700">
           <div>
             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Voucher Type</label>
@@ -462,7 +488,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
         </div>
       </div>
 
-      {/* ⭐ FORENSIC TIMELINE ACTIVATION NODE */}
+      {/* ⭐ FORENSIC TIMELINE ACTIVE BOX */}
       {targetRecordId ? (
         <div className="mt-6">
           <ForensicTimeline recordId={targetRecordId} refreshTrigger={auditRefreshKey} />
