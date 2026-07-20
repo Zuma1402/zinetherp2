@@ -3,7 +3,8 @@ import { User, Role, Department, Division, Ledger, AccountType } from '../types'
 import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
-import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key } from 'lucide-react';
+import { useLanguage, Language } from '../context/LanguageContext'; // ⭐ ACTIVE LANGUAGE ENGINE
+import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key, Globe } from 'lucide-react';
 
 interface SettingsProps {
   currentUser: User;
@@ -20,6 +21,8 @@ const Settings: React.FC<SettingsProps> = ({
   onCompanyCreated,
   activeCompanyId: propCompanyId
 }) => {
+  const { language, setLanguage } = useLanguage(); // ⭐ ACTIVE TRANSLATION HOOK
+
   // Profile State
   const [name, setName] = useState(currentUser.name);
   const [password, setPassword] = useState(currentUser.password);
@@ -62,10 +65,8 @@ const Settings: React.FC<SettingsProps> = ({
   const [newCorpPrefix, setNewCorpPrefix] = useState('INV-');
   const [newCorpNextNumber, setNewCorpNextNumber] = useState(1);
   
-  // New Base Currency Settle State Field Variable
   const [newCorpBaseCurrency, setNewCorpBaseCurrency] = useState('PKR');
 
-  // ⭐ NEW MODULE TOGGLE STATES (Pristine Additions)
   const [newCorpEcomEnabled, setNewCorpEcomEnabled] = useState(true);
   const [activeCorpEcomEnabled, setActiveCorpEcomEnabled] = useState(false);
 
@@ -94,14 +95,10 @@ const Settings: React.FC<SettingsProps> = ({
   const activeSelectionObj = allDbCompanies.find(c => c.id === localActiveId);
   const activeSelectionNameClean = activeSelectionObj ? activeSelectionObj.name.toLowerCase().replace(/\s+/g, '') : '';
   
-  // SECURITY HIERARCHY DEFINITION
   const isSuperAdminRoot = currentUser.role === 'ADMIN' && !currentUser.company_id;
-  
-  // ✅ FIX: Force Super Admin power for handle '@zaid' to prevent dropdown context locking out Multi-Tenant tools
   const isMasterZenithScope = currentUser.username.toLowerCase() === 'zaid' || (isSuperAdminRoot && 
     (!localActiveId || localActiveId === '' || activeSelectionNameClean === 'zinetherp' || (masterCompanyRow && localActiveId === masterCompanyRow.id) || localActiveId === '11111111-1111-1111-1111-111111111111'));
 
-  // Fetch lookups matrix lists for ledgers mapping control room
   const fetchLedgerMappingData = async (companyId: string) => {
     if (!companyId) return;
     try {
@@ -141,7 +138,6 @@ const Settings: React.FC<SettingsProps> = ({
         
       if (compProfile) {
         if (compProfile.base_currency) setActiveCompanyBaseCurrency(compProfile.base_currency);
-        // Sync active workspace view module arrays
         const modules = compProfile.enabled_modules || ['core_accounting'];
         setActiveCorpEcomEnabled(modules.includes('ecommerce_reconciliation'));
       } else {
@@ -228,7 +224,6 @@ const Settings: React.FC<SettingsProps> = ({
           nextInvoiceNumber: Number(nextInvoiceNumber)
       });
 
-      // Update current active workspace enabled modules array toggle settings
       if (localActiveId) {
         const updatedModules = ['core_accounting'];
         if (activeCorpEcomEnabled) updatedModules.push('ecommerce_reconciliation');
@@ -341,7 +336,6 @@ const Settings: React.FC<SettingsProps> = ({
         return;
       }
 
-      // Setup dynamic enabling module strings array list
       const modulesArray = ['core_accounting'];
       if (newCorpEcomEnabled) modulesArray.push('ecommerce_reconciliation');
 
@@ -350,7 +344,7 @@ const Settings: React.FC<SettingsProps> = ({
         id: companyId, 
         name: targetNameClean,
         base_currency: newCorpBaseCurrency,
-        enabled_modules: modulesArray // Save modules
+        enabled_modules: modulesArray 
       }]);
       if (companyError) throw companyError;
 
@@ -469,24 +463,44 @@ const Settings: React.FC<SettingsProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* PROFILE BLOCK */}
-        <div className="bg-white p-6 border border-gray-200 rounded-2xl shadow-xs space-y-4 h-fit">
-          <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-3">
-            <UserIcon size={16} className="text-indigo-600" /> User Profile Node
-          </h2>
-          <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Full Signature Name</label>
-              <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-xs font-bold bg-gray-50 outline-none" required />
+        {/* PROFILE & LANGUAGE SELECTION BLOCK */}
+        <div className="bg-white p-6 border border-gray-200 rounded-2xl shadow-xs space-y-6 h-fit">
+          <div>
+            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-3 mb-4">
+              <UserIcon size={16} className="text-indigo-600" /> User Profile Node
+            </h2>
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Full Signature Name</label>
+                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-xs font-bold bg-gray-50 outline-none" required />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Access Authorization Key</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-xs font-bold bg-gray-50 outline-none" required />
+              </div>
+              <button type="submit" className="w-full bg-indigo-600 text-white font-bold text-xs py-2 rounded-lg hover:bg-indigo-700 shadow-sm flex items-center justify-center gap-1.5 uppercase tracking-wider">
+                <Save size={13} /> Update Profile
+              </button>
+            </form>
+          </div>
+
+          {/* ⭐ SYSTEM MULTI-LANGUAGE PREFERENCE SELECTOR (Pristine Addition) */}
+          <div className="pt-4 border-t border-gray-100 space-y-3">
+            <div className="flex items-center gap-2">
+              <Globe size={16} className="text-indigo-600" />
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">Interface Language</h3>
             </div>
-            <div>
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Access Authorization Key</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-xs font-bold bg-gray-50 outline-none" required />
-            </div>
-            <button type="submit" className="w-full bg-indigo-600 text-white font-bold text-xs py-2 rounded-lg hover:bg-indigo-700 shadow-sm flex items-center justify-center gap-1.5 uppercase tracking-wider">
-              <Save size={13} /> Update Profile
-            </button>
-          </form>
+            <p className="text-[11px] text-gray-400 font-medium">Select preferred operational system language:</p>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as Language)}
+              className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500 shadow-xs"
+            >
+              <option value="en">English (Corporate Standard)</option>
+              <option value="roman_ur">Roman Urdu (Urdu in English Script)</option>
+              <option value="ur">اردو (Urdu Standard)</option>
+            </select>
+          </div>
         </div>
 
         {/* ISOLATED CONFIGURATIONS LAYER */}
@@ -535,7 +549,6 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* LIVE TENANT PROFILE LEVEL CAPABILITIES TOGGLE PANEL */}
               {currentUser.role === 'ADMIN' && (
                 <div className="p-4 border rounded-xl bg-indigo-50/20 border-indigo-100 space-y-2">
                   <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Active Workspace Capability Enforcements</h4>
@@ -609,7 +622,6 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
-              {/* COMPACT ONBOARDING MATRIX MODULE SELECTION CHECKBOX */}
               <div className="p-4 bg-indigo-950/40 border border-indigo-500/20 rounded-xl space-y-3">
                 <h4 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Ecosystem Capabilities Allocations Configuration</h4>
                 <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer">
@@ -734,7 +746,6 @@ const Settings: React.FC<SettingsProps> = ({
             )}
           </div>
 
-          {/* Inline Tenant Staff Form */}
           {isAddingTenantStaff && !isMasterZenithScope && (
             <form onSubmit={handleTenantAddStaffOnly} className="bg-slate-50 p-5 border border-slate-200 rounded-xl mb-6 space-y-4 shadow-inner">
               <h4 className="text-xs font-bold text-gray-700 uppercase">Lock New Employee Account into "{companyName}" Workspace</h4>
