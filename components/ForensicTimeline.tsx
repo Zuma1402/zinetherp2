@@ -1,26 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { AuditService } from '../services/auditService';
 import { ShieldCheck, User, Clock, AlertCircle, RefreshCw } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext'; // ⭐ ACTIVE LANGUAGE ENGINE
+import { useLanguage } from '../context/LanguageContext';
 
 interface ForensicTimelineProps {
   recordId: string;
-  refreshTrigger?: any;
+  refreshTrigger?: unknown;
 }
 
 export const ForensicTimeline: React.FC<ForensicTimelineProps> = ({ recordId, refreshTrigger }) => {
-  const { t } = useLanguage(); // ⭐ ACTIVE TRANSLATION HOOK
+  const { t } = useLanguage();
   const [logs, setLogs] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const loadHistory = async () => {
     if (!recordId) return;
     setIsLoading(true);
     try {
       const history = await AuditService.getRecordHistory(recordId);
-      setLogs(history);
+      setLogs(history || []);
     } catch (err) {
-      console.error(err);
+      console.error("Forensic log read error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -40,7 +40,9 @@ export const ForensicTimeline: React.FC<ForensicTimelineProps> = ({ recordId, re
             <ShieldCheck size={18} />
           </div>
           <div>
-            <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">{t('forensic_audit_trail')}</h4>
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">
+              {t('forensic_audit_trail')}
+            </h4>
             <p className="text-[10px] text-gray-400 font-bold">INTERNAL ACCOUNTING SENTINEL ACTIVE</p>
           </div>
         </div>
@@ -66,17 +68,19 @@ export const ForensicTimeline: React.FC<ForensicTimelineProps> = ({ recordId, re
       ) : (
         <div className="relative border-l-2 border-gray-100 pl-5 ml-2.5 space-y-6">
           {logs.map((log) => {
-            const dateStr = new Date(log.created_at).toLocaleString('en-PK', {
-              dateStyle: 'medium',
-              timeStyle: 'short'
-            });
+            const dateStr = log.created_at 
+              ? new Date(log.created_at).toLocaleString('en-US', {
+                  dateStyle: 'medium',
+                  timeStyle: 'short'
+                })
+              : '';
 
             let actionBadgeColor = 'bg-blue-50 text-blue-700 border-blue-100';
             if (log.action === 'INSERT') actionBadgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-100';
             if (log.action === 'DELETE') actionBadgeColor = 'bg-rose-50 text-rose-700 border-rose-100';
 
             return (
-              <div key={log.id} className="relative group animate-in slide-in-from-left duration-200">
+              <div key={log.id || Math.random()} className="relative group animate-in slide-in-from-left duration-200">
                 <div className={`absolute -left-[27px] top-0.5 w-3 h-3 rounded-full border-2 border-white ring-4 ${log.action === 'UPDATE' ? 'bg-amber-400 ring-amber-50' : log.action === 'INSERT' ? 'bg-emerald-500 ring-emerald-50' : 'bg-rose-500 ring-rose-50'}`}></div>
                 
                 <div className="space-y-1.5 text-xs">
@@ -86,12 +90,14 @@ export const ForensicTimeline: React.FC<ForensicTimelineProps> = ({ recordId, re
                     </span>
                     <div className="flex items-center gap-1 font-black text-gray-800">
                       <User size={12} className="text-gray-400" />
-                      <span>@{log.username}</span>
+                      <span>@{log.username || 'system'}</span>
                     </div>
-                    <div className="flex items-center gap-1 font-bold text-gray-400 font-mono text-[10px] ml-auto">
-                      <Clock size={11} />
-                      <span>{dateStr}</span>
-                    </div>
+                    {dateStr && (
+                      <div className="flex items-center gap-1 font-bold text-gray-400 font-mono text-[10px] ml-auto">
+                        <Clock size={11} />
+                        <span>{dateStr}</span>
+                      </div>
+                    )}
                   </div>
 
                   {log.meta_changes && (
