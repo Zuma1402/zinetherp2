@@ -88,22 +88,22 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       if (recordSnapshot.currency) setCurrency(recordSnapshot.currency);
       if (recordSnapshot.exchangeRate) setExchangeRate(recordSnapshot.exchangeRate);
       
-      const mainDebtorRow = recordSnapshot.entries.find((e: any) => e.debit > 0);
-      if (mainDebtorRow) setCustomerId(mainDebtorRow.ledgerId);
+      const mainDebtorRow = recordSnapshot.entries?.find((e: any) => e.debit > 0);
+      if (mainDebtorRow) setCustomerId(mainDebtorRow.ledgerId || mainDebtorRow.ledger_id || '');
 
       if (recordSnapshot.entries && recordSnapshot.entries.length > 1) {
         const salesRows = recordSnapshot.entries.filter((e: any) => e.credit > 0);
         if (salesRows.length > 0) {
           setLineItems(salesRows.map((s: any) => ({
-            itemId: s.itemId || '',
+            itemId: s.itemId || s.item_id || '',
             qty: s.qty ? Math.abs(s.qty) : 1,
-            rate: s.foreignTotal ? (s.foreignTotal / (s.qty || 1)) : (s.credit / (recordSnapshot.exchangeRate || 1)),
+            rate: s.rate ? Number(s.rate) : (s.foreignTotal ? (s.foreignTotal / (s.qty || 1)) : (s.credit / (recordSnapshot.exchangeRate || 1))),
             taxType: s.taxType || '',
             taxRate: s.taxRate || 0,
             taxAmount: s.taxAmount || 0,
-            amount: s.foreignTotal || (s.credit / (recordSnapshot.exchangeRate || 1)),
-            departmentId: s.departmentId || '',
-            divisionId: s.divisionId || ''
+            amount: s.amount ? Number(s.amount) : (s.foreignTotal ? s.foreignTotal : (s.credit / (recordSnapshot.exchangeRate || 1))),
+            departmentId: s.departmentId || s.department_id || '',
+            divisionId: s.divisionId || s.division_id || ''
           })));
         }
       }
@@ -454,7 +454,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   return (
     <div className="max-w-7xl mx-auto">
-      
       <style>{`
         @media print {
           @page {
@@ -477,7 +476,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             {recordSnapshot ? `Edit Sales Invoice [${invoiceNo}]` : 'Create Sales Invoice'}
           </h2>
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
-            <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
+            <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
               <Printer size={14} /> Export / Print
             </button>
             <span className="text-[10px] bg-green-50 text-green-600 px-3 py-1.5 rounded-full font-black uppercase tracking-widest border border-green-100 flex items-center gap-1"><LinkIcon size={10}/>Live Sync</span>
@@ -560,14 +559,14 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                       </select>
                     </td>
                     <td className="p-3">
-                      <select value={line.departmentId} onChange={e => handleRowMetricChange(idx, 'departmentId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-indigo-500">
+                      <select value={line.departmentId || ''} onChange={e => handleRowMetricChange(idx, 'departmentId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-indigo-500">
                         <option value="">Global / Unallocated</option>
                         {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         <option value="QUICK_ADD_ROW_DEPT" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Department</option>
                       </select>
                     </td>
                     <td className="p-3">
-                      <select value={line.divisionId} onChange={e => handleRowMetricChange(idx, 'divisionId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-indigo-500">
+                      <select value={line.divisionId || ''} onChange={e => handleRowMetricChange(idx, 'divisionId', e.target.value)} className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-indigo-500">
                         <option value="">Whole Strategy</option>
                         {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Division</option>
@@ -601,7 +600,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
                     <td className="p-3"><input type="number" value={line.taxRate} onChange={e => handleRowMetricChange(idx, 'taxRate', parseFloat(e.target.value) || 0)} className="w-full p-2 border border-gray-200 rounded-xl text-center" /></td>
                     <td className="p-3"><input type="text" readOnly value={line.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })} className="w-full p-2 bg-slate-50 border rounded-xl text-right" /></td>
                     <td className="p-3 text-right font-mono pr-6 text-xs flex items-center justify-end gap-3 h-[52px]">
-                      <span>{line.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span>{(Number(line.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                       <button onClick={() => setLineItems(lineItems.filter((_, i) => i !== idx))} disabled={lineItems.length === 1} className="text-gray-300 hover:text-rose-500 transition-colors disabled:opacity-30"><Trash2 size={14}/></button>
                     </td>
                   </tr>
@@ -640,7 +639,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
         </div>
       </div>
 
-      {/* ⭐ LIVE AUDIT SENTINEL TIMELINE LINK */}
+      {/* ⭐ LIVE AUDIT SENTINEL TIMELINE LINK INJECTED SAFELY */}
       {recordSnapshot && (
         <div className="mt-6 print:hidden">
           <ForensicTimeline recordId={recordSnapshot.id} />
@@ -649,7 +648,6 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
       {/* 📄 2. PRINT BLOCK */}
       <div className="hidden print:block printable-invoice-canvas bg-white p-2 space-y-6 text-black font-sans" style={{ color: '#000000', backgroundColor: '#ffffff' }}>
-        
         {/* Brand Header */}
         <div className="flex justify-between items-start border-b-2 border-black pb-6">
           <div>

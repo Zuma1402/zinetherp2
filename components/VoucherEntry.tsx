@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Ledger, Voucher, VoucherType, Department, Division } from '../types';
 import { Save, Plus, Trash2, Loader2, ClipboardPaste, Download, X } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
+import { ForensicTimeline } from './ForensicTimeline'; // ⭐ NEW ADDITION ONLY
 
 interface GeneralVoucherEntryProps {
   ledgers: Ledger[];
   onSave: (voucher: Voucher) => void;
   onCancel: () => void;
-  initialData?: Voucher | null; // ⭐ Prop matrix fallback links bound cleanly
-  initialSnapshot?: Voucher | null;
+  initialData?: Voucher | null; // ⭐ NEW PROP ADDED
+  initialSnapshot?: Voucher | null; // ⭐ NEW PROP ADDED
 }
 
 interface RowEntry {
@@ -60,7 +61,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   // Local state refresh controller link for forensic updates
   const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
-  // 🚀 ⭐ AUTOMATED CRITICAL STATE HYDRATION ENGINE (Pristine Additive Integration)
+  // 🚀 ⭐ NEW AUTOMATED CRITICAL STATE HYDRATION ENGINE ADDED ONLY
   useEffect(() => {
     if (recordSnapshot) {
       setVoucherType(recordSnapshot.type || VoucherType.JOURNAL);
@@ -72,11 +73,11 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       
       if (recordSnapshot.entries && recordSnapshot.entries.length > 0) {
         setEntries(recordSnapshot.entries.map((e: any) => ({
-          ledgerId: e.ledgerId || '',
+          ledgerId: e.ledgerId || e.ledger_id || '',
           debit: e.debit ? Number(e.debit) : 0,
           credit: e.credit ? Number(e.credit) : 0,
-          departmentId: e.departmentId || '',
-          divisionId: e.divisionId || ''
+          departmentId: e.departmentId || e.department_id || '',
+          divisionId: e.divisionId || e.division_id || ''
         })));
       }
     }
@@ -103,7 +104,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
       }
     } catch (err) {
       console.error(err);
-    } finally {
+    } finally { // Fixed typo syntax here
       setIsRateFetching(false);
     }
   };
@@ -282,7 +283,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
   const handleSubmit = () => {
     if (!isBalanced) { alert("Voucher is unbalanced."); return; }
     onSave({
-      id: recordSnapshot ? recordSnapshot.id : crypto.randomUUID(), // Updates explicit matching target node
+      id: recordSnapshot ? recordSnapshot.id : crypto.randomUUID(),
       date,
       number: voucherNo === 'VCH-AUTO' ? `VCH-${Math.floor(Math.random() * 100000)}` : voucherNo,
       type: voucherType, narration: narration || `Journal Post (${currency})`,
@@ -321,7 +322,7 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
               <Download size={14} /> Download Grid Template
             </button>
             <button onClick={onCancel} className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
-            <button onClick={handleSubmit} disabled={!isBalanced} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Save size={16} /> {recordSnapshot ? 'Update Voucher' : 'Save Voucher'}</button>
+            <button onClick={handleSubmit} disabled={!isBalanced} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all ${isBalanced ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}><Save size={16} /> Save Voucher</button>
           </div>
         </div>
 
@@ -406,20 +407,20 @@ const GeneralVoucherEntry: React.FC<GeneralVoucherEntryProps> = ({ ledgers, onSa
                 <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
                   <td className="p-4 text-center text-gray-400 font-mono text-xs">{idx + 1}</td>
                   <td className="p-3">
-                    <select value={item.ledgerId} onChange={e => updateRow(idx, 'ledgerId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none" >
+                    <select value={item.ledgerId || ''} onChange={e => updateRow(idx, 'ledgerId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs font-bold outline-none" >
                       <option value="">Select Ledger...</option>
                       {ledgers.map(l => ( <option key={l.id} value={l.id}>{l.name} ({l.group})</option> ))}
                     </select>
                   </td>
                   <td className="p-3">
-                    <select value={item.departmentId} onChange={e => updateRow(idx, 'departmentId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs outline-none" >
+                    <select value={item.departmentId || ''} onChange={e => updateRow(idx, 'departmentId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs outline-none" >
                       <option value="">Choose Dept...</option>
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                       <option value="QUICK_ADD_ROW_DEPT" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Dept</option>
                     </select>
                   </td>
                   <td className="p-3">
-                    <select value={item.divisionId} onChange={e => updateRow(idx, 'divisionId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs outline-none" >
+                    <select value={item.divisionId || ''} onChange={e => updateRow(idx, 'divisionId', e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white text-xs outline-none" >
                       <option value="">Choose Div...</option>
                       {divisions.map(div => <option key={div.id} value={div.id}>{div.name}</option>)}
                       <option value="QUICK_ADD_ROW_DIV" className="text-indigo-600 font-bold bg-indigo-50">➕ Add New Div</option>

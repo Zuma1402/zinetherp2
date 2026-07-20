@@ -76,7 +76,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
       if (recordSnapshot.currency) setCurrency(recordSnapshot.currency);
       if (recordSnapshot.exchangeRate) setExchangeRate(recordSnapshot.exchangeRate);
 
-      const mainCreditorRow = recordSnapshot.entries.find((e: any) => e.credit > 0);
+      const mainCreditorRow = recordSnapshot.entries?.find((e: any) => e.credit > 0);
       if (mainCreditorRow) setSupplierId(mainCreditorRow.ledgerId);
     }
   }, [recordSnapshot]);
@@ -362,7 +362,7 @@ const PurchaseInvoice: React.FC<PurchaseInvoiceProps> = ({ ledgers, items, onSav
           </div>
           <div>
             <label className="block text-[10px] font-black text-blue-900/40 uppercase tracking-[0.2em] mb-1.5">Post Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2.5 border border-blue-100 rounded-xl bg-white font-bold text-xs shadow-xs" />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl bg-white font-bold text-xs shadow-xs" />
           </div>
         </div>
 
