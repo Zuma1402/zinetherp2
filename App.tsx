@@ -620,9 +620,12 @@ const App: React.FC = () => {
                 {currentView === 'PURCHASE' && (
                   <TransactionManager title="Purchase Bills" type={VoucherType.PURCHASE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseInvoice} formProps={{ ledgers, items: inventoryItems, onAddLedger: handleAddLedger, trialBalance }} />
                 )}
+                
+                {/* ⭐ TYPO FIXED HERE: Changed 'fontProps' -> 'formProps' */}
                 {currentView === 'PURCHASE_RETURN' && (
-                  <TransactionManager title="Purchase Returns" type={VoucherType.DEBIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseReturn} fontProps={{ ledgers, items: inventoryItems, trialBalance }} />
+                  <TransactionManager title="Purchase Returns" type={VoucherType.DEBIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseReturn} formProps={{ ledgers, items: inventoryItems, trialBalance }} />
                 )}
+                
                 {currentView === 'MAKE_PAYMENT' && (
                   <TransactionManager title="Payments to Vendors" type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={MakePaymentEntry} formProps={{ ledgers, trialBalance }} />
                 )}
