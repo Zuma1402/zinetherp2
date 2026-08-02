@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Mail, Send, X, CheckCircle2, Loader2 } from 'lucide-react';
+import { Mail, Send, X, CheckCircle2, Loader2, Download } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
-import emailjs from '@emailjs/browser';
 
 interface EmailModalProps {
   recipientEmail?: string;
@@ -37,53 +36,38 @@ export const EmailModal: React.FC<EmailModalProps> = ({
     setIsSending(true);
 
     try {
-      // 1. Convert Invoice HTML to Base64 PDF Attachment
+      // 1. Silent PDF Generation & Download
       const element = document.getElementById('printable-invoice');
-      if (!element) throw new Error('Invoice element not found');
+      if (element) {
+        const opt = {
+          margin: 0.5,
+          filename: `${documentNumber}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        await html2pdf().set(opt).from(element).save();
+      }
 
-      const opt = {
-        margin: 0.5,
-        filename: `${documentNumber}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-      };
+      // 2. Open Gmail Web Compose with pre-filled text
+      const subject = `${documentTitle} #${documentNumber} - ${documentDetails.customerName}`;
+      const body = `${customMessage}\n\n--- Document Summary ---\nInvoice #: ${documentNumber}\nDate: ${documentDetails.date}\nNet Payable: ${documentDetails.currency || 'PKR'} ${documentDetails.amount.toLocaleString()}\n\n[Invoice PDF (${documentNumber}.pdf) has been saved to your downloads folder. Please attach it to complete send.]`;
 
-      // Generate PDF data string
-      const pdfBase64 = await html2pdf().set(opt).from(element).outputPdf('datauristring');
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+        email
+      )}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-      // 2. Direct Background Dispatch via EmailJS / Webhook
-      // Replace with your EmailJS credentials or standard API endpoint
-      const templateParams = {
-        to_email: email,
-        subject: `${documentTitle} #${documentNumber} - ${documentDetails.customerName}`,
-        message: customMessage,
-        content_attachment: pdfBase64
-      };
-
-      // Direct Silent Dispatch
-      await emailjs.send(
-        'YOUR_SERVICE_ID', // Replace with your Service ID
-        'YOUR_TEMPLATE_ID', // Replace with your Template ID
-        templateParams,
-        'YOUR_PUBLIC_KEY'   // Replace with your Public Key
-      );
+      window.open(gmailUrl, '_blank');
 
       setIsSending(false);
       setIsSent(true);
       setTimeout(() => {
         onClose();
-      }, 2000);
+      }, 1500);
     } catch (error) {
-      console.error('Direct PDF dispatch error:', error);
+      console.error('Email action failed', error);
       setIsSending(false);
-      
-      // Fallback: If EmailJS API is not configured, download PDF directly for fast manual attach
-      alert('Email API keys required for direct background send. Downloading PDF now...');
-      const element = document.getElementById('printable-invoice');
-      if (element) {
-        html2pdf().from(element).save(`${documentNumber}.pdf`);
-      }
+      onClose();
     }
   };
 
@@ -96,7 +80,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
               <Mail size={16} />
             </span>
             <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">
-              1-Click Direct Email Dispatch
+              Send Invoice via Gmail
             </h3>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -107,8 +91,8 @@ export const EmailModal: React.FC<EmailModalProps> = ({
         {isSent ? (
           <div className="py-8 text-center space-y-2">
             <CheckCircle2 size={48} className="text-emerald-500 mx-auto animate-bounce" />
-            <h4 className="text-base font-black text-gray-900">Email Dispatched Successfully!</h4>
-            <p className="text-xs text-gray-400 font-bold">Invoice PDF delivered directly to client inbox.</p>
+            <h4 className="text-base font-black text-gray-900">PDF Downloaded & Gmail Ready!</h4>
+            <p className="text-xs text-gray-400 font-bold">Attach the downloaded PDF in your Gmail compose tab.</p>
           </div>
         ) : (
           <form onSubmit={handleSendEmail} className="space-y-4 mt-4">
@@ -128,7 +112,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
 
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                Email Message Body
+                Email Content
               </label>
               <textarea
                 rows={4}
@@ -136,6 +120,13 @@ export const EmailModal: React.FC<EmailModalProps> = ({
                 onChange={(e) => setCustomMessage(e.target.value)}
                 className="w-full p-3 border border-gray-200 rounded-xl text-xs font-medium bg-gray-50 outline-none focus:border-indigo-500"
               />
+            </div>
+
+            <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 text-[11px] font-bold text-indigo-900 space-y-1">
+              <div className="flex items-center gap-1.5">
+                <Download size={14} className="text-indigo-600" />
+                <span>PDF will download & Gmail compose window will open automatically.</span>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -152,7 +143,7 @@ export const EmailModal: React.FC<EmailModalProps> = ({
                 className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-2 uppercase tracking-wider"
               >
                 {isSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                Send Direct Email
+                Download & Compose Email
               </button>
             </div>
           </form>
