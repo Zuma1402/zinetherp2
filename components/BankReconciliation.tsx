@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Ledger, Voucher, VoucherType } from '../types';
-import { Upload, CheckCircle2, AlertCircle, PlusCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Upload, CheckCircle2, AlertCircle, PlusCircle, ShieldCheck, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface BankReconciliationProps {
   ledgers: Ledger[];
@@ -26,38 +27,14 @@ export const BankReconciliation: React.FC<BankReconciliationProps> = ({
   const [pastedData, setPastedData] = useState('');
   const [parsedBankRows, setParsedBankRows] = useState<BankStatementRow[]>([]);
   const [showPasteBox, setShowPasteBox] = useState(true);
+  const [fileName, setFileName] = useState('');
 
   const bankLedgers = ledgers.filter(
     (l) => l.group.toLowerCase().includes('bank') || l.name.toLowerCase().includes('bank')
   );
 
-  // Parse Excel / CSV Copy-Paste Data
-  const handleParseBankStatement = () => {
-    if (!pastedData.trim()) return;
-
-    const lines = pastedData.split('\n');
-    const rows: BankStatementRow[] = [];
-
-    lines.forEach((line) => {
-      if (!line.trim()) return;
-      const cells = line.split('\t');
-
-      // Standard Columns: Date | Description | Debit | Credit
-      const date = cells[0]?.trim() || new Date().toISOString().split('T')[0];
-      const description = cells[1]?.trim() || 'Bank Entry';
-      const debit = parseFloat(cells[2]?.replace(/,/g, '')) || 0;
-      const credit = parseFloat(cells[3]?.replace(/,/g, '')) || 0;
-
-      rows.push({
-        date,
-        description,
-        debit,
-        credit,
-        status: 'UNMATCHED',
-      });
-    });
-
-    // Smart Auto-Matching Engine
+  // Helper function to run Auto-Matching Engine
+  const processRowsAndMatch = (rows: BankStatementRow[]) => {
     const erpBankVouchers = vouchers.filter((v) =>
       v.entries?.some((e) => e.ledgerId === selectedBankId)
     );
@@ -67,7 +44,6 @@ export const BankReconciliation: React.FC<BankReconciliationProps> = ({
         const erpDebit = v.entries?.reduce((sum, e) => sum + (e.ledgerId === selectedBankId ? e.debit || 0 : 0), 0);
         const erpCredit = v.entries?.reduce((sum, e) => sum + (e.ledgerId === selectedBankId ? e.credit || 0 : 0), 0);
 
-        // Bank Debit = ERP Credit (Withdrawal) & Bank Credit = ERP Debit (Deposit)
         return (
           (bankRow.debit > 0 && Math.abs(bankRow.debit - erpCredit) < 1) ||
           (bankRow.credit > 0 && Math.abs(bankRow.credit - erpDebit) < 1)
@@ -84,12 +60,73 @@ export const BankReconciliation: React.FC<BankReconciliationProps> = ({
     setShowPasteBox(false);
   };
 
-  // Quick Inject Missing Bank Charges / Income into ERP
+  // Direct Excel / CSV File Upload Handler
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name);
+    const reader = new FileReader();
+
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+
+      // Convert sheet to JSON rows
+      const data: any[] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      const rows: BankStatementRow[] = [];
+
+      data.forEach((row, idx) => {
+        if (idx === 0 && (typeof row[0] === 'string' && row[0].toLowerCase().includes('date'))) return; // Skip Header
+
+        if (row.length > 0) {
+          const date = row[0] ? String(row[0]).trim() : new Date().toISOString().split('T')[0];
+          const description = row[1] ? String(row[1]).trim() : 'Bank Entry';
+          const debit = parseFloat(String(row[2] || 0).replace(/,/g, '')) || 0;
+          const credit = parseFloat(String(row[3] || 0).replace(/,/g, '')) || 0;
+
+          if (debit > 0 || credit > 0) {
+            rows.push({ date, description, debit, credit, status: 'UNMATCHED' });
+          }
+        }
+      });
+
+      processRowsAndMatch(rows);
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  // Textarea Paste Handler
+  const handleParseBankStatement = () => {
+    if (!pastedData.trim()) return;
+
+    const lines = pastedData.split('\n');
+    const rows: BankStatementRow[] = [];
+
+    lines.forEach((line) => {
+      if (!line.trim()) return;
+      const cells = line.split('\t');
+
+      const date = cells[0]?.trim() || new Date().toISOString().split('T')[0];
+      const description = cells[1]?.trim() || 'Bank Entry';
+      const debit = parseFloat(cells[2]?.replace(/,/g, '')) || 0;
+      const credit = parseFloat(cells[3]?.replace(/,/g, '')) || 0;
+
+      rows.push({ date, description, debit, credit, status: 'UNMATCHED' });
+    });
+
+    processRowsAndMatch(rows);
+  };
+
   const handleQuickInject = (row: BankStatementRow) => {
     if (!selectedBankId) return alert('Select Bank Ledger first.');
 
     const newVoucherId = crypto.randomUUID();
-    const isDebit = row.debit > 0; // Bank Debit = Expense / Charge for ERP
+    const isDebit = row.debit > 0;
 
     const voucherPayload: Voucher = {
       id: newVoucherId,
@@ -110,7 +147,6 @@ export const BankReconciliation: React.FC<BankReconciliationProps> = ({
 
     onSaveVoucher(voucherPayload);
 
-    // Update UI Status
     setParsedBankRows((prev) =>
       prev.map((r) => (r === row ? { ...r, status: 'MATCHED', matchedVoucherId: newVoucherId } : r))
     );
@@ -148,30 +184,55 @@ export const BankReconciliation: React.FC<BankReconciliationProps> = ({
         </div>
       </div>
 
-      {/* Paste Engine Box */}
+      {/* Upload & Paste Engine Box */}
       {showPasteBox ? (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl p-6 shadow-sm">
-          <h3 className="text-xs font-black text-indigo-950 uppercase tracking-widest mb-2 flex items-center gap-2">
-            <Upload size={16} /> Direct Bank Statement Paste Engine
-          </h3>
-          <p className="text-xs text-indigo-700 font-bold mb-3">
-            Copy columns from Excel/Bank CSV: **[Date | Description | Debit | Credit]** and paste below:
-          </p>
-          <textarea
-            rows={5}
-            value={pastedData}
-            onChange={(e) => setPastedData(e.target.value)}
-            placeholder="Paste Bank Statement rows directly here (Ctrl + V)..."
-            className="w-full p-4 border border-blue-200 rounded-2xl text-xs font-mono bg-white outline-none focus:ring-2 ring-indigo-200 text-gray-800"
-          />
-          <div className="flex justify-end gap-3 mt-4">
-            <button
-              onClick={handleParseBankStatement}
-              disabled={!selectedBankId || !pastedData.trim()}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-md disabled:bg-gray-200 uppercase tracking-wider"
-            >
-              Analyze & Reconcile
-            </button>
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-3xl p-6 shadow-sm space-y-6">
+          
+          {/* File Upload Zone */}
+          <div className="bg-white border-2 border-dashed border-indigo-300 rounded-2xl p-6 text-center hover:border-indigo-500 transition-all">
+            <FileSpreadsheet size={36} className="mx-auto text-indigo-600 mb-2" />
+            <h4 className="text-sm font-black text-gray-800">Upload Bank Statement File (.xlsx, .xls, .csv)</h4>
+            <p className="text-xs text-gray-400 font-medium mt-1">Columns required: Date | Description | Debit | Credit</p>
+            
+            <label className={`mt-4 inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black text-white uppercase tracking-wider cursor-pointer shadow-md ${selectedBankId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-300 cursor-not-allowed'}`}>
+              <Upload size={14} /> {fileName ? fileName : 'Choose File'}
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                disabled={!selectedBankId}
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+            {!selectedBankId && (
+              <p className="text-[11px] text-rose-500 font-bold mt-2">⚠️ Please select a Bank Account first</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex-1 h-px bg-blue-200"></div>
+            <span className="text-xs font-bold text-gray-400 uppercase">OR PASTE DIRECTLY</span>
+            <div className="flex-1 h-px bg-blue-200"></div>
+          </div>
+
+          {/* Direct Paste Zone */}
+          <div>
+            <textarea
+              rows={4}
+              value={pastedData}
+              onChange={(e) => setPastedData(e.target.value)}
+              placeholder="Paste Bank Statement rows directly here (Ctrl + V)..."
+              className="w-full p-4 border border-blue-200 rounded-2xl text-xs font-mono bg-white outline-none focus:ring-2 ring-indigo-200 text-gray-800"
+            />
+            <div className="flex justify-end gap-3 mt-3">
+              <button
+                onClick={handleParseBankStatement}
+                disabled={!selectedBankId || !pastedData.trim()}
+                className="px-6 py-2.5 bg-gray-900 hover:bg-black text-white font-black text-xs rounded-xl shadow-md disabled:bg-gray-200 uppercase tracking-wider"
+              >
+                Analyze & Reconcile Text
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -208,10 +269,13 @@ export const BankReconciliation: React.FC<BankReconciliationProps> = ({
             <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
               <h4 className="text-xs font-black text-gray-800 uppercase tracking-wider">Reconciliation Matrix</h4>
               <button
-                onClick={() => setShowPasteBox(true)}
+                onClick={() => {
+                  setShowPasteBox(true);
+                  setFileName('');
+                }}
                 className="text-xs font-bold text-indigo-600 hover:underline"
               >
-                + Paste New Statement
+                + Upload Another File
               </button>
             </div>
 
