@@ -382,6 +382,7 @@ const App: React.FC = () => {
       );
   }
 
+  // ⭐ FIXED SIDEBAR ITEM WITH WHITESPACE-NOWRAP FOR CLEAN ALIGNMENT
   const SidebarItem = ({ view, icon: Icon, label, nested = false, badge }: { view: View; icon?: React.ElementType; label: string, nested?: boolean, badge?: number }) => {
     return (
       <button
@@ -389,19 +390,19 @@ const App: React.FC = () => {
             setCurrentView(view);
             setIsMobileMenuOpen(false);
         }}
-        className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-colors rounded-lg mb-0.5
-          ${nested ? 'pl-11' : ''}
+        className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold transition-colors rounded-xl mb-0.5 whitespace-nowrap
+          ${nested ? 'pl-10' : ''}
           ${currentView === view 
-            ? 'bg-indigo-50 text-indigo-700 font-bold' 
+            ? 'bg-indigo-50 text-indigo-700 font-extrabold shadow-2xs' 
             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           }`}
       >
-        <div className="flex items-center gap-3">
-          {Icon && <Icon size={18} />}
-          {label}
+        <div className="flex items-center gap-2.5 min-w-0">
+          {Icon && <Icon size={18} className="shrink-0" />}
+          <span className="truncate">{label}</span>
         </div>
         {badge !== undefined && badge > 0 && (
-          <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
+          <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-2xs shrink-0">
             {badge}
           </span>
         )}
@@ -513,8 +514,8 @@ const App: React.FC = () => {
             </div>
 
             <SidebarItem view="INVENTORY" icon={Package} label="Inventory" badge={lowStockCount} />
-            {/* ⭐ NEW SIDEBAR ROUTE: MULTI-WAREHOUSE & BATCHES */}
-            <SidebarItem view="WAREHOUSES" icon={WarehouseIcon} label="Warehouses & Batches" />
+            {/* ⭐ OPTION A ALIGNED WAREHOUSE LABEL */}
+            <SidebarItem view="WAREHOUSES" icon={WarehouseIcon} label="Warehouses" />
             <SidebarItem view="EXPENSES" icon={Wallet} label="Expenses" />
             
             {/* ⭐ DYNAMIC MULTI-TENANT GATE ENFORCEMENT */}
@@ -605,7 +606,7 @@ const App: React.FC = () => {
                   <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
 
-                {/* ⭐ NEW VIEW: WAREHOUSES & BATCH EXPIRY MONITOR */}
+                {/* ⭐ WAREHOUSES VIEW RENDER BLOCK */}
                 {currentView === 'WAREHOUSES' && (
                   <WarehouseManager />
                 )}
