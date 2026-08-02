@@ -136,7 +136,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       }
     } catch (err) {
       console.error(err);
-    } font-bold {
+    } finally {
       setIsRateFetching(false);
     }
   };
