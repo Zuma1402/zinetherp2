@@ -19,7 +19,8 @@ import {
   X,
   Building2,
   Radio,
-  Landmark // ⭐ IMPORTED FOR BANK RECONCILIATION ICON
+  Landmark, // ⭐ IMPORTED FOR BANK RECONCILIATION ICON
+  Warehouse as WarehouseIcon // ⭐ ADDED WAREHOUSE ICON
 } from 'lucide-react';
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
@@ -62,6 +63,9 @@ import EcommerceReconciliation from './components/EcommerceReconciliation';
 // ⭐ IMPORTED BANK RECONCILIATION ENGINE COMPONENT
 import { BankReconciliation } from './components/BankReconciliation';
 
+// ⭐ NEW IMPORT: MULTI-WAREHOUSE & BATCH MONITOR MODULE
+import { WarehouseManager } from './components/WarehouseManager';
+
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
 import { calculateTrialBalance, calculateFinancialSummary } from './services/accountingService';
 import { getCurrentUser, logout } from './services/authService';
@@ -80,6 +84,7 @@ type View =
   | 'GENERAL_LEDGER'
   | 'BANK_RECONCILIATION' // ⭐ ADDED VIEW ROUTE
   | 'INVENTORY'
+  | 'WAREHOUSES' // ⭐ ADDED MULTI-WAREHOUSE VIEW ROUTE
   | 'UNITS'
   | 'QUOTATION'
   | 'SALES_ORDER'
@@ -387,7 +392,7 @@ const App: React.FC = () => {
         className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-colors rounded-lg mb-0.5
           ${nested ? 'pl-11' : ''}
           ${currentView === view 
-            ? 'bg-indigo-50 text-indigo-700' 
+            ? 'bg-indigo-50 text-indigo-700 font-bold' 
             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           }`}
       >
@@ -508,9 +513,11 @@ const App: React.FC = () => {
             </div>
 
             <SidebarItem view="INVENTORY" icon={Package} label="Inventory" badge={lowStockCount} />
+            {/* ⭐ NEW SIDEBAR ROUTE: MULTI-WAREHOUSE & BATCHES */}
+            <SidebarItem view="WAREHOUSES" icon={WarehouseIcon} label="Warehouses & Batches" />
             <SidebarItem view="EXPENSES" icon={Wallet} label="Expenses" />
             
-            {/* ⭐ DYNAMIC MULTI-TENANT GATE ENFORCEMENT: Only shows if module is explicitly enabled on the active company metadata node */}
+            {/* ⭐ DYNAMIC MULTI-TENANT GATE ENFORCEMENT */}
             {activeModules.includes('ecommerce_reconciliation') && (
               <SidebarItem view="ECOM_RECONCILIATION" icon={Radio} label="E-Commerce Payouts" />
             )}
@@ -597,6 +604,12 @@ const App: React.FC = () => {
                 {currentView === 'INVENTORY' && (
                   <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
+
+                {/* ⭐ NEW VIEW: WAREHOUSES & BATCH EXPIRY MONITOR */}
+                {currentView === 'WAREHOUSES' && (
+                  <WarehouseManager />
+                )}
+
                 {currentView === 'UNITS' && (
                   <UnitManager units={units} onAddUnit={handleAddUnit} onDeleteUnit={handleDeleteUnit} onBack={() => setCurrentView('INVENTORY')} />
                 )}

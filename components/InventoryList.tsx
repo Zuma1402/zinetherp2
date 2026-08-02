@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { InventoryItem, Unit, StockTransaction, ValuationMethod } from '../types';
-import { Plus, Package, Pencil, Trash2, X, Save, Settings, AlertTriangle, Calculator, History, RotateCcw, Calendar, Filter } from 'lucide-react';
+import { Plus, Package, Pencil, Trash2, X, Save, Settings, AlertTriangle, Calculator, History, Calendar, Filter } from 'lucide-react';
 import { calculateStockValue } from '../services/inventoryService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 
@@ -15,8 +15,8 @@ interface InventoryListProps {
 }
 
 const InventoryList: React.FC<InventoryListProps> = ({ 
-    items, 
-    units, 
+    items = [], 
+    units = [], 
     transactions = [], 
     onAddItem, 
     onUpdateItem, 
@@ -123,7 +123,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
 
   const displayedItems = useMemo(() => {
     if (!showLowStockOnly) return items;
-    return items.filter(item => item.currentStock <= (item.minStockLevel || 0));
+    return items.filter(item => (item.currentStock || 0) <= (item.minStockLevel || 0));
   }, [items, showLowStockOnly]);
 
   const totalStockValue = items.reduce((sum, item) => {
@@ -131,7 +131,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
       return sum + val;
   }, 0);
 
-  const lowStockItems = items.filter(item => item.currentStock <= (item.minStockLevel || 0));
+  const lowStockItems = items.filter(item => (item.currentStock || 0) <= (item.minStockLevel || 0));
 
   const itemTransactions = selectedHistoryItem 
     ? transactions.filter(t => t.itemId === selectedHistoryItem).reverse() 
@@ -143,7 +143,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
     <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <div>
-           <h2 className="text-2xl font-bold text-gray-800">Inventory</h2>
+           <h2 className="text-2xl font-bold text-gray-800">Inventory Master</h2>
            <p className="text-gray-500 text-sm">Stock list and valuation</p>
         </div>
         <div className="flex items-center gap-4 flex-wrap">
@@ -211,7 +211,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
 
             <button 
                 onClick={() => { resetForm(); setShowForm(!showForm); }}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 font-bold"
             >
                 {showForm ? <X size={18} /> : <Plus size={18} />}
                 {showForm ? 'Cancel' : 'New Item'}
@@ -344,7 +344,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-50">
                 {displayedItems.map(item => {
-                    const isLowStock = item.currentStock <= (item.minStockLevel || 0);
+                    const isLowStock = (item.currentStock || 0) <= (item.minStockLevel || 0);
                     const calculatedValue = calculateStockValue(item, filteredTransactions, valuationMethod);
                     
                     return (
@@ -374,7 +374,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
                                             ? 'bg-rose-500 text-white border-rose-400' 
                                             : item.currentStock > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-100 text-gray-400 border-gray-200'
                                      }`}>
-                                        {item.currentStock}
+                                         {item.currentStock}
                                      </span>
                                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Min: {item.minStockLevel || 0}</span>
                                  </div>
