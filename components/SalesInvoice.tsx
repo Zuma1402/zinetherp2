@@ -4,6 +4,7 @@ import { Ledger, Voucher, VoucherType, InventoryItem, AccountType, StockTransact
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
 import { ForensicTimeline } from './ForensicTimeline'; // ⭐ REGISTERED AUDIT SENTINEL TIMELINE
+import { PrintInvoice } from './PrintInvoice'; // ⭐ INJECTED CUSTOM PRINT & EMAIL PREVIEW MODAL
 
 interface SalesInvoiceProps {
   ledgers: Ledger[];
@@ -63,6 +64,9 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
   const [isDivModalOpen, setIsDivModalOpen] = useState(false);
   const [isCustModalOpen, setIsCustModalOpen] = useState(false);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
+  // ⭐ PRINT & EMAIL PREVIEW MODAL STATE
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   const [newDeptName, setNewDeptName] = useState('');
   const [newDivName, setNewDivName] = useState('');
@@ -132,7 +136,7 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
       }
     } catch (err) {
       console.error(err);
-    } finally {
+    } font-bold {
       setIsRateFetching(false);
     }
   };
@@ -452,6 +456,25 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
 
   const activeCustomerObj = ledgers.find(l => l.id === customerId);
 
+  // Dynamic construct voucher object for preview modal
+  const previewVoucherData: Voucher = {
+    id: recordSnapshot ? recordSnapshot.id : 'PREVIEW-VCH',
+    number: invoiceNo || 'INV-0001',
+    date: date,
+    type: VoucherType.SALES,
+    narration: narration || `Sales Invoice #${invoiceNo}`,
+    currency: currency,
+    exchangeRate: exchangeRate,
+    entries: [
+      { ledgerId: customerId, debit: totalAmountBasePKR, credit: 0 },
+      ...lineItems.map(line => ({
+        ledgerId: mappedSalesId || line.itemId || 'Sales Account',
+        debit: 0,
+        credit: line.amount * exchangeRate
+      }))
+    ]
+  } as any;
+
   return (
     <div className="max-w-7xl mx-auto">
       <style>{`
@@ -476,7 +499,8 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
             {recordSnapshot ? `Edit Sales Invoice [${invoiceNo}]` : 'Create Sales Invoice'}
           </h2>
           <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
-            <button onClick={() => window.print()} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs" >
+            {/* ⭐ MODIFIED ROUTE: Triggers Print & Email Preview Modal */}
+            <button onClick={() => setIsPrintModalOpen(true)} className="px-4 py-2 text-xs font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl flex items-center gap-2 border border-slate-200 transition-all shadow-xs">
               <Printer size={14} /> Export / Print
             </button>
             <span className="text-[10px] bg-green-50 text-green-600 px-3 py-1.5 rounded-full font-black uppercase tracking-widest border border-green-100 flex items-center gap-1"><LinkIcon size={10}/>Live Sync</span>
@@ -764,6 +788,16 @@ const SalesInvoice: React.FC<SalesInvoiceProps> = ({ ledgers, items, trialBalanc
           </div>
         </div>
       </div>
+
+      {/* ⭐ INJECTED CUSTOM PRINT & EMAIL PREVIEW MODAL */}
+      {isPrintModalOpen && (
+        <PrintInvoice
+          voucher={previewVoucherData}
+          ledgers={ledgers}
+          companyName={companyName}
+          onClose={() => setIsPrintModalOpen(false)}
+        />
+      )}
 
       {/* MODALS */}
       {isTaxModalOpen && (
