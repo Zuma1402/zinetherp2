@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Ledger, Voucher, AccountType } from '../types';
 import { calculateTrialBalance } from '../services/accountingService';
-import { Download, Calendar, Globe } from 'lucide-react';
+import { Download, Globe, ExternalLink } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -10,9 +10,10 @@ interface Props {
   vouchers: Voucher[];
   ledgers: Ledger[];
   companyName: string;
+  onViewLedger?: (ledgerId: string) => void; // ⭐ DRILL-DOWN HOOK
 }
 
-const BalanceSheet: React.FC<Props> = ({ vouchers, ledgers, companyName }) => {
+const BalanceSheet: React.FC<Props> = ({ vouchers, ledgers, companyName, onViewLedger }) => {
   // Fix: Use Local Time for default date
   const [asOfDate, setAsOfDate] = useState(() => new Date().toLocaleDateString('en-CA'));
 
@@ -176,33 +177,47 @@ const BalanceSheet: React.FC<Props> = ({ vouchers, ledgers, companyName }) => {
             
             <div className="space-y-6">
                 <div>
-                    <h4 className="font-bold text-gray-600 mb-2">Capital & Equity</h4>
+                    <h4 className="font-bold text-gray-600 mb-2 font-sans">Capital & Equity</h4>
                     {equity.map(row => (
-                        <div key={row.ledgerId} className="flex justify-between py-1 border-b border-gray-200 border-dashed">
-                            <span>{row.ledgerName}</span>
-                            <span>{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <div 
+                          key={row.ledgerId} 
+                          onClick={() => onViewLedger && onViewLedger(row.ledgerId)}
+                          className="flex justify-between py-1.5 px-2 border-b border-gray-200 border-dashed cursor-pointer hover:bg-indigo-50/50 rounded transition-all group"
+                        >
+                            <span className="group-hover:text-indigo-600 font-medium font-sans flex items-center gap-1.5">
+                              {row.ledgerName}
+                              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 text-indigo-500 transition-opacity" />
+                            </span>
+                            <span className="font-bold group-hover:text-indigo-600">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                     ))}
-                    <div className="flex justify-between py-1 font-semibold text-indigo-700">
+                    <div className="flex justify-between py-2 px-2 font-semibold text-indigo-700 font-sans">
                         <span>Net Profit / (Loss)</span>
-                        <span>{netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <span className="font-mono font-bold">{netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
                 </div>
 
                 <div>
-                    <h4 className="font-bold text-gray-600 mb-2">Liabilities</h4>
+                    <h4 className="font-bold text-gray-600 mb-2 font-sans">Liabilities</h4>
                     {liabilities.map(row => (
-                        <div key={row.ledgerId} className="flex justify-between py-1 border-b border-gray-200 border-dashed">
-                            <span>{row.ledgerName}</span>
-                            <span>{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <div 
+                          key={row.ledgerId} 
+                          onClick={() => onViewLedger && onViewLedger(row.ledgerId)}
+                          className="flex justify-between py-1.5 px-2 border-b border-gray-200 border-dashed cursor-pointer hover:bg-rose-50/50 rounded transition-all group"
+                        >
+                            <span className="group-hover:text-rose-600 font-medium font-sans flex items-center gap-1.5">
+                              {row.ledgerName}
+                              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 text-rose-500 transition-opacity" />
+                            </span>
+                            <span className="font-bold group-hover:text-rose-600">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                     ))}
-                    {liabilities.length === 0 && <div className="text-gray-400 italic text-xs">No liabilities</div>}
+                    {liabilities.length === 0 && <div className="text-gray-400 italic text-xs font-sans">No liabilities</div>}
                 </div>
             </div>
 
             <div className="mt-8 pt-4 border-t-2 border-gray-300 flex justify-between items-center">
-                <span className="font-bold text-lg">TOTAL</span>
+                <span className="font-bold text-lg font-sans">TOTAL</span>
                 <span className="font-bold text-lg">{totalLiabEquity.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
         </div>
@@ -214,29 +229,43 @@ const BalanceSheet: React.FC<Props> = ({ vouchers, ledgers, companyName }) => {
             <div className="space-y-6">
                  {/* Current Assets */}
                  <div>
-                    <h4 className="font-bold text-gray-600 mb-2">Current Assets</h4>
+                    <h4 className="font-bold text-gray-600 mb-2 font-sans">Current Assets</h4>
                     {assets.filter(a => ledgers.find(l => l.id === a.ledgerId)?.group.includes('Current') || ledgers.find(l => l.id === a.ledgerId)?.group.includes('Bank') || ledgers.find(l => l.id === a.ledgerId)?.group.includes('Cash') || ledgers.find(l => l.id === a.ledgerId)?.group.includes('Debtors')).map(row => (
-                        <div key={row.ledgerId} className="flex justify-between py-1 border-b border-gray-200 border-dashed">
-                            <span>{row.ledgerName}</span>
-                            <span>{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <div 
+                          key={row.ledgerId} 
+                          onClick={() => onViewLedger && onViewLedger(row.ledgerId)}
+                          className="flex justify-between py-1.5 px-2 border-b border-gray-200 border-dashed cursor-pointer hover:bg-emerald-50/50 rounded transition-all group"
+                        >
+                            <span className="group-hover:text-emerald-600 font-medium font-sans flex items-center gap-1.5">
+                              {row.ledgerName}
+                              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 text-emerald-500 transition-opacity" />
+                            </span>
+                            <span className="font-bold group-hover:text-emerald-600">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                     ))}
                  </div>
 
                  {/* Fixed Assets */}
                  <div>
-                    <h4 className="font-bold text-gray-600 mb-2">Fixed Assets</h4>
+                    <h4 className="font-bold text-gray-600 mb-2 font-sans">Fixed Assets</h4>
                     {assets.filter(a => ledgers.find(l => l.id === a.ledgerId)?.group.includes('Fixed')).map(row => (
-                        <div key={row.ledgerId} className="flex justify-between py-1 border-b border-gray-200 border-dashed">
-                            <span>{row.ledgerName}</span>
-                            <span>{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <div 
+                          key={row.ledgerId} 
+                          onClick={() => onViewLedger && onViewLedger(row.ledgerId)}
+                          className="flex justify-between py-1.5 px-2 border-b border-gray-200 border-dashed cursor-pointer hover:bg-emerald-50/50 rounded transition-all group"
+                        >
+                            <span className="group-hover:text-emerald-600 font-medium font-sans flex items-center gap-1.5">
+                              {row.ledgerName}
+                              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 text-emerald-500 transition-opacity" />
+                            </span>
+                            <span className="font-bold group-hover:text-emerald-600">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                     ))}
                  </div>
                  
                  {/* Others */}
                   <div>
-                    <h4 className="font-bold text-gray-600 mb-2">Other Assets</h4>
+                    <h4 className="font-bold text-gray-600 mb-2 font-sans">Other Assets</h4>
                     {assets.filter(a => 
                         !ledgers.find(l => l.id === a.ledgerId)?.group.includes('Fixed') && 
                         !ledgers.find(l => l.id === a.ledgerId)?.group.includes('Current') &&
@@ -244,16 +273,23 @@ const BalanceSheet: React.FC<Props> = ({ vouchers, ledgers, companyName }) => {
                         !ledgers.find(l => l.id === a.ledgerId)?.group.includes('Cash') &&
                         !ledgers.find(l => l.id === a.ledgerId)?.group.includes('Debtors')
                     ).map(row => (
-                        <div key={row.ledgerId} className="flex justify-between py-1 border-b border-gray-200 border-dashed">
-                            <span>{row.ledgerName}</span>
-                            <span>{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                        <div 
+                          key={row.ledgerId} 
+                          onClick={() => onViewLedger && onViewLedger(row.ledgerId)}
+                          className="flex justify-between py-1.5 px-2 border-b border-gray-200 border-dashed cursor-pointer hover:bg-emerald-50/50 rounded transition-all group"
+                        >
+                            <span className="group-hover:text-emerald-600 font-medium font-sans flex items-center gap-1.5">
+                              {row.ledgerName}
+                              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 text-emerald-500 transition-opacity" />
+                            </span>
+                            <span className="font-bold group-hover:text-emerald-600">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                     ))}
                  </div>
             </div>
 
             <div className="mt-8 pt-4 border-t-2 border-gray-300 flex justify-between items-center">
-                <span className="font-bold text-lg">TOTAL</span>
+                <span className="font-bold text-lg font-sans">TOTAL</span>
                 <span className="font-bold text-lg">{totalAssets.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
         </div>

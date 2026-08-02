@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Ledger, Voucher, AccountType, Department, Division } from '../types';
 import { calculateTrialBalance } from '../services/accountingService';
-import { Download, ArrowRight, Calendar as CalendarIcon, Layers, Compass, Globe } from 'lucide-react';
+import { Download, ArrowRight, Calendar as CalendarIcon, Layers, Compass, Globe, ExternalLink } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -10,9 +10,10 @@ interface Props {
   vouchers: Voucher[];
   ledgers: Ledger[];
   companyName: string;
+  onViewLedger?: (ledgerId: string) => void; // ⭐ DRILL-DOWN HOOK
 }
 
-const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }) => {
+const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName, onViewLedger }) => {
   // Date State - Default to current month (Local Time)
   const [startDate, setStartDate] = useState(() => {
       const date = new Date();
@@ -285,10 +286,17 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
                 
                 <div className="space-y-4 pl-2">
                     {incomeRows.map(row => (
-                        <div key={row.ledgerId} className="flex justify-between items-end group">
-                            <span className="text-gray-700 font-medium group-hover:text-gray-900 transition-colors">{row.ledgerName}</span>
+                        <div 
+                          key={row.ledgerId} 
+                          onClick={() => onViewLedger && onViewLedger(row.ledgerId)}
+                          className="flex justify-between items-end group cursor-pointer hover:bg-indigo-50/40 p-2 rounded-lg transition-all"
+                        >
+                            <span className="text-gray-700 font-medium group-hover:text-indigo-600 transition-colors flex items-center gap-2">
+                              {row.ledgerName}
+                              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 text-indigo-500 transition-opacity" />
+                            </span>
                             <div className="flex-1 mx-4 border-b border-gray-200 border-dotted mb-1"></div>
-                            <span className="font-mono text-gray-800 font-semibold">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span className="font-mono text-gray-800 font-semibold group-hover:text-indigo-600">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                     ))}
                     {incomeRows.length === 0 && (
@@ -315,10 +323,17 @@ const ProfitLossStatement: React.FC<Props> = ({ vouchers, ledgers, companyName }
 
                 <div className="space-y-4 pl-2">
                     {expenseRows.map(row => (
-                        <div key={row.ledgerId} className="flex justify-between items-end group">
-                            <span className="text-gray-700 font-medium group-hover:text-gray-900 transition-colors">{row.ledgerName}</span>
+                        <div 
+                          key={row.ledgerId} 
+                          onClick={() => onViewLedger && onViewLedger(row.ledgerId)}
+                          className="flex justify-between items-end group cursor-pointer hover:bg-rose-50/40 p-2 rounded-lg transition-all"
+                        >
+                            <span className="text-gray-700 font-medium group-hover:text-rose-600 transition-colors flex items-center gap-2">
+                              {row.ledgerName}
+                              <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 text-rose-500 transition-opacity" />
+                            </span>
                             <div className="flex-1 mx-4 border-b border-gray-200 border-dotted mb-1"></div>
-                            <span className="font-mono text-gray-800 font-semibold">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span className="font-mono text-gray-800 font-semibold group-hover:text-rose-600">{row.convertedBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                     ))}
                     {expenseRows.length === 0 && (
