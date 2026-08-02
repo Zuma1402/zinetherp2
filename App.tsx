@@ -18,7 +18,8 @@ import {
   Menu,
   X,
   Building2,
-  Radio
+  Radio,
+  Landmark // ⭐ IMPORTED FOR BANK RECONCILIATION ICON
 } from 'lucide-react';
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
@@ -58,6 +59,9 @@ import { AgingReports } from './components/AgingReports';
 // New E-Commerce Reconciliation Component Import
 import EcommerceReconciliation from './components/EcommerceReconciliation';
 
+// ⭐ IMPORTED BANK RECONCILIATION ENGINE COMPONENT
+import { BankReconciliation } from './components/BankReconciliation';
+
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
 import { calculateTrialBalance, calculateFinancialSummary } from './services/accountingService';
 import { getCurrentUser, logout } from './services/authService';
@@ -74,6 +78,7 @@ type View =
   | 'CHART_OF_ACCOUNTS' 
   | 'JOURNAL_ENTRY' 
   | 'GENERAL_LEDGER'
+  | 'BANK_RECONCILIATION' // ⭐ ADDED VIEW ROUTE
   | 'INVENTORY'
   | 'UNITS'
   | 'QUOTATION'
@@ -461,6 +466,8 @@ const App: React.FC = () => {
             <SidebarItem view="CHART_OF_ACCOUNTS" icon={BookOpen} label="Chart of Accounts" />
             <SidebarItem view="JOURNAL_ENTRY" icon={FileText} label="Journal General" />
             <SidebarItem view="GENERAL_LEDGER" icon={ClipboardList} label="General Ledger" />
+            {/* ⭐ ADDED BANK RECONCILIATION SIDEBAR ITEM */}
+            <SidebarItem view="BANK_RECONCILIATION" icon={Landmark} label="Bank Reconciliation" />
             
             <div className="pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">Business</div>
             
@@ -581,8 +588,14 @@ const App: React.FC = () => {
                 {currentView === 'GENERAL_LEDGER' && (
                   <GeneralLedgerView ledgers={ledgers} vouchers={vouchers} initialLedgerId={selectedLedgerForView} />
                 )}
+
+                {/* ⭐ INJECTED BANK RECONCILIATION VIEW RENDER BLOCK */}
+                {currentView === 'BANK_RECONCILIATION' && (
+                  <BankReconciliation ledgers={ledgers} vouchers={vouchers} onSaveVoucher={handleSaveVoucher} />
+                )}
+
                 {currentView === 'INVENTORY' && (
-                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteInventoryItem} onManageUnits={() => setCurrentView('UNITS')} />
+                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
                 {currentView === 'UNITS' && (
                   <UnitManager units={units} onAddUnit={handleAddUnit} onDeleteUnit={handleDeleteUnit} onBack={() => setCurrentView('INVENTORY')} />
@@ -641,11 +654,22 @@ const App: React.FC = () => {
                   <EcommerceReconciliation ledgers={ledgers} onSave={handleSaveVoucher} />
                 )}
 
+                {/* ⭐ INJECTED DRILL-DOWN HOOK CONNECTORS */}
                 {currentView === 'REPORT_PL' && (
-                    <ProfitLossStatement vouchers={vouchers} ledgers={ledgers} companyName={companyName} />
+                    <ProfitLossStatement 
+                      vouchers={vouchers} 
+                      ledgers={ledgers} 
+                      companyName={companyName} 
+                      onViewLedger={handleViewLedgerHistory} 
+                    />
                 )}
                 {currentView === 'REPORT_BS' && (
-                    <BalanceSheet vouchers={vouchers} ledgers={ledgers} companyName={companyName} />
+                    <BalanceSheet 
+                      vouchers={vouchers} 
+                      ledgers={ledgers} 
+                      companyName={companyName} 
+                      onViewLedger={handleViewLedgerHistory} 
+                    />
                 )}
                 {currentView === 'REPORT_AGING' && ( 
                     <AgingReports ledgers={ledgers} vouchers={vouchers} />
