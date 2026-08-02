@@ -484,7 +484,7 @@ const Settings: React.FC<SettingsProps> = ({
             </form>
           </div>
 
-          {/* ⭐ SYSTEM MULTI-LANGUAGE PREFERENCE SELECTOR (Pristine Addition) */}
+          {/* ⭐ SYSTEM MULTI-LANGUAGE PREFERENCE SELECTOR (Pristine Addition with Global Options) */}
           <div className="pt-4 border-t border-gray-100 space-y-3">
             <div className="flex items-center gap-2">
               <Globe size={16} className="text-indigo-600" />
@@ -499,6 +499,10 @@ const Settings: React.FC<SettingsProps> = ({
               <option value="en">English (Corporate Standard)</option>
               <option value="roman_ur">Roman Urdu (Urdu in English Script)</option>
               <option value="ur">اردو (Urdu Standard)</option>
+              <option value="ar">العربية (Arabic Standard)</option>
+              <option value="zh">中文 (Chinese Simplified)</option>
+              <option value="fr">Français (French)</option>
+              <option value="es">Español (Spanish)</option>
             </select>
           </div>
         </div>
