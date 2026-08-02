@@ -89,6 +89,9 @@ export interface StockTransaction {
   qty: number; // Positive for In, Negative for Out
   rate: number;
   voucherId: string;
+  warehouseId?: string;  // ⭐ NEW: Multi-Warehouse Location Link
+  batchNumber?: string;  // ⭐ NEW: Batch Identification Number
+  expiryDate?: string;   // ⭐ NEW: Expiry Monitoring Date
 }
 
 export interface Unit {
@@ -110,4 +113,25 @@ export interface Department {
 export interface Division {
   id: string;
   name: string;
+}
+
+// ⭐ NEW: Multi-Warehouse Location Registry Interface
+export interface Warehouse {
+  id: string;
+  name: string;
+  code?: string;
+  location?: string;
+  is_default?: boolean;
+  company_id?: string;
+}
+
+// ⭐ NEW: Batch & Expiry Allocation Ledger Model
+export interface StockBatch {
+  id: string;
+  itemId: string;
+  warehouseId: string;
+  batchNumber: string;
+  expiryDate?: string;
+  quantity: number;
+  company_id?: string;
 }
