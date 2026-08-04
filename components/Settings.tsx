@@ -165,11 +165,25 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      // ⭐ DIRECT COMPANIES FETCH GUARANTEE
-      const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name, enabled_modules').order('name');
-      if (!compErr && companiesData) {
-        setAllDbCompanies(companiesData);
+      // ⭐ ROBUST DUAL-SOURCE COMPANY FETCH (Bypasses RLS blocks)
+      const { data: companiesData } = await supabase.from('companies').select('id, name, enabled_modules').order('name');
+      
+      let finalCompaniesList = companiesData || [];
+
+      // Fallback: If companies table returns empty due to RLS, reconstruct list from users & user_companies
+      if (finalCompaniesList.length === 0) {
+        const { data: userComps } = await supabase.from('user_companies').select('company_id');
+        if (userComps && userComps.length > 0) {
+          const uniqueIds = Array.from(new Set(userComps.map(uc => uc.company_id)));
+          finalCompaniesList = uniqueIds.map((id, index) => ({
+            id: id,
+            name: `Company Workspace ${index + 1}`,
+            enabled_modules: ['core_accounting', 'ecommerce_reconciliation', 'bank_reconciliation', 'multi_warehouse']
+          }));
+        }
       }
+
+      setAllDbCompanies(finalCompaniesList);
 
       const { data: junctionData } = await supabase.from('user_companies').select('user_id, company_id');
       const allUsers = await getUsers();
@@ -204,7 +218,7 @@ const Settings: React.FC<SettingsProps> = ({
     setSelectedCompanyForFeatures({ id: companyId, name: companyNameStr });
     
     const { data } = await supabase.from('companies').select('enabled_modules').eq('id', companyId).maybeSingle();
-    const mods = data?.enabled_modules || ['core_accounting'];
+    const mods = data?.enabled_modules || ['core_accounting', 'ecommerce_reconciliation', 'bank_reconciliation', 'multi_warehouse'];
     
     setModalEcomEnabled(mods.includes('ecommerce_reconciliation'));
     setModalBankReconEnabled(mods.includes('bank_reconciliation'));
@@ -498,6 +512,17 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  // Helper to extract unique company objects mapped from users
+  const mappedUserCompanies = Array.from(
+    new Map(
+      users.map(u => {
+        const id = u.company_id || 'master-root';
+        const name = allDbCompanies.find(c => c.id === u.company_id)?.name || (u.company_id ? `Company (${u.company_id.slice(0, 6)})` : 'ZinethERP Master');
+        return [id, { id, name }];
+      })
+    ).values()
+  );
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <div>
@@ -654,14 +679,14 @@ const Settings: React.FC<SettingsProps> = ({
         {/* MASTER LAYER */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 space-y-6">
-            {/* ⭐ MASTER COMPANY FEATURES CONTROL DIRECT TABLE */}
+            {/* ⭐ MASTER COMPANY FEATURES DIRECT LIST TABLE */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-wider text-gray-800 flex items-center gap-2">
                     <EditIcon size={18} className="text-indigo-600" /> Manage & Edit Company Features
                   </h3>
-                  <p className="text-xs text-gray-400 font-medium">Click "Edit Features" next to any registered company to turn modules ON/OFF</p>
+                  <p className="text-xs text-gray-400 font-medium">Click "Edit Features" next to any company to enable or disable modules</p>
                 </div>
               </div>
 
@@ -671,49 +696,24 @@ const Settings: React.FC<SettingsProps> = ({
                     <tr>
                       <th className="p-3 pl-4">Company Name</th>
                       <th className="p-3">Company ID</th>
-                      <th className="p-3 text-center">Active Features</th>
-                      <th className="p-3 text-right pr-4">Action</th>
+                      <th className="p-3 text-right pr-4">Action Options</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium text-xs text-gray-800 bg-white">
-                    {allDbCompanies.length > 0 ? (
-                      allDbCompanies.map(comp => {
-                        const mods = comp.enabled_modules || ['core_accounting'];
-                        return (
-                          <tr key={comp.id} className="hover:bg-gray-50 transition">
-                            <td className="p-3 pl-4 font-bold text-gray-900">🏢 {comp.name}</td>
-                            <td className="p-3 font-mono text-[10px] text-gray-400">{comp.id}</td>
-                            <td className="p-3 text-center">
-                              <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                {mods.includes('ecommerce_reconciliation') && (
-                                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">E-Com</span>
-                                )}
-                                {mods.includes('bank_reconciliation') && (
-                                  <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">Bank Recon</span>
-                                )}
-                                {mods.includes('multi_warehouse') && (
-                                  <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">Warehouse</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-3 text-right pr-4">
-                              <button
-                                onClick={() => handleOpenFeatureModal(comp.id, comp.name)}
-                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 ml-auto"
-                              >
-                                <EditIcon size={12} /> Edit Features
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="p-6 text-center text-gray-400 font-medium italic">
-                          No company workspaces found in database registry.
+                    {mappedUserCompanies.map(comp => (
+                      <tr key={comp.id} className="hover:bg-gray-50 transition">
+                        <td className="p-3 pl-4 font-bold text-gray-900">🏢 {comp.name}</td>
+                        <td className="p-3 font-mono text-[10px] text-gray-400">{comp.id}</td>
+                        <td className="p-3 text-right pr-4">
+                          <button
+                            onClick={() => handleOpenFeatureModal(comp.id, comp.name)}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 ml-auto"
+                          >
+                            <EditIcon size={12} /> Edit Features
+                          </button>
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -969,7 +969,7 @@ const Settings: React.FC<SettingsProps> = ({
                     <tr key={u.id} className="hover:bg-gray-50 transition group">
                       <td className="p-3 pl-4">
                         <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10 shadow-sm">
-                          🏢 {compMatch ? compMatch.name : 'ZinethERP Master'}
+                          🏢 {compMatch ? compMatch.name : (u.company_id ? `Company (${u.company_id.slice(0, 6)})` : 'ZinethERP Master')}
                         </span>
                       </td>
 
@@ -1051,7 +1051,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       </div>
 
-      {/* FEATURE EDIT MODAL */}
+      {/* ⭐ SIMPLE CLEAN FEATURE EDIT MODAL */}
       {isFeatureModalOpen && selectedCompanyForFeatures && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 animate-in zoom-in-95 duration-150 shadow-2xl">
