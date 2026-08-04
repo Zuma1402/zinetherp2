@@ -3,8 +3,8 @@ import { User, Role, Department, Division, Ledger, AccountType } from '../types'
 import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
-import { useLanguage, Language } from '../context/LanguageContext'; // ⭐ ACTIVE LANGUAGE ENGINE
-import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key, Globe, CheckSquare, Square } from 'lucide-react';
+import { useLanguage, Language } from '../context/LanguageContext';
+import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key, Globe, Settings as EditIcon, CheckSquare, Square } from 'lucide-react';
 
 interface SettingsProps {
   currentUser: User;
@@ -21,7 +21,7 @@ const Settings: React.FC<SettingsProps> = ({
   onCompanyCreated,
   activeCompanyId: propCompanyId
 }) => {
-  const { language, setLanguage } = useLanguage(); // ⭐ ACTIVE TRANSLATION HOOK
+  const { language, setLanguage, t } = useLanguage();
 
   // Profile State
   const [name, setName] = useState(currentUser.name);
@@ -34,18 +34,16 @@ const Settings: React.FC<SettingsProps> = ({
   const [taxId, setTaxId] = useState('');
   const [invoicePrefix, setInvoicePrefix] = useState('INV-');
   const [nextInvoiceNumber, setNextInvoiceNumber] = useState(1);
-  
-  // Active Company Base Currency (For Tenant Reading view Only)
   const [activeCompanyBaseCurrency, setActiveCompanyBaseCurrency] = useState('PKR');
 
-  // STRUCTURAL LEDGER MAPPING CONFIGURATION SYSTEM HOOKS
+  // STRUCTURAL LEDGER MAPPING
   const [allCompanyLedgers, setAllCompanyLedgers] = useState<Ledger[]>([]);
   const [defaultSalesLedger, setDefaultSalesLedger] = useState('');
   const [defaultPurchaseLedger, setDefaultPurchaseLedger] = useState('');
   const [defaultStockLedger, setDefaultStockLedger] = useState('');
   const [isMappingSaving, setIsMappingSaving] = useState(false);
 
-  // QUICK ADD LEDGER MODAL STATES
+  // QUICK ADD LEDGER MODAL
   const [isQuickLedgerModalOpen, setIsQuickLedgerModalOpen] = useState(false);
   const [quickLedgerName, setQuickLedgerName] = useState('');
   const [quickLedgerType, setQuickLedgerType] = useState<AccountType>(AccountType.INCOME);
@@ -53,21 +51,25 @@ const Settings: React.FC<SettingsProps> = ({
 
   // States Matrix
   const [users, setUsers] = useState<User[]>([]);
-  const [allDbCompanies, setAllDbCompanies] = useState<{id: string, name: string}[]>([]);
+  const [allDbCompanies, setAllDbCompanies] = useState<{id: string, name: string, enabled_modules?: string[]}[]>([]);
   const [selectedCompanyToDelete, setSelectedCompanyToDelete] = useState('');
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
 
-  // Form Inputs
+  // ⭐ EDIT EXISTING COMPANY FEATURES STATES
+  const [editingCompanyId, setEditingCompanyId] = useState('');
+  const [editEcomEnabled, setEditEcomEnabled] = useState(false);
+  const [editBankReconEnabled, setEditBankReconEnabled] = useState(false);
+  const [editWarehouseEnabled, setEditWarehouseEnabled] = useState(false);
+
+  // Form Inputs: New Company Creation
   const [newCorpCompanyName, setNewCorpCompanyName] = useState('');
   const [newCorpEmail, setNewCorpEmail] = useState('');
   const [newCorpTaxId, setNewCorpTaxId] = useState('');
   const [newCorpPrefix, setNewCorpPrefix] = useState('INV-');
   const [newCorpNextNumber, setNewCorpNextNumber] = useState(1);
-  
   const [newCorpBaseCurrency, setNewCorpBaseCurrency] = useState('PKR');
 
-  // ⭐ DYNAMIC FEATURE MODULE CHECKBOX STATES
   const [newCorpEcomEnabled, setNewCorpEcomEnabled] = useState(true);
   const [newCorpBankReconEnabled, setNewCorpBankReconEnabled] = useState(true);
   const [newCorpWarehouseEnabled, setNewCorpWarehouseEnabled] = useState(true);
@@ -82,7 +84,6 @@ const Settings: React.FC<SettingsProps> = ({
   const [staffRole, setStaffRole] = useState<Role>('ACCOUNTANT');
   const [isAddingTenantStaff, setIsAddingTenantStaff] = useState(false);
 
-  // LOCAL ENGINE STATE SYNCHRONIZER
   const [localActiveId, setLocalActiveId] = useState(
     propCompanyId || localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
   );
@@ -148,14 +149,9 @@ const Settings: React.FC<SettingsProps> = ({
         setActiveCorpEcomEnabled(modules.includes('ecommerce_reconciliation'));
         setActiveCorpBankReconEnabled(modules.includes('bank_reconciliation'));
         setActiveCorpWarehouseEnabled(modules.includes('multi_warehouse'));
-      } else {
-        setActiveCompanyBaseCurrency('PKR');
-        setActiveCorpEcomEnabled(false);
-        setActiveCorpBankReconEnabled(false);
-        setActiveCorpWarehouseEnabled(false);
       }
     } catch (err) {
-      console.error("Ledger maps registry reading crash:", err);
+      console.error("Ledger maps registry error:", err);
     }
   };
 
@@ -168,16 +164,16 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name');
+      const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name, enabled_modules');
       if (!compErr && companiesData) {
-        const uniqueCompaniesMap = new Map();
-        companiesData.forEach(c => {
-          const cleanName = c.name.trim().toLowerCase();
-          if (!uniqueCompaniesMap.has(cleanName)) {
-            uniqueCompaniesMap.set(cleanName, c);
-          }
-        });
-        setAllDbCompanies(Array.from(uniqueCompaniesMap.values()));
+        setAllDbCompanies(companiesData);
+        if (companiesData.length > 0 && !editingCompanyId) {
+          setEditingCompanyId(companiesData[0].id);
+          const mods = companiesData[0].enabled_modules || ['core_accounting'];
+          setEditEcomEnabled(mods.includes('ecommerce_reconciliation'));
+          setEditBankReconEnabled(mods.includes('bank_reconciliation'));
+          setEditWarehouseEnabled(mods.includes('multi_warehouse'));
+        }
       }
 
       const { data: junctionData } = await supabase.from('user_companies').select('user_id, company_id');
@@ -207,6 +203,44 @@ const Settings: React.FC<SettingsProps> = ({
   useEffect(() => {
     syncEngineData();
   }, [currentUser, localActiveId, allDbCompanies.length]);
+
+  const handleSelectCompanyToEdit = (cId: string) => {
+    setEditingCompanyId(cId);
+    const comp = allDbCompanies.find(c => c.id === cId);
+    if (comp) {
+      const mods = comp.enabled_modules || ['core_accounting'];
+      setEditEcomEnabled(mods.includes('ecommerce_reconciliation'));
+      setEditBankReconEnabled(mods.includes('bank_reconciliation'));
+      setEditWarehouseEnabled(mods.includes('multi_warehouse'));
+    }
+  };
+
+  // ⭐ UPDATE EXISTING COMPANY FEATURES
+  const handleUpdateCompanyModules = async () => {
+    if (!editingCompanyId) return;
+
+    const modulesArray = ['core_accounting'];
+    if (editEcomEnabled) modulesArray.push('ecommerce_reconciliation');
+    if (editBankReconEnabled) modulesArray.push('bank_reconciliation');
+    if (editWarehouseEnabled) modulesArray.push('multi_warehouse');
+
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({ enabled_modules: modulesArray })
+        .eq('id', editingCompanyId);
+
+      if (!error) {
+        alert("Company features updated successfully!");
+        syncEngineData();
+        window.dispatchEvent(new CustomEvent('companySwitched', { detail: { id: editingCompanyId } }));
+      } else {
+        alert("Failed to update features: " + error.message);
+      }
+    } catch (e: any) {
+      alert("Error updating company modules: " + e.message);
+    }
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -276,7 +310,7 @@ const Settings: React.FC<SettingsProps> = ({
       alert("Chart of accounts automatic double-entry ledgers mapping saved!");
       await syncEngineData();
     } catch (err: any) {
-      alert(`Ledger configuration blueprint crash: ${err.message}`);
+      alert(`Ledger configuration crash: ${err.message}`);
     } finally {
       setIsMappingSaving(false);
     }
@@ -617,121 +651,189 @@ const Settings: React.FC<SettingsProps> = ({
 
         {/* MASTER LAYER */}
         {isMasterZenithScope && (
-          <div className="md:col-span-3 bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-2xl shadow-xl p-6 border border-indigo-900/40">
-            <div className="flex items-center gap-3 mb-5 border-b border-indigo-900/60 pb-3">
-               <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
-                 <Landmark size={22} />
-               </div>
-               <div>
-                 <h2 className="text-md font-bold tracking-tight">Enterprise Multi-Company Control Centre</h2>
-                 <p className="text-sm text-gray-400 font-medium">Configure ecosystem access signatures, core numbering sequences, and tenant user boundaries</p>
-               </div>
-            </div>
+          <div className="md:col-span-3 space-y-6">
+            {/* ⭐ SECTION 1: EDIT FEATURES OF ANY EXISTING COMPANY */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+              <h3 className="text-sm font-black uppercase tracking-wider text-gray-800 flex items-center gap-2 border-b pb-3">
+                <EditIcon size={18} className="text-indigo-600" /> Manage & Add Features to Existing Companies
+              </h3>
 
-            <form onSubmit={handleMasterClusterDeployment} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div>
-                  <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Company Profile Title</label>
-                  <input type="text" value={newCorpCompanyName} onChange={e => setNewCorpCompanyName(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white placeholder-gray-500 outline-none" placeholder="e.g. Khaochey NW" required />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Official Contact Email</label>
-                  <input type="email" value={newCorpEmail} onChange={e => setNewCorpEmail(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-medium text-white placeholder-gray-500 outline-none" placeholder="billing@corporate.com" />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Tax Node / NTN ID (Optional)</label>
-                  <input type="text" value={newCorpTaxId} onChange={e => setNewCorpTaxId(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-medium text-white placeholder-gray-500 outline-none" placeholder="Optional Registry NTN" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-indigo-950/50 pt-4">
-                <div>
-                  <label className="block text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1.5">Reporting / Base Currency</label>
-                  <select value={newCorpBaseCurrency} onChange={e => setNewCorpBaseCurrency(e.target.value)} className="w-full p-3 bg-slate-900 text-indigo-300 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold outline-none">
-                    <option value="PKR">PKR (Pakistani Rupee)</option>
-                    <option value="USD">USD (United States Dollar)</option>
-                    <option value="AED">AED (United Arab Emirates Dirham)</option>
-                    <option value="GBP">GBP (British Pound Sterling)</option>
-                    <option value="SAR">SAR (Saudi Riyal)</option>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Select Target Company</label>
+                  <select
+                    value={editingCompanyId}
+                    onChange={e => handleSelectCompanyToEdit(e.target.value)}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-indigo-500"
+                  >
+                    {allDbCompanies.map(c => (
+                      <option key={c.id} value={c.id}>🏢 {c.name}</option>
+                    ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Invoice Format Prefix</label>
-                  <input type="text" value={newCorpPrefix} onChange={e => setNewCorpPrefix(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white outline-none" required />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Initial Next Index Sequence</label>
-                  <input type="number" value={newCorpNextNumber} onChange={e => setNewCorpNextNumber(Number(e.target.value))} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white outline-none" required />
-                </div>
-              </div>
 
-              {/* ⭐ FEATURE ACCESS CONTROL CHECKBOXES */}
-              <div className="p-4 bg-indigo-950/40 border border-indigo-500/20 rounded-xl space-y-3">
-                <h4 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Ecosystem Capabilities Allocations Configuration</h4>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
-                    <input 
-                      type="checkbox" 
-                      checked={newCorpEcomEnabled} 
-                      onChange={e => setNewCorpEcomEnabled(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
-                    />
-                    E-Commerce Payouts
-                  </label>
-
-                  <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
-                    <input 
-                      type="checkbox" 
-                      checked={newCorpBankReconEnabled} 
-                      onChange={e => setNewCorpBankReconEnabled(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
-                    />
-                    Bank Reconciliation
-                  </label>
-
-                  <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
-                    <input 
-                      type="checkbox" 
-                      checked={newCorpWarehouseEnabled} 
-                      onChange={e => setNewCorpWarehouseEnabled(e.target.checked)}
-                      className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
-                    />
-                    Multi-Warehouse & Batches
-                  </label>
+                <div className="md:col-span-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleUpdateCompanyModules}
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-md flex items-center gap-2 transition-all"
+                  >
+                    <Save size={14} /> Update Company Features
+                  </button>
                 </div>
               </div>
 
-              <div className="bg-indigo-950/30 border border-indigo-900/30 p-4 rounded-xl space-y-4 shadow-inner">
-                <h4 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase">Bind Initial Workspace Staff Member Identity (Optional)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Module Toggle Checkboxes */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <label className={`p-3 rounded-xl border cursor-pointer flex items-center gap-2.5 text-xs font-bold transition-all ${editEcomEnabled ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                  <input
+                    type="checkbox"
+                    checked={editEcomEnabled}
+                    onChange={e => setEditEcomEnabled(e.target.checked)}
+                    className="rounded text-indigo-600 w-4 h-4"
+                  />
+                  E-Commerce Payouts
+                </label>
+
+                <label className={`p-3 rounded-xl border cursor-pointer flex items-center gap-2.5 text-xs font-bold transition-all ${editBankReconEnabled ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                  <input
+                    type="checkbox"
+                    checked={editBankReconEnabled}
+                    onChange={e => setEditBankReconEnabled(e.target.checked)}
+                    className="rounded text-indigo-600 w-4 h-4"
+                  />
+                  Bank Reconciliation
+                </label>
+
+                <label className={`p-3 rounded-xl border cursor-pointer flex items-center gap-2.5 text-xs font-bold transition-all ${editWarehouseEnabled ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
+                  <input
+                    type="checkbox"
+                    checked={editWarehouseEnabled}
+                    onChange={e => setEditWarehouseEnabled(e.target.checked)}
+                    className="rounded text-indigo-600 w-4 h-4"
+                  />
+                  Multi-Warehouse & Batches
+                </label>
+              </div>
+            </div>
+
+            {/* SECTION 2: CREATE NEW COMPANY */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-2xl shadow-xl p-6 border border-indigo-900/40">
+              <div className="flex items-center gap-3 mb-5 border-b border-indigo-900/60 pb-3">
+                 <div className="p-2.5 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-400">
+                   <Landmark size={22} />
+                 </div>
+                 <div>
+                   <h2 className="text-md font-bold tracking-tight">Enterprise Multi-Company Control Centre</h2>
+                   <p className="text-sm text-gray-400 font-medium">Deploy independent corporate entities & assign staff boundaries</p>
+                 </div>
+              </div>
+
+              <form onSubmit={handleMasterClusterDeployment} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Staff Display Name</label>
-                    <input type="text" placeholder="e.g. Accountant Staff" value={staffName} onChange={e => setStaffName(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Company Profile Title</label>
+                    <input type="text" value={newCorpCompanyName} onChange={e => setNewCorpCompanyName(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white placeholder-gray-500 outline-none" placeholder="e.g. Khaochey NW" required />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Unique Username Handle</label>
-                    <input type="text" placeholder="e.g. khaocheynw" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Official Contact Email</label>
+                    <input type="email" value={newCorpEmail} onChange={e => setNewCorpEmail(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-medium text-white placeholder-gray-500 outline-none" placeholder="billing@corporate.com" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Security Login Password</label>
-                    <input type="text" placeholder="Default: Testing@123" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Tax Node / NTN ID (Optional)</label>
+                    <input type="text" value={newCorpTaxId} onChange={e => setNewCorpTaxId(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-medium text-white placeholder-gray-500 outline-none" placeholder="Optional Registry NTN" />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-indigo-950/50 pt-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Scope Locked Role Assignment</label>
-                    <select value={staffRole} onChange={e => setStaffRole(e.target.value as Role)} className="w-full p-2 text-xs bg-indigo-950 text-indigo-300 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none font-bold">
-                      <option value="ADMIN">ADMIN (Company-Level Sub Admin)</option>
-                      <option value="ACCOUNTANT">Editor / Accountant</option>
-                      <option value="VIEWER">Viewer (Read Only)</option>
+                    <label className="block text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1.5">Reporting / Base Currency</label>
+                    <select value={newCorpBaseCurrency} onChange={e => setNewCorpBaseCurrency(e.target.value)} className="w-full p-3 bg-slate-900 text-indigo-300 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold outline-none">
+                      <option value="PKR">PKR (Pakistani Rupee)</option>
+                      <option value="USD">USD (United States Dollar)</option>
+                      <option value="AED">AED (United Arab Emirates Dirham)</option>
+                      <option value="GBP">GBP (British Pound Sterling)</option>
+                      <option value="SAR">SAR (Saudi Riyal)</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Invoice Format Prefix</label>
+                    <input type="text" value={newCorpPrefix} onChange={e => setNewCorpPrefix(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white outline-none" required />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Initial Next Index Sequence</label>
+                    <input type="number" value={newCorpNextNumber} onChange={e => setNewCorpNextNumber(Number(e.target.value))} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white outline-none" required />
+                  </div>
                 </div>
-              </div>
 
-              <button type="submit" disabled={isCreatingCorp} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg tracking-wider uppercase">
-                {isCreatingCorp ? 'Deploying Decentralized Nodes...' : <><Plus size={15} /> Execute & Launch Corporate Cluster</>}
-              </button>
-            </form>
+                {/* FEATURE ACCESS CONTROL CHECKBOXES */}
+                <div className="p-4 bg-indigo-950/40 border border-indigo-500/20 rounded-xl space-y-3">
+                  <h4 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Ecosystem Capabilities Allocations Configuration</h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
+                      <input 
+                        type="checkbox" 
+                        checked={newCorpEcomEnabled} 
+                        onChange={e => setNewCorpEcomEnabled(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
+                      />
+                      E-Commerce Payouts
+                    </label>
+
+                    <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
+                      <input 
+                        type="checkbox" 
+                        checked={newCorpBankReconEnabled} 
+                        onChange={e => setNewCorpBankReconEnabled(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
+                      />
+                      Bank Reconciliation
+                    </label>
+
+                    <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
+                      <input 
+                        type="checkbox" 
+                        checked={newCorpWarehouseEnabled} 
+                        onChange={e => setNewCorpWarehouseEnabled(e.target.checked)}
+                        className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
+                      />
+                      Multi-Warehouse & Batches
+                    </label>
+                  </div>
+                </div>
+
+                <div className="bg-indigo-950/30 border border-indigo-900/30 p-4 rounded-xl space-y-4 shadow-inner">
+                  <h4 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase">Bind Initial Workspace Staff Member Identity (Optional)</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Staff Display Name</label>
+                      <input type="text" placeholder="e.g. Accountant Staff" value={staffName} onChange={e => setStaffName(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Unique Username Handle</label>
+                      <input type="text" placeholder="e.g. khaocheynw" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Security Login Password</label>
+                      <input type="text" placeholder="Default: Testing@123" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Scope Locked Role Assignment</label>
+                      <select value={staffRole} onChange={e => setStaffRole(e.target.value as Role)} className="w-full p-2 text-xs bg-indigo-950 text-indigo-300 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none font-bold">
+                        <option value="ADMIN">ADMIN (Company-Level Sub Admin)</option>
+                        <option value="ACCOUNTANT">Editor / Accountant</option>
+                        <option value="VIEWER">Viewer (Read Only)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" disabled={isCreatingCorp} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg tracking-wider uppercase">
+                  {isCreatingCorp ? 'Deploying Decentralized Nodes...' : <><Plus size={15} /> Execute & Launch Corporate Cluster</>}
+                </button>
+              </form>
+            </div>
           </div>
         )}
 
@@ -950,7 +1052,7 @@ const Settings: React.FC<SettingsProps> = ({
       {/* QUICK ADD LEDGER MODAL */}
       {isQuickLedgerModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full p-6 animate-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full animate-in zoom-in-95 duration-150">
             <div className="border-b pb-3 mb-4">
               <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
                 <span className="text-indigo-600">➕</span>

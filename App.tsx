@@ -19,9 +19,10 @@ import {
   X,
   Building2,
   Radio,
-  Landmark, // ⭐ IMPORTED FOR BANK RECONCILIATION ICON
-  Warehouse as WarehouseIcon // ⭐ ADDED WAREHOUSE ICON
+  Landmark,
+  Warehouse as WarehouseIcon
 } from 'lucide-react';
+
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
 import ProfitLossStatement from './components/ProfitLossStatement';
@@ -41,29 +42,20 @@ import UnitManager from './components/UnitManager';
 import TransactionManager from './components/TransactionManager';
 import Dashboard from './components/Dashboard';
 
-// Sales Components
 import QuotationEntry from './components/sales/QuotationEntry';
 import SalesOrderEntry from './components/sales/SalesOrderEntry';
 import DeliveryNoteEntry from './components/sales/DeliveryNoteEntry';
 import RecurringInvoiceManager from './components/sales/RecurringInvoiceManager';
 import SalesRefundEntry from './components/sales/SalesRefundEntry';
 
-// Purchase Components
 import PurchaseOrderEntry from './components/purchase/PurchaseOrderEntry';
 import GoodsReceivingEntry from './components/purchase/GoodsReceivingEntry';
 import MakePaymentEntry from './components/purchase/MakePaymentEntry';
 import PurchaseRefundEntry from './components/purchase/PurchaseRefundEntry';
 
-// Aging Component Import
 import { AgingReports } from './components/AgingReports';
-
-// New E-Commerce Reconciliation Component Import
 import EcommerceReconciliation from './components/EcommerceReconciliation';
-
-// ⭐ IMPORTED BANK RECONCILIATION ENGINE COMPONENT
 import { BankReconciliation } from './components/BankReconciliation';
-
-// ⭐ NEW IMPORT: MULTI-WAREHOUSE & BATCH MONITOR MODULE
 import { WarehouseManager } from './components/WarehouseManager';
 
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
@@ -72,8 +64,8 @@ import { getCurrentUser, logout } from './services/authService';
 import { getCompanySettings, saveCompanySettings } from './services/settingsService';
 import { CloudService } from './services/cloudService';
 import { supabase } from './services/supabaseService'; 
+import { LanguageProvider } from './context/LanguageContext';
 
-// 👑 VERCEL TELEMETRY ENGINE ADDITIONS
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -82,9 +74,9 @@ type View =
   | 'CHART_OF_ACCOUNTS' 
   | 'JOURNAL_ENTRY' 
   | 'GENERAL_LEDGER'
-  | 'BANK_RECONCILIATION' // ⭐ ADDED VIEW ROUTE
+  | 'BANK_RECONCILIATION'
   | 'INVENTORY'
-  | 'WAREHOUSES' // ⭐ ADDED MULTI-WAREHOUSE VIEW ROUTE
+  | 'WAREHOUSES'
   | 'UNITS'
   | 'QUOTATION'
   | 'SALES_ORDER'
@@ -107,7 +99,7 @@ type View =
   | 'ECOM_RECONCILIATION'
   | 'SETTINGS';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [isLoading, setIsLoading] = useState(true);
@@ -125,21 +117,17 @@ const App: React.FC = () => {
   const [selectedLedgerForView, setSelectedLedgerForView] = useState<string>('');
   const [subscriptionStatus, setSubscriptionStatus] = useState<'TRIAL' | 'ACTIVE' | 'EXPIRED'>('TRIAL');
 
-  // New Multi-Company States
   const [companies, setCompanies] = useState<any[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState<string>(
     localStorage.getItem('supabase_active_company_id') || localStorage.getItem('active_company_id') || ''
   );
 
-  // ⭐ ACTIVE MODULE RESILIENT STATE (Pristine Addition)
   const [activeModules, setActiveModules] = useState<string[]>(['core_accounting']);
 
-  // Menu State
   const [salesMenuOpen, setSalesMenuOpen] = useState(false);
   const [purchaseMenuOpen, setPurchaseMenuOpen] = useState(false);
   const [reportsMenuOpen, setReportsMenuOpen] = useState(false);
 
-  // Helper to completely reload fresh state from Cloud DB on any update
   const reloadCloudData = async (targetCompanyId: string) => {
     if (!targetCompanyId) return;
     setSyncStatus('syncing');
@@ -156,7 +144,6 @@ const App: React.FC = () => {
         setSelectedLedgerForView('');
       }
 
-      // Fetch dynamic active workspace capabilities module string sets
       const { data: currentComp } = await supabase
         .from('companies')
         .select('enabled_modules')
@@ -176,7 +163,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Load companies mapped to user or ALL if admin standard bypass
   const fetchUserCompanies = async (currentUserSession: User) => {
     try {
       let finalUniqueList: any[] = [];
@@ -220,7 +206,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Initialize App Configuration Matrix
   useEffect(() => {
     const init = async () => {
         const session = getCurrentUser();
@@ -239,7 +224,6 @@ const App: React.FC = () => {
     };
     init();
 
-    // Context workspace modules live payload refresh sync triggers listeners
     const handleWorkspaceSwitch = (e: any) => {
       if (e.detail && e.detail.id) {
         reloadCloudData(e.detail.id);
@@ -288,7 +272,7 @@ const App: React.FC = () => {
     } catch (e) {
         console.error("Operation Sync Failed:", e);
         setSyncStatus('error');
-        alert("Database sync failed! Check matrix fields.");
+        alert("Database sync failed!");
     }
   };
 
@@ -382,7 +366,6 @@ const App: React.FC = () => {
       );
   }
 
-  // ⭐ FIXED SIDEBAR ITEM WITH WHITESPACE-NOWRAP FOR CLEAN ALIGNMENT
   const SidebarItem = ({ view, icon: Icon, label, nested = false, badge }: { view: View; icon?: React.ElementType; label: string, nested?: boolean, badge?: number }) => {
     return (
       <button
@@ -473,7 +456,6 @@ const App: React.FC = () => {
             <SidebarItem view="JOURNAL_ENTRY" icon={FileText} label="Journal General" />
             <SidebarItem view="GENERAL_LEDGER" icon={ClipboardList} label="General Ledger" />
             
-            {/* ⭐ BANK RECONCILIATION COMPANY ACCESS GATE */}
             {activeModules.includes('bank_reconciliation') && (
               <SidebarItem view="BANK_RECONCILIATION" icon={Landmark} label="Bank Reconciliation" />
             )}
@@ -518,14 +500,12 @@ const App: React.FC = () => {
 
             <SidebarItem view="INVENTORY" icon={Package} label="Inventory" badge={lowStockCount} />
             
-            {/* ⭐ MULTI-WAREHOUSE COMPANY ACCESS GATE */}
             {activeModules.includes('multi_warehouse') && (
               <SidebarItem view="WAREHOUSES" icon={WarehouseIcon} label="Warehouses" />
             )}
 
             <SidebarItem view="EXPENSES" icon={Wallet} label="Expenses" />
             
-            {/* ⭐ DYNAMIC MULTI-TENANT E-COMMERCE GATE */}
             {activeModules.includes('ecommerce_reconciliation') && (
               <SidebarItem view="ECOM_RECONCILIATION" icon={Radio} label="E-Commerce Payouts" />
             )}
@@ -604,17 +584,14 @@ const App: React.FC = () => {
                   <GeneralLedgerView ledgers={ledgers} vouchers={vouchers} initialLedgerId={selectedLedgerForView} />
                 )}
 
-                {/* ⭐ BANK RECONCILIATION VIEW GATE */}
                 {currentView === 'BANK_RECONCILIATION' && activeModules.includes('bank_reconciliation') && (
                   <BankReconciliation ledgers={ledgers} vouchers={vouchers} onSaveVoucher={handleSaveVoucher} />
                 )}
 
-                {/* ⭐ INVENTORY VIEW */}
                 {currentView === 'INVENTORY' && (
                   <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteInventoryItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
 
-                {/* ⭐ WAREHOUSES VIEW GATE */}
                 {currentView === 'WAREHOUSES' && activeModules.includes('multi_warehouse') && (
                   <WarehouseManager />
                 )}
@@ -711,6 +688,14 @@ const App: React.FC = () => {
       <SpeedInsights />
       <Analytics />
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   );
 };
 
