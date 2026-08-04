@@ -529,7 +529,6 @@ const AppContent: React.FC = () => {
                      <SidebarItem view="REPORT_PL" label="Profit & Loss" nested />
                      <SidebarItem view="REPORT_BS" label="Balance Sheet" nested />
                      <SidebarItem view="REPORT_AGING" label="Aging Analysis" nested /> 
-                     {/* ⭐ 4 NAYI REPORTS IN SIDEBAR DROPDOWN */}
                      <SidebarItem view="REPORT_TRIAL" label="Trial Balance" nested />
                      <SidebarItem view="REPORT_CASH" label="Cash & Bank Book" nested />
                      <SidebarItem view="REPORT_STOCK" label="Stock Summary" nested />
@@ -685,15 +684,18 @@ const AppContent: React.FC = () => {
                     <AgingReports ledgers={ledgers} vouchers={vouchers} />
                 )}
 
-                {/* ⭐ ROUTING ALL 4 NEW REPORTS TO ReportView */}
-                {(currentView === 'REPORT_TRIAL' || currentView === 'REPORT_CASH' || currentView === 'REPORT_STOCK' || currentView === 'REPORT_SALES') && (
-                  <ReportView 
-                    trialBalance={trialBalance} 
-                    summary={financialSummary} 
-                    ledgers={ledgers} 
-                    vouchers={vouchers} 
-                    inventory={inventoryItems} 
-                  />
+                {/* ⭐ ROUTING ALL 4 NEW REPORTS DIRECTLY TO ReportView WITH EXACT TYPE */}
+                {currentView === 'REPORT_TRIAL' && (
+                  <ReportView type="TRIAL_BALANCE" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
+                )}
+                {currentView === 'REPORT_CASH' && (
+                  <ReportView type="CASH_BANK" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
+                )}
+                {currentView === 'REPORT_STOCK' && (
+                  <ReportView type="STOCK_SUMMARY" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
+                )}
+                {currentView === 'REPORT_SALES' && (
+                  <ReportView type="SALES_TAX" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
                 )}
 
                 {currentView === 'SETTINGS' && user?.role === 'ADMIN' && (
