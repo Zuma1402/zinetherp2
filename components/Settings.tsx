@@ -56,7 +56,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
 
-  // ⭐ FEATURE EDIT MODAL STATES
+  // FEATURE EDIT MODAL STATES
   const [isFeatureModalOpen, setIsFeatureModalOpen] = useState(false);
   const [selectedCompanyForFeatures, setSelectedCompanyForFeatures] = useState<{id: string, name: string} | null>(null);
   const [modalEcomEnabled, setModalEcomEnabled] = useState(false);
@@ -165,7 +165,8 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name, enabled_modules');
+      // ⭐ DIRECT COMPANIES FETCH GUARANTEE
+      const { data: companiesData, error: compErr } = await supabase.from('companies').select('id, name, enabled_modules').order('name');
       if (!compErr && companiesData) {
         setAllDbCompanies(companiesData);
       }
@@ -196,7 +197,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   useEffect(() => {
     syncEngineData();
-  }, [currentUser, localActiveId, allDbCompanies.length]);
+  }, [currentUser, localActiveId]);
 
   // ⭐ OPEN EDIT FEATURES MODAL FOR ANY COMPANY
   const handleOpenFeatureModal = async (companyId: string, companyNameStr: string) => {
@@ -229,7 +230,7 @@ const Settings: React.FC<SettingsProps> = ({
       if (!error) {
         alert(`Features updated for "${selectedCompanyForFeatures.name}"!`);
         setIsFeatureModalOpen(false);
-        syncEngineData();
+        await syncEngineData();
         window.dispatchEvent(new CustomEvent('companySwitched', { detail: { id: selectedCompanyForFeatures.id } }));
       } else {
         alert("Failed to update features: " + error.message);
@@ -653,7 +654,7 @@ const Settings: React.FC<SettingsProps> = ({
         {/* MASTER LAYER */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 space-y-6">
-            {/* ⭐ SECTION 1: MASTER COMPANY FEATURES CONTROL DIRECT TABLE */}
+            {/* ⭐ MASTER COMPANY FEATURES CONTROL DIRECT TABLE */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
                 <div>
@@ -675,36 +676,44 @@ const Settings: React.FC<SettingsProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium text-xs text-gray-800 bg-white">
-                    {allDbCompanies.map(comp => {
-                      const mods = comp.enabled_modules || ['core_accounting'];
-                      return (
-                        <tr key={comp.id} className="hover:bg-gray-50 transition">
-                          <td className="p-3 pl-4 font-bold text-gray-900">🏢 {comp.name}</td>
-                          <td className="p-3 font-mono text-[10px] text-gray-400">{comp.id}</td>
-                          <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                              {mods.includes('ecommerce_reconciliation') && (
-                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">E-Com</span>
-                              )}
-                              {mods.includes('bank_reconciliation') && (
-                                <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">Bank Recon</span>
-                              )}
-                              {mods.includes('multi_warehouse') && (
-                                <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">Warehouse</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3 text-right pr-4">
-                            <button
-                              onClick={() => handleOpenFeatureModal(comp.id, comp.name)}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 ml-auto"
-                            >
-                              <EditIcon size={12} /> Edit Features
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {allDbCompanies.length > 0 ? (
+                      allDbCompanies.map(comp => {
+                        const mods = comp.enabled_modules || ['core_accounting'];
+                        return (
+                          <tr key={comp.id} className="hover:bg-gray-50 transition">
+                            <td className="p-3 pl-4 font-bold text-gray-900">🏢 {comp.name}</td>
+                            <td className="p-3 font-mono text-[10px] text-gray-400">{comp.id}</td>
+                            <td className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                {mods.includes('ecommerce_reconciliation') && (
+                                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">E-Com</span>
+                                )}
+                                {mods.includes('bank_reconciliation') && (
+                                  <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">Bank Recon</span>
+                                )}
+                                {mods.includes('multi_warehouse') && (
+                                  <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">Warehouse</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 text-right pr-4">
+                              <button
+                                onClick={() => handleOpenFeatureModal(comp.id, comp.name)}
+                                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 ml-auto"
+                              >
+                                <EditIcon size={12} /> Edit Features
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="p-6 text-center text-gray-400 font-medium italic">
+                          No company workspaces found in database registry.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
