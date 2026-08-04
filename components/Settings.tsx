@@ -56,7 +56,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
 
-  // ⭐ SIMPLE IN-LINE FEATURE EDIT MODAL STATES
+  // FEATURE EDIT MODAL STATES
   const [isFeatureModalOpen, setIsFeatureModalOpen] = useState(false);
   const [selectedCompanyForFeatures, setSelectedCompanyForFeatures] = useState<{id: string, name: string} | null>(null);
   const [modalEcomEnabled, setModalEcomEnabled] = useState(false);
@@ -198,11 +198,9 @@ const Settings: React.FC<SettingsProps> = ({
     syncEngineData();
   }, [currentUser, localActiveId, allDbCompanies.length]);
 
-  // ⭐ TRIGGER EDIT FEATURES MODAL FOR A COMPANY DIRECTLY FROM TABLE
   const handleOpenFeatureModal = async (companyId: string, companyNameStr: string) => {
     setSelectedCompanyForFeatures({ id: companyId, name: companyNameStr });
     
-    // Fetch fresh modules from DB
     const { data } = await supabase.from('companies').select('enabled_modules').eq('id', companyId).maybeSingle();
     const mods = data?.enabled_modules || ['core_accounting'];
     
@@ -941,7 +939,7 @@ const Settings: React.FC<SettingsProps> = ({
 
                       <td className="p-3 text-right pr-4">
                          <div className="flex justify-end gap-2 items-center">
-                            {/* ⭐ DIRECT EDIT FEATURES BUTTON FOR THIS SPECIFIC COMPANY */}
+                            {/* DIRECT EDIT FEATURES BUTTON IN TABLE */}
                             {isMasterZenithScope && compMatch && (
                               <button
                                 onClick={() => handleOpenFeatureModal(compMatch.id, compMatch.name)}
@@ -997,7 +995,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       </div>
 
-      {/* ⭐ SIMPLE CLEAN FEATURE EDIT MODAL */}
+      {/* FEATURE EDIT MODAL */}
       {isFeatureModalOpen && selectedCompanyForFeatures && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 animate-in zoom-in-95 duration-150 shadow-2xl">
