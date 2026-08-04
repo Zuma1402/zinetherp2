@@ -64,7 +64,7 @@ import { getCurrentUser, logout } from './services/authService';
 import { getCompanySettings, saveCompanySettings } from './services/settingsService';
 import { CloudService } from './services/cloudService';
 import { supabase } from './services/supabaseService'; 
-import { LanguageProvider } from './context/LanguageContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Analytics } from "@vercel/analytics/react";
@@ -100,6 +100,7 @@ type View =
   | 'SETTINGS';
 
 const AppContent: React.FC = () => {
+  const { t, language } = useLanguage();
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [isLoading, setIsLoading] = useState(true);
@@ -449,22 +450,22 @@ const AppContent: React.FC = () => {
         </div>
         
         <nav className="flex-1 px-4 py-2 space-y-0.5 overflow-y-auto">
-            <SidebarItem view="DASHBOARD" icon={LayoutDashboard} label="Dashboard" />
+            <SidebarItem view="DASHBOARD" icon={LayoutDashboard} label={t('dashboard') || "Dashboard"} />
 
-            <div className="pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">Accounting</div>
-            <SidebarItem view="CHART_OF_ACCOUNTS" icon={BookOpen} label="Chart of Accounts" />
-            <SidebarItem view="JOURNAL_ENTRY" icon={FileText} label="Journal General" />
-            <SidebarItem view="GENERAL_LEDGER" icon={ClipboardList} label="General Ledger" />
+            <div className="pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">{t('accounting') || "Accounting"}</div>
+            <SidebarItem view="CHART_OF_ACCOUNTS" icon={BookOpen} label={t('chartOfAccounts') || "Chart of Accounts"} />
+            <SidebarItem view="JOURNAL_ENTRY" icon={FileText} label={t('journalEntry') || "Journal General"} />
+            <SidebarItem view="GENERAL_LEDGER" icon={ClipboardList} label={t('generalLedger') || "General Ledger"} />
             
             {activeModules.includes('bank_reconciliation') && (
               <SidebarItem view="BANK_RECONCILIATION" icon={Landmark} label="Bank Reconciliation" />
             )}
             
-            <div className="pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">Business</div>
+            <div className="pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">{t('business') || "Business"}</div>
             
             <div>
                 <button onClick={() => setSalesMenuOpen(!salesMenuOpen)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-lg transition">
-                  <div className="flex items-center gap-3"><ShoppingCart size={18} className="text-indigo-500" /> Sales</div>
+                  <div className="flex items-center gap-3"><ShoppingCart size={18} className="text-indigo-500" /> {t('sales') || "Sales"}</div>
                   {salesMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
                 {salesMenuOpen && (
@@ -483,7 +484,7 @@ const AppContent: React.FC = () => {
 
             <div>
                 <button onClick={() => setPurchaseMenuOpen(!purchaseMenuOpen)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-lg transition">
-                  <div className="flex items-center gap-3"><ShoppingBag size={18} className="text-blue-500" /> Purchases</div>
+                  <div className="flex items-center gap-3"><ShoppingBag size={18} className="text-blue-500" /> {t('purchases') || "Purchases"}</div>
                   {purchaseMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
                 {purchaseMenuOpen && (
@@ -498,22 +499,22 @@ const AppContent: React.FC = () => {
                 )}
             </div>
 
-            <SidebarItem view="INVENTORY" icon={Package} label="Inventory" badge={lowStockCount} />
+            <SidebarItem view="INVENTORY" icon={Package} label={t('inventory') || "Inventory"} badge={lowStockCount} />
             
             {activeModules.includes('multi_warehouse') && (
               <SidebarItem view="WAREHOUSES" icon={WarehouseIcon} label="Warehouses" />
             )}
 
-            <SidebarItem view="EXPENSES" icon={Wallet} label="Expenses" />
+            <SidebarItem view="EXPENSES" icon={Wallet} label={t('expenses') || "Expenses"} />
             
             {activeModules.includes('ecommerce_reconciliation') && (
               <SidebarItem view="ECOM_RECONCILIATION" icon={Radio} label="E-Commerce Payouts" />
             )}
 
-            <div className="pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">System</div>
+            <div className="pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">{t('system') || "System"}</div>
             <div>
                 <button onClick={() => setReportsMenuOpen(!reportsMenuOpen)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 rounded-lg transition">
-                  <div className="flex items-center gap-3"><PieChart size={18} className="text-orange-500" /> Reports</div>
+                  <div className="flex items-center gap-3"><PieChart size={18} className="text-orange-500" /> {t('reports') || "Reports"}</div>
                   {reportsMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </button>
                 {reportsMenuOpen && (
@@ -524,7 +525,7 @@ const AppContent: React.FC = () => {
                   </div>
                 )}
             </div>
-            {user?.role === 'ADMIN' && <SidebarItem view="SETTINGS" icon={SettingsIcon} label="Settings" />}
+            {user?.role === 'ADMIN' && <SidebarItem view="SETTINGS" icon={SettingsIcon} label={t('settings') || "Settings"} />}
         </nav>
 
         <div className="p-4 border-t border-gray-100 bg-gray-50/50">
@@ -538,7 +539,7 @@ const AppContent: React.FC = () => {
   if (!user) return <Login onLogin={handleLogin} />;
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden relative">
+    <div className="flex h-screen bg-gray-50 overflow-hidden relative" dir={language === 'ur' || language === 'ar' ? 'rtl' : 'ltr'}>
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex">
         <SidebarContent />
       </aside>
