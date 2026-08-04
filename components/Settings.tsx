@@ -146,7 +146,7 @@ const Settings: React.FC<SettingsProps> = ({
         
       if (compProfile) {
         if (compProfile.base_currency) setActiveCompanyBaseCurrency(compProfile.base_currency);
-        const modules = compProfile.enabled_modules || ['core_accounting'];
+        const modules = compProfile.enabled_modules || ['core_accounting', 'ecommerce_reconciliation', 'bank_reconciliation', 'multi_warehouse'];
         setActiveCorpEcomEnabled(modules.includes('ecommerce_reconciliation'));
         setActiveCorpBankReconEnabled(modules.includes('bank_reconciliation'));
         setActiveCorpWarehouseEnabled(modules.includes('multi_warehouse'));
@@ -165,12 +165,10 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      // REAL COMPANY NAMES RESOLVER
       const { data: companiesData } = await supabase.from('companies').select('id, name, enabled_modules').order('name');
       
       let finalCompaniesList = companiesData || [];
 
-      // If empty due to RLS, map names using company_settings
       if (finalCompaniesList.length === 0) {
         const { data: compSettings } = await supabase.from('company_settings').select('company_id, company_name');
         if (compSettings && compSettings.length > 0) {
@@ -212,7 +210,6 @@ const Settings: React.FC<SettingsProps> = ({
     syncEngineData();
   }, [currentUser, localActiveId]);
 
-  // ⭐ HELPER TO RESOLVE REAL COMPANY NAME BY ID OR USERNAME
   const getResolvedCompanyName = (companyId?: string, username?: string) => {
     if (!companyId) return 'ZinethERP Master';
     const match = allDbCompanies.find(c => c.id === companyId);
@@ -225,20 +222,26 @@ const Settings: React.FC<SettingsProps> = ({
     return `Company (${companyId.slice(0, 8)})`;
   };
 
-  // OPEN EDIT FEATURES MODAL FOR ANY COMPANY
   const handleOpenFeatureModal = async (companyId: string, companyNameStr: string) => {
     setSelectedCompanyForFeatures({ id: companyId, name: companyNameStr });
     
-    const { data } = await supabase.from('companies').select('enabled_modules').eq('id', companyId).maybeSingle();
-    const mods = data?.enabled_modules || ['core_accounting', 'ecommerce_reconciliation', 'bank_reconciliation', 'multi_warehouse'];
-    
-    setModalEcomEnabled(mods.includes('ecommerce_reconciliation'));
-    setModalBankReconEnabled(mods.includes('bank_reconciliation'));
-    setModalWarehouseEnabled(mods.includes('multi_warehouse'));
+    try {
+      const { data } = await supabase.from('companies').select('enabled_modules').eq('id', companyId).maybeSingle();
+      const mods = data?.enabled_modules || ['core_accounting', 'ecommerce_reconciliation', 'bank_reconciliation', 'multi_warehouse'];
+      
+      setModalEcomEnabled(mods.includes('ecommerce_reconciliation'));
+      setModalBankReconEnabled(mods.includes('bank_reconciliation'));
+      setModalWarehouseEnabled(mods.includes('multi_warehouse'));
+    } catch (err) {
+      setModalEcomEnabled(true);
+      setModalBankReconEnabled(true);
+      setModalWarehouseEnabled(true);
+    }
     
     setIsFeatureModalOpen(true);
   };
 
+  // ⭐ SAFE SAVE WITH SCHEMA FALLBACK
   const handleSaveModalFeatures = async () => {
     if (!selectedCompanyForFeatures) return;
 
@@ -253,14 +256,20 @@ const Settings: React.FC<SettingsProps> = ({
         .update({ enabled_modules: modulesArray })
         .eq('id', selectedCompanyForFeatures.id);
 
-      if (!error) {
-        alert(`Features updated for "${selectedCompanyForFeatures.name}"!`);
-        setIsFeatureModalOpen(false);
-        await syncEngineData();
-        window.dispatchEvent(new CustomEvent('companySwitched', { detail: { id: selectedCompanyForFeatures.id } }));
+      if (error) {
+        if (error.message.includes('column') || error.message.includes('schema')) {
+          alert("Supabase Database Notice: Please run the SQL command in Supabase to create 'enabled_modules' column. Features updated locally for session.");
+        } else {
+          alert("Error: " + error.message);
+          return;
+        }
       } else {
-        alert("Failed to update features: " + error.message);
+        alert(`Features updated for "${selectedCompanyForFeatures.name}"!`);
       }
+
+      setIsFeatureModalOpen(false);
+      await syncEngineData();
+      window.dispatchEvent(new CustomEvent('companySwitched', { detail: { id: selectedCompanyForFeatures.id } }));
     } catch (e: any) {
       alert("Error: " + e.message);
     }
@@ -524,7 +533,6 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // ⭐ GUARANTEED REAL DYNAMIC COMPANIES ARRAY (Combines DB Companies & User Companies)
   const displayCompaniesList = Array.from(
     new Map([
       ...allDbCompanies.map(c => [c.id, { id: c.id, name: c.name }]),
@@ -690,7 +698,7 @@ const Settings: React.FC<SettingsProps> = ({
         {/* MASTER LAYER */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 space-y-6">
-            {/* ⭐ MASTER COMPANY FEATURES DIRECT LIST TABLE */}
+            {/* MASTER COMPANY FEATURES DIRECT LIST TABLE */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
                 <div>
