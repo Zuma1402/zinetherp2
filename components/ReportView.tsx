@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { TrialBalanceRow, FinancialSummary, Department, Division, Ledger, Voucher, InventoryItem, VoucherType } from '../types';
-import { supabase } from '../services/supabaseService';
-import { Layers, Compass, BookOpen, Wallet, Package, ShoppingBag, Search, Download, BarChart2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { TrialBalanceRow, FinancialSummary, Ledger, Voucher, InventoryItem, VoucherType } from '../types';
+import { BookOpen, Wallet, ArrowLeftRight, ShoppingBag, Search, Printer, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
 interface ReportViewProps {
-  type?: 'TRIAL_BALANCE' | 'CASH_BANK' | 'STOCK_SUMMARY' | 'SALES_TAX';
+  type?: 'TRIAL_BALANCE' | 'CASH_BANK' | 'STOCK_MOVEMENT' | 'SALES_TAX';
   trialBalance: TrialBalanceRow[];
   summary: FinancialSummary;
   ledgers?: Ledger[];
@@ -14,70 +12,10 @@ interface ReportViewProps {
 }
 
 const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBalance, summary, ledgers = [], vouchers = [], inventory = [] }) => {
-  // ⭐ Segments Structural Hooks
-  const [activeDept, setActiveDept] = useState('');
-  const [activeDiv, setActiveDiv] = useState('');
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [divisions, setDivisions] = useState<Division[]>([]);
-  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCashBankLedger, setSelectedCashBankLedger] = useState('');
-  
-  // Dynamic filtered states computed locally
-  const [computedSummary, setComputedSummary] = useState<FinancialSummary>(summary);
 
-  useEffect(() => {
-    const loadDimensions = async () => {
-      const { data: d } = await supabase.from('departments').select('*');
-      const { data: v } = await supabase.from('divisions').select('*');
-      if (d) setDepartments(d);
-      if (v) setDivisions(v);
-    };
-    loadDimensions();
-  }, []);
-
-  // Recalculate dimensional breakdown based on selected tags
-  useEffect(() => {
-    if (!activeDept && !activeDiv) {
-      setComputedSummary(summary);
-      return;
-    }
-
-    const runSegmentedPL = async () => {
-      try {
-        let query = supabase.from('journal_entries').select('debit, credit, ledgers(type)');
-        
-        if (activeDept) query = query.eq('department_id', activeDept);
-        if (activeDiv) query = query.eq('division_id', activeDiv);
-
-        const { data: lines } = await query;
-        
-        let inc = 0;
-        let exp = 0;
-
-        if (lines) {
-          lines.forEach((l: any) => {
-            const type = l.ledgers?.type;
-            if (type === 'INCOME') inc += (l.credit - l.debit);
-            if (type === 'EXPENSE') exp += (l.debit - l.credit);
-          });
-        }
-
-        setComputedSummary({
-          ...summary,
-          totalIncome: inc,
-          totalExpenses: exp,
-          netProfit: inc - exp
-        });
-      } catch (err) {
-        console.error('Error computing segmented statement metrics', err);
-      }
-    };
-
-    runSegmentedPL();
-  }, [activeDept, activeDiv, summary]);
-
-  // ⭐ 1. Extended Trial Balance Calculations
+  // 1. Trial Balance Calculation
   const extendedTrialData = useMemo(() => {
     return ledgers.map(ledger => {
       let debit = 0;
@@ -117,7 +55,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
     }), { debit: 0, credit: 0 });
   }, [extendedTrialData]);
 
-  // ⭐ 2. Cash & Bank Accounts Filtering
+  // 2. Cash & Bank Accounts Filtering
   const cashBankLedgers = useMemo(() => {
     return ledgers.filter(l => 
       l.type === 'ASSET' && (
@@ -152,7 +90,42 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
     return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [selectedCashBankLedger, cashBankLedgers, vouchers]);
 
-  // ⭐ 3. Sales & Tax Summary
+  // 3. Stock Inflow & Outflow Movement Calculation
+  const stockMovementData = useMemo(() => {
+    return inventory.map(item => {
+      let inflowQty = 0;
+      let outflowQty = 0;
+
+      vouchers.forEach(v => {
+        if (v.items && Array.isArray(v.items)) {
+          v.items.forEach((line: any) => {
+            if (line.itemId === item.id || line.description === item.name) {
+              const qty = Number(line.quantity || line.qty || 0);
+              if (v.type === VoucherType.PURCHASE || v.type === VoucherType.CREDIT_NOTE) {
+                inflowQty += qty;
+              } else if (v.type === VoucherType.SALES || v.type === VoucherType.DEBIT_NOTE) {
+                outflowQty += qty;
+              }
+            }
+          });
+        }
+      });
+
+      return {
+        id: item.id,
+        name: item.name,
+        sku: item.sku || 'N/A',
+        unit: item.unit || 'Pcs',
+        inflowQty,
+        outflowQty,
+        currentStock: item.currentStock || 0,
+        costPrice: item.costPrice || 0,
+        valuation: (item.currentStock || 0) * (item.costPrice || 0)
+      };
+    }).filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()) || i.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [inventory, vouchers, searchTerm]);
+
+  // 4. Sales & Tax Summary
   const salesTaxData = useMemo(() => {
     const salesVouchers = vouchers.filter(v => v.type === VoucherType.SALES);
     return salesVouchers.map(v => {
@@ -174,14 +147,47 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
   }, [vouchers, searchTerm]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 printable-report">
+      {/* Print Specific Inline Styling */}
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          .printable-report, .printable-report * {
+            visibility: visible;
+          }
+          .printable-report {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+          }
+          th, td {
+            border: 1px solid #cbd5e1 !important;
+            padding: 8px !important;
+            color: black !important;
+          }
+        }
+      `}</style>
+
       {/* Header Bar */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
           <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
             {type === 'TRIAL_BALANCE' && <><BookOpen className="text-indigo-600" size={22} /> Trial Balance (آزمائشی میزان)</>}
             {type === 'CASH_BANK' && <><Wallet className="text-emerald-600" size={22} /> Cash & Bank Book</>}
-            {type === 'STOCK_SUMMARY' && <><Package className="text-orange-600" size={22} /> Stock Summary & Valuation</>}
+            {type === 'STOCK_MOVEMENT' && <><ArrowLeftRight className="text-orange-600" size={22} /> Stock Inflow & Outflow Movement</>}
             {type === 'SALES_TAX' && <><ShoppingBag className="text-blue-600" size={22} /> Sales & Tax Summary Report</>}
           </h2>
           <p className="text-xs text-gray-500 font-medium mt-1">Real-time dynamic audit summary generated from live transactions</p>
@@ -198,10 +204,16 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
               className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-xl font-bold bg-gray-50 outline-none focus:border-indigo-500" 
             />
           </div>
-          <button onClick={() => window.print()} className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs hover:bg-slate-800 shrink-0">
-            <Download size={14} /> Export / Print
+          <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm hover:bg-indigo-700 shrink-0">
+            <Printer size={14} /> Print / Export PDF
           </button>
         </div>
+      </div>
+
+      {/* Print Visible Watermark Header */}
+      <div className="hidden print:block mb-4 border-b pb-2">
+        <h1 className="text-xl font-black text-black uppercase">ZinethERP Financial Reporting</h1>
+        <p className="text-xs font-bold text-gray-600">Generated Report: {type.replace('_', ' ')} | Date: {new Date().toLocaleDateString()}</p>
       </div>
 
       {/* 1. TRIAL BALANCE */}
@@ -228,12 +240,12 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-slate-900 text-white font-black text-xs border-t">
+            <tfoot className="bg-slate-900 text-white print:bg-gray-200 print:text-black font-black text-xs border-t">
               <tr>
                 <td colSpan={2} className="p-4 pl-6 uppercase tracking-wider">Total Trial Balance Mizan</td>
-                <td className="p-4 text-right text-emerald-400">Rs {trialTotals.debit.toLocaleString()}</td>
-                <td className="p-4 text-right text-rose-400">Rs {trialTotals.credit.toLocaleString()}</td>
-                <td className="p-4 text-right pr-6 text-indigo-300">Audited Node</td>
+                <td className="p-4 text-right text-emerald-400 print:text-black">Rs {trialTotals.debit.toLocaleString()}</td>
+                <td className="p-4 text-right text-rose-400 print:text-black">Rs {trialTotals.credit.toLocaleString()}</td>
+                <td className="p-4 text-right pr-6 text-indigo-300 print:text-black">Audited Node</td>
               </tr>
             </tfoot>
           </table>
@@ -243,7 +255,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
       {/* 2. CASH & BANK BOOK */}
       {type === 'CASH_BANK' && (
         <div className="space-y-4">
-          <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-center gap-3">
+          <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-center gap-3 no-print">
             <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Select Cash/Bank Account:</label>
             <select 
               value={selectedCashBankLedger} 
@@ -288,35 +300,46 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
         </div>
       )}
 
-      {/* 3. STOCK SUMMARY */}
-      {type === 'STOCK_SUMMARY' && (
+      {/* 3. STOCK INFLOW & OUTFLOW MOVEMENT REPORT */}
+      {type === 'STOCK_MOVEMENT' && (
         <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
           <table className="w-full text-xs text-left">
-            <thead className="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider border-b">
+            <thead className="bg-slate-100 text-gray-600 font-black uppercase tracking-wider border-b">
               <tr>
-                <th className="p-3.5 pl-6">Inventory Item Name</th>
+                <th className="p-3.5 pl-6">Item Description</th>
                 <th className="p-3.5 text-center">SKU / Code</th>
-                <th className="p-3.5 text-right">Current Stock Qty</th>
-                <th className="p-3.5 text-right">Cost Price</th>
-                <th className="p-3.5 text-right pr-6">Total Asset Value</th>
+                <th className="p-3.5 text-right text-emerald-700">
+                  <span className="flex items-center justify-end gap-1"><ArrowDownLeft size={13}/> Inflow Qty (Aamad)</span>
+                </th>
+                <th className="p-3.5 text-right text-rose-700">
+                  <span className="flex items-center justify-end gap-1"><ArrowUpRight size={13}/> Outflow Qty (Kharij)</span>
+                </th>
+                <th className="p-3.5 text-right text-indigo-900">Available Stock Balance</th>
+                <th className="p-3.5 text-right pr-6">Asset Valuation</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-bold text-gray-800">
-              {inventory.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => {
-                const totalValue = item.currentStock * item.costPrice;
-                return (
-                  <tr key={item.id} className="hover:bg-gray-50 transition">
-                    <td className="p-3.5 pl-6 text-gray-900 font-extrabold">{item.name}</td>
-                    <td className="p-3.5 text-center text-gray-400 font-mono">{item.sku || 'N/A'}</td>
-                    <td className="p-3.5 text-right font-black text-indigo-700">{item.currentStock} {item.unit || 'Pcs'}</td>
-                    <td className="p-3.5 text-right text-gray-600">Rs {item.costPrice.toLocaleString()}</td>
-                    <td className="p-3.5 text-right pr-6 font-black text-emerald-600">Rs {totalValue.toLocaleString()}</td>
-                  </tr>
-                );
-              })}
-              {inventory.length === 0 && (
+              {stockMovementData.map(item => (
+                <tr key={item.id} className="hover:bg-gray-50 transition">
+                  <td className="p-3.5 pl-6 text-gray-900 font-extrabold">{item.name}</td>
+                  <td className="p-3.5 text-center text-gray-400 font-mono">{item.sku}</td>
+                  <td className="p-3.5 text-right text-emerald-600 font-black">
+                    {item.inflowQty > 0 ? `+${item.inflowQty} ${item.unit}` : '-'}
+                  </td>
+                  <td className="p-3.5 text-right text-rose-600 font-black">
+                    {item.outflowQty > 0 ? `-${item.outflowQty} ${item.unit}` : '-'}
+                  </td>
+                  <td className="p-3.5 text-right font-black text-indigo-950 bg-indigo-50/50">
+                    {item.currentStock} {item.unit}
+                  </td>
+                  <td className="p-3.5 text-right pr-6 font-black text-emerald-600">
+                    Rs {item.valuation.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+              {stockMovementData.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-gray-400 italic">No inventory stock items available.</td>
+                  <td colSpan={6} className="p-8 text-center text-gray-400 italic">No inventory movement recorded in system.</td>
                 </tr>
               )}
             </tbody>

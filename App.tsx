@@ -531,7 +531,7 @@ const AppContent: React.FC = () => {
                      <SidebarItem view="REPORT_AGING" label="Aging Analysis" nested /> 
                      <SidebarItem view="REPORT_TRIAL" label="Trial Balance" nested />
                      <SidebarItem view="REPORT_CASH" label="Cash & Bank Book" nested />
-                     <SidebarItem view="REPORT_STOCK" label="Stock Summary" nested />
+                     <SidebarItem view="REPORT_STOCK" label="Stock In & Outflow" nested />
                      <SidebarItem view="REPORT_SALES" label="Sales & Tax Report" nested />
                   </div>
                 )}
@@ -684,7 +684,7 @@ const AppContent: React.FC = () => {
                     <AgingReports ledgers={ledgers} vouchers={vouchers} />
                 )}
 
-                {/* ⭐ ROUTING ALL 4 NEW REPORTS DIRECTLY TO ReportView WITH EXACT TYPE */}
+                {/* ⭐ ROUTING DIRECTLY TO ReportView WITH EXACT MATCHING TYPES */}
                 {currentView === 'REPORT_TRIAL' && (
                   <ReportView type="TRIAL_BALANCE" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
                 )}
@@ -692,7 +692,7 @@ const AppContent: React.FC = () => {
                   <ReportView type="CASH_BANK" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
                 )}
                 {currentView === 'REPORT_STOCK' && (
-                  <ReportView type="STOCK_SUMMARY" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
+                  <ReportView type="STOCK_MOVEMENT" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
                 )}
                 {currentView === 'REPORT_SALES' && (
                   <ReportView type="SALES_TAX" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
