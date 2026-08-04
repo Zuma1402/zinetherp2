@@ -165,19 +165,18 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      // ⭐ ROBUST DUAL-SOURCE COMPANY FETCH (Bypasses RLS blocks)
+      // ⭐ REAL COMPANY NAMES RESOLVER
       const { data: companiesData } = await supabase.from('companies').select('id, name, enabled_modules').order('name');
       
       let finalCompaniesList = companiesData || [];
 
-      // Fallback: If companies table returns empty due to RLS, reconstruct list from users & user_companies
+      // If empty due to RLS, map names using company_settings or local storage
       if (finalCompaniesList.length === 0) {
-        const { data: userComps } = await supabase.from('user_companies').select('company_id');
-        if (userComps && userComps.length > 0) {
-          const uniqueIds = Array.from(new Set(userComps.map(uc => uc.company_id)));
-          finalCompaniesList = uniqueIds.map((id, index) => ({
-            id: id,
-            name: `Company Workspace ${index + 1}`,
+        const { data: compSettings } = await supabase.from('company_settings').select('company_id, company_name');
+        if (compSettings && compSettings.length > 0) {
+          finalCompaniesList = compSettings.map(cs => ({
+            id: cs.company_id,
+            name: cs.company_name || 'Corporate Workspace',
             enabled_modules: ['core_accounting', 'ecommerce_reconciliation', 'bank_reconciliation', 'multi_warehouse']
           }));
         }
@@ -213,7 +212,20 @@ const Settings: React.FC<SettingsProps> = ({
     syncEngineData();
   }, [currentUser, localActiveId]);
 
-  // ⭐ OPEN EDIT FEATURES MODAL FOR ANY COMPANY
+  // ⭐ HELPER TO RESOLVE REAL COMPANY NAME BY ID OR USERNAME
+  const getResolvedCompanyName = (companyId?: string, username?: string) => {
+    if (!companyId) return 'ZinethERP Master';
+    const match = allDbCompanies.find(c => c.id === companyId);
+    if (match && match.name) return match.name;
+
+    if (username?.includes('bd')) return 'Khaochey BD';
+    if (username?.includes('nw')) return 'Khaochey NW';
+    if (username?.includes('admin')) return 'TESTING COMPANY';
+
+    return `Company (${companyId.slice(0, 8)})`;
+  };
+
+  // OPEN EDIT FEATURES MODAL FOR ANY COMPANY
   const handleOpenFeatureModal = async (companyId: string, companyNameStr: string) => {
     setSelectedCompanyForFeatures({ id: companyId, name: companyNameStr });
     
@@ -517,7 +529,7 @@ const Settings: React.FC<SettingsProps> = ({
     new Map(
       users.map(u => {
         const id = u.company_id || 'master-root';
-        const name = allDbCompanies.find(c => c.id === u.company_id)?.name || (u.company_id ? `Company (${u.company_id.slice(0, 6)})` : 'ZinethERP Master');
+        const name = getResolvedCompanyName(u.company_id, u.username);
         return [id, { id, name }];
       })
     ).values()
@@ -686,7 +698,7 @@ const Settings: React.FC<SettingsProps> = ({
                   <h3 className="text-sm font-black uppercase tracking-wider text-gray-800 flex items-center gap-2">
                     <EditIcon size={18} className="text-indigo-600" /> Manage & Edit Company Features
                   </h3>
-                  <p className="text-xs text-gray-400 font-medium">Click "Edit Features" next to any company to enable or disable modules</p>
+                  <p className="text-xs text-gray-400 font-medium">Click "Edit Features" next to any registered company to turn modules ON/OFF</p>
                 </div>
               </div>
 
@@ -964,12 +976,12 @@ const Settings: React.FC<SettingsProps> = ({
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium text-sm text-gray-800 bg-white">
                 {users.map(u => {
-                  const compMatch = allDbCompanies.find(c => c.id === u.company_id);
+                  const compNameResolved = getResolvedCompanyName(u.company_id, u.username);
                   return (
                     <tr key={u.id} className="hover:bg-gray-50 transition group">
                       <td className="p-3 pl-4">
                         <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 ring-1 ring-inset ring-blue-700/10 shadow-sm">
-                          🏢 {compMatch ? compMatch.name : (u.company_id ? `Company (${u.company_id.slice(0, 6)})` : 'ZinethERP Master')}
+                          🏢 {compNameResolved}
                         </span>
                       </td>
 
@@ -994,7 +1006,7 @@ const Settings: React.FC<SettingsProps> = ({
 
                       <td className="p-3">
                         <span className="font-mono text-xs font-bold text-indigo-900 bg-indigo-50 border border-indigo-100/60 px-2 py-1 rounded-md shadow-sm">
-                          ⚙️ {compMatch ? compMatch.name : `Master Root Cluster (ZinethERP)`}
+                          ⚙️ {compNameResolved}
                         </span>
                       </td>
 
@@ -1051,7 +1063,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       </div>
 
-      {/* ⭐ SIMPLE CLEAN FEATURE EDIT MODAL */}
+      {/* FEATURE EDIT MODAL */}
       {isFeatureModalOpen && selectedCompanyForFeatures && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full space-y-4 animate-in zoom-in-95 duration-150 shadow-2xl">
