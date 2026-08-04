@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Voucher, VoucherType, Ledger } from '../types';
 import { Plus, Search, Calendar, ArrowLeft, Trash2 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface TransactionManagerProps {
   title: string;
@@ -23,6 +24,7 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
   FormComponent, 
   formProps 
 }) => {
+  const { t } = useLanguage();
   const [view, setView] = useState<'LIST' | 'FORM'>('LIST');
   
   // ⭐ NEW INJECTED DRILL-DOWN CONTAINER DATA SEED STATE (Additive Modification)
@@ -122,54 +124,54 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
           onClick={() => { setSelectedSnapshotRecord(null); setView('FORM'); }}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2 shadow-sm font-bold text-xs uppercase tracking-wider"
         >
-          <Plus size={18} /> Create New
+          <Plus size={18} /> {t('add')}
         </button>
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row gap-4 items-end md:items-center">
         <div className="flex-1 w-full">
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Search</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">{t('search')}</label>
             <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
                 <input 
                     type="text" 
-                    placeholder="Search by Voucher # or Narration" 
-                    className="w-full pl-9 p-2 border border-gray-300 rounded focus:ring-2 ring-indigo-200 outline-none bg-white text-gray-900"
+                    placeholder={t('search')} 
+                    className="w-full pl-9 p-2 border border-gray-300 rounded focus:ring-2 ring-indigo-200 outline-none bg-white text-gray-900 text-xs font-bold"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                 />
             </div>
         </div>
         <div>
-             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">From Date</label>
-             <input 
-                type="date" 
-                className="p-2 border border-gray-300 rounded outline-none bg-white text-gray-900" 
-                value={startDate} 
-                onChange={e => setStartDate(e.target.value)} 
-             />
-        </div>
-        <div>
-             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">To Date</label>
-             <input 
-                type="date" 
-                className="p-2 border border-gray-300 rounded outline-none bg-white text-gray-900" 
-                value={endDate} 
-                onChange={e => setEndDate(e.target.value)} 
-             />
+             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">{t('dateRange')}</label>
+             <div className="flex items-center gap-2">
+               <input 
+                  type="date" 
+                  className="p-2 border border-gray-300 rounded outline-none bg-white text-gray-900 text-xs font-bold" 
+                  value={startDate} 
+                  onChange={e => setStartDate(e.target.value)} 
+               />
+               <span className="text-gray-400 text-xs font-bold">-</span>
+               <input 
+                  type="date" 
+                  className="p-2 border border-gray-300 rounded outline-none bg-white text-gray-900 text-xs font-bold" 
+                  value={endDate} 
+                  onChange={e => setEndDate(e.target.value)} 
+               />
+             </div>
         </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100">
+                <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-100 uppercase text-xs">
                     <tr>
-                        <th className="p-4">Date</th>
-                        <th className="p-4">Voucher #</th>
-                        <th className="p-4">Description</th>
-                        <th className="p-4 text-right">Amount</th>
-                        <th className="p-4 text-center w-20">Action</th>
+                        <th className="p-4">{t('date')}</th>
+                        <th className="p-4">{t('voucherNo')}</th>
+                        <th className="p-4">{t('description')}</th>
+                        <th className="p-4 text-right">{t('amount')}</th>
+                        <th className="p-4 text-center w-20">{t('actions')}</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -177,27 +179,27 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
                         const amount = v.entries.reduce((s, e) => s + e.debit, 0); // Total Debit
                         return (
                             <tr key={v.id} className="hover:bg-gray-50 group">
-                                <td className="p-4 text-gray-600 whitespace-nowrap">{v.date}</td>
+                                <td className="p-4 text-gray-600 whitespace-nowrap text-xs font-bold">{v.date}</td>
                                 
                                 {/* ⭐ INTERACTIVE DRILL-DOWN BUTTON ANCHOR LINK (Pristine Functional Addition) */}
                                 <td className="p-4">
                                   <button 
                                     type="button"
                                     onClick={() => executeForensicFormLoad(v)}
-                                    className="font-mono font-bold text-indigo-600 hover:text-indigo-900 hover:underline cursor-pointer text-left focus:outline-none"
+                                    className="font-mono font-bold text-indigo-600 hover:text-indigo-900 hover:underline cursor-pointer text-left focus:outline-none text-xs"
                                   >
                                     {v.number}
                                   </button>
                                 </td>
 
-                                <td className="p-4 text-gray-700 max-w-md truncate">{v.narration}</td>
-                                <td className="p-4 text-right font-semibold text-gray-900">{amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                <td className="p-4 text-gray-700 max-w-md truncate text-xs font-bold">{v.narration}</td>
+                                <td className="p-4 text-right font-black text-gray-900 text-xs">Rs {amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                 <td className="p-4 text-center">
                                     {onDelete && (
                                       <button 
                                         onClick={() => handleDelete(v.id, v.number)}
                                         className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
-                                        title="Delete Transaction"
+                                        title={t('delete')}
                                       >
                                         <Trash2 size={16} />
                                       </button>
@@ -207,14 +209,14 @@ const TransactionManager: React.FC<TransactionManagerProps> = ({
                         );
                     })}
                     {filteredVouchers.length === 0 && (
-                        <tr><td colSpan={5} className="p-8 text-center text-gray-400">No transactions found in this period.</td></tr>
+                        <tr><td colSpan={5} className="p-8 text-center text-gray-400 italic font-medium">No transactions found in this period.</td></tr>
                     )}
                 </tbody>
                 {filteredVouchers.length > 0 && (
-                     <tfoot className="bg-gray-50 font-bold text-gray-800">
+                     <tfoot className="bg-gray-50 font-black text-gray-800 text-xs uppercase">
                         <tr>
                             <td colSpan={3} className="p-4 text-right">Total Period Value</td>
-                            <td className="p-4 text-right">{totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                            <td className="p-4 text-right font-black text-indigo-900">Rs {totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                             <td></td>
                         </tr>
                      </tfoot>
