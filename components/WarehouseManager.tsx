@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Warehouse as WarehouseIcon, Plus, Building2, PackageCheck, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Warehouse as WarehouseIcon, Plus, Building2, PackageCheck, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
 import { Warehouse } from '../types';
 
@@ -47,15 +47,10 @@ export const WarehouseManager: React.FC = () => {
       company_id: activeCompanyId || undefined
     };
 
-    // ⭐ INSTANT LOCAL STATE UPDATE (Guarantees immediate entry display on screen)
     setWarehouses(prev => [newWh, ...prev]);
 
-    // Save to Database
     try {
-      const { error } = await supabase.from('warehouses').insert([newWh]);
-      if (error) {
-        console.error("Database insert warning:", error);
-      }
+      await supabase.from('warehouses').insert([newWh]);
     } catch (error) {
       console.error("Cloud insert error:", error);
     }
@@ -66,13 +61,26 @@ export const WarehouseManager: React.FC = () => {
     fetchData();
   };
 
-  // Helper for expiry warning highlight
+  // ⭐ DELETE WAREHOUSE FUNCTION
+  const handleDeleteWarehouse = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete warehouse "${name}"?`)) return;
+
+    // Instant local removal
+    setWarehouses(prev => prev.filter(w => w.id !== id));
+
+    try {
+      await supabase.from('warehouses').delete().eq('id', id);
+    } catch (err) {
+      console.error("Failed to delete warehouse", err);
+    }
+  };
+
   const isExpiringSoon = (dateStr?: string) => {
     if (!dateStr) return false;
     const exp = new Date(dateStr).getTime();
     const today = new Date().getTime();
     const diffDays = (exp - today) / (1000 * 3600 * 24);
-    return diffDays <= 30; // 30 days buffer
+    return diffDays <= 30;
   };
 
   return (
@@ -131,18 +139,27 @@ export const WarehouseManager: React.FC = () => {
           </form>
         </div>
 
-        {/* Warehouse List & Batch Status Table */}
+        {/* Warehouse List */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Warehouse Nodes Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {warehouses.map(wh => (
-              <div key={wh.id} className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-3">
-                <span className="p-3 bg-slate-100 text-slate-700 rounded-xl"><Building2 size={20} /></span>
-                <div>
-                  <h4 className="text-sm font-black text-gray-900">{wh.name}</h4>
-                  <p className="text-[10px] font-bold text-indigo-600 font-mono">CODE: {wh.code || 'MAIN'}</p>
-                  <p className="text-[11px] font-medium text-gray-500">{wh.location || 'Primary Location'}</p>
+              <div key={wh.id} className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-center justify-between group">
+                <div className="flex items-center gap-3">
+                  <span className="p-3 bg-slate-100 text-slate-700 rounded-xl"><Building2 size={20} /></span>
+                  <div>
+                    <h4 className="text-sm font-black text-gray-900">{wh.name}</h4>
+                    <p className="text-[10px] font-bold text-indigo-600 font-mono">CODE: {wh.code || 'MAIN'}</p>
+                    <p className="text-[11px] font-medium text-gray-500">{wh.location || 'Primary Location'}</p>
+                  </div>
                 </div>
+                {/* ⭐ DELETE BUTTON */}
+                <button
+                  onClick={() => handleDeleteWarehouse(wh.id, wh.name)}
+                  className="p-2 text-gray-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                  title="Delete Warehouse"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             ))}
             {warehouses.length === 0 && (

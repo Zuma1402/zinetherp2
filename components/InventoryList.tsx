@@ -23,7 +23,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
     onDeleteItem, 
     onManageUnits 
 }) => {
-  // ⭐ SAFE ARRAY FALLBACK GUARDS (Prevents Blank White Screen)
+  // ⭐ SAFE GUARDS (Prevents React rendering crash / blank white screen)
   const safeItems = Array.isArray(items) ? items : [];
   const safeUnits = Array.isArray(units) ? units : [];
   const safeTransactions = Array.isArray(transactions) ? transactions : [];

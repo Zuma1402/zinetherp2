@@ -602,8 +602,9 @@ const App: React.FC = () => {
                   <BankReconciliation ledgers={ledgers} vouchers={vouchers} onSaveVoucher={handleSaveVoucher} />
                 )}
 
+                {/* ⭐ PROPER HANDLER CONNECTIONS TO PREVENT INVENTORY CRASH */}
                 {currentView === 'INVENTORY' && (
-                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteItem} onManageUnits={() => setCurrentView('UNITS')} />
+                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteInventoryItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
 
                 {/* ⭐ WAREHOUSES VIEW RENDER BLOCK */}
@@ -648,7 +649,6 @@ const App: React.FC = () => {
                   <TransactionManager title="Purchase Bills" type={VoucherType.PURCHASE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseInvoice} formProps={{ ledgers, items: inventoryItems, onAddLedger: handleAddLedger, trialBalance }} />
                 )}
                 
-                {/* ⭐ TYPO FIXED HERE: Changed 'fontProps' -> 'formProps' */}
                 {currentView === 'PURCHASE_RETURN' && (
                   <TransactionManager title="Purchase Returns" type={VoucherType.DEBIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseReturn} formProps={{ ledgers, items: inventoryItems, trialBalance }} />
                 )}
@@ -663,12 +663,10 @@ const App: React.FC = () => {
                   <TransactionManager title="Expenses" type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={ExpenseEntry} formProps={{ ledgers, trialBalance }} />
                 )}
                 
-                {/* ⭐ Injected state wrapper view mapping container for E-Commerce uploads */}
                 {currentView === 'ECOM_RECONCILIATION' && (
                   <EcommerceReconciliation ledgers={ledgers} onSave={handleSaveVoucher} />
                 )}
 
-                {/* ⭐ INJECTED DRILL-DOWN HOOK CONNECTORS */}
                 {currentView === 'REPORT_PL' && (
                     <ProfitLossStatement 
                       vouchers={vouchers} 
