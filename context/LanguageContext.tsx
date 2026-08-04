@@ -25,6 +25,17 @@ const translations: Translations = {
     system: 'System',
     settings: 'Settings',
     logout: 'Logout',
+    aiAssistant: 'AI Assistant',
+    settingsPanel: 'Settings Panel',
+    userProfileNode: 'User Profile Node',
+    fullSignatureName: 'Full Signature Name',
+    accessAuthKey: 'Access Authorization Key',
+    updateProfile: 'Update Profile',
+    interfaceLanguage: 'Interface Language',
+    selectLanguageDesc: 'Select preferred operational system language:',
+    askAiPlaceholder: 'Ask AI financial questions or request accounting insights...',
+    clearChat: 'Clear Chat',
+    aiDisclaimer: 'AI responses are generated based on active ledger data & financial parameters.'
   },
   fr: {
     dashboard: 'Tableau de bord',
@@ -44,6 +55,17 @@ const translations: Translations = {
     system: 'Système',
     settings: 'Paramètres',
     logout: 'Déconnexion',
+    aiAssistant: 'Assistant IA',
+    settingsPanel: 'Panneau de Configuration',
+    userProfileNode: 'Profil Utilisateur',
+    fullSignatureName: 'Nom Complet',
+    accessAuthKey: "Clé d'autorisation",
+    updateProfile: 'Mettre à jour le profil',
+    interfaceLanguage: "Langue de l'interface",
+    selectLanguageDesc: 'Sélectionnez la langue opérationnelle préférée :',
+    askAiPlaceholder: 'Posez des questions financières ou demandez des analyses comptables...',
+    clearChat: 'Effacer la discussion',
+    aiDisclaimer: 'Les réponses sont générées à partir des données comptables actives.'
   },
   ur: {
     dashboard: 'ڈیش بورڈ',
@@ -63,6 +85,17 @@ const translations: Translations = {
     system: 'سسٹم',
     settings: 'سیٹنگز',
     logout: 'لاگ آؤٹ',
+    aiAssistant: 'اے آئی اسسٹنٹ',
+    settingsPanel: 'سیٹنگز پینل',
+    userProfileNode: 'صارف کی پروفائل',
+    fullSignatureName: 'پورا نام',
+    accessAuthKey: 'پاس ورڈ کی',
+    updateProfile: 'پروفائل اپ ڈیٹ کریں',
+    interfaceLanguage: 'سسٹم کی زبان',
+    selectLanguageDesc: 'اپنی پسندیدہ زبان کا انتخاب کریں:',
+    askAiPlaceholder: 'مالیاتی سوالات پوچھیں یا اکاؤنٹنگ رپورٹ حاصل کریں...',
+    clearChat: 'چیٹ صاف کریں',
+    aiDisclaimer: 'اے آئی کے جوابات آپ کے کھاتوں کی بنیاد پر تیار کیے جاتے ہیں۔'
   },
   roman_ur: {
     dashboard: 'Dashboard',
@@ -82,6 +115,17 @@ const translations: Translations = {
     system: 'System',
     settings: 'Settings',
     logout: 'Logout',
+    aiAssistant: 'AI Assistant',
+    settingsPanel: 'Settings Panel',
+    userProfileNode: 'User Profile Node',
+    fullSignatureName: 'Poora Naam',
+    accessAuthKey: 'Password Key',
+    updateProfile: 'Profile Update Karen',
+    interfaceLanguage: 'System Ki Language',
+    selectLanguageDesc: 'Apni pasandida zaban select karen:',
+    askAiPlaceholder: 'Maliati sawal poochen ya accounting insight mangen...',
+    clearChat: 'Chat Saaf Karen',
+    aiDisclaimer: 'AI jawabat aap ke live ledger data par mabni hain.'
   },
   ar: {
     dashboard: 'لوحة القيادة',
@@ -89,7 +133,7 @@ const translations: Translations = {
     chartOfAccounts: 'شجرة الحسابات',
     journalEntry: 'دفتر اليومية',
     generalLedger: 'الدفتر العام',
-    bankReconciliation: 'التسوية Банكية',
+    bankReconciliation: 'التسوية البنكية',
     business: 'الأعمال',
     sales: 'المبيعات',
     purchases: 'المشتريات',
@@ -101,6 +145,17 @@ const translations: Translations = {
     system: 'النظام',
     settings: 'الإعدادات',
     logout: 'تسجيل الخروج',
+    aiAssistant: 'مساعد الذكاء الاصطناعي',
+    settingsPanel: 'لوحة الإعدادات',
+    userProfileNode: 'ملف المستخدم',
+    fullSignatureName: 'الاسم الكامل',
+    accessAuthKey: 'مفتاح المرور',
+    updateProfile: 'تحديث الملف الشخصي',
+    interfaceLanguage: 'لغة النظام',
+    selectLanguageDesc: 'اختر لغة التشغيل المفضلة:',
+    askAiPlaceholder: 'طرح أسئلة مالية أو طلب تحليلات محاسبية...',
+    clearChat: 'مسح المحادثة',
+    aiDisclaimer: 'يتم إنشاء الإجابات بناءً على البيانات المالية الحالية.'
   },
   zh: {
     dashboard: '仪表板',
@@ -120,6 +175,17 @@ const translations: Translations = {
     system: '系统',
     settings: '设置',
     logout: '退出登录',
+    aiAssistant: 'AI 助手',
+    settingsPanel: '设置面板',
+    userProfileNode: '用户个人资料',
+    fullSignatureName: '全名',
+    accessAuthKey: '访问授权密钥',
+    updateProfile: '更新个人资料',
+    interfaceLanguage: '界面语言',
+    selectLanguageDesc: '选择首选系统语言：',
+    askAiPlaceholder: '询问财务问题或请求会计分析...',
+    clearChat: '清空聊天',
+    aiDisclaimer: 'AI 响应基于实时账簿数据生成。'
   },
   es: {
     dashboard: 'Panel de Control',
@@ -139,6 +205,17 @@ const translations: Translations = {
     system: 'Sistema',
     settings: 'Configuración',
     logout: 'Cerrar Sesión',
+    aiAssistant: 'Asistente IA',
+    settingsPanel: 'Panel de Configuración',
+    userProfileNode: 'Perfil de Usuario',
+    fullSignatureName: 'Nombre Completo',
+    accessAuthKey: 'Clave de Autorización',
+    updateProfile: 'Actualizar Perfil',
+    interfaceLanguage: 'Idioma de Interfaz',
+    selectLanguageDesc: 'Seleccione el idioma preferido del sistema:',
+    askAiPlaceholder: 'Haga preguntas financieras o solicite informes contables...',
+    clearChat: 'Limpiar Chat',
+    aiDisclaimer: 'Las respuestas de IA se generan según los datos contables activos.'
   }
 };
 
@@ -160,7 +237,6 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('preferred_language', lang);
   };
 
-  // Safe translation helper with English fallback if key/language missing
   const t = (key: string): string => {
     if (translations[language] && translations[language][key]) {
       return translations[language][key];

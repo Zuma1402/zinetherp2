@@ -21,7 +21,7 @@ const Settings: React.FC<SettingsProps> = ({
   onCompanyCreated,
   activeCompanyId: propCompanyId
 }) => {
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
 
   // Profile State
   const [name, setName] = useState(currentUser.name);
@@ -146,7 +146,7 @@ const Settings: React.FC<SettingsProps> = ({
         
       if (compProfile) {
         if (compProfile.base_currency) setActiveCompanyBaseCurrency(compProfile.base_currency);
-        const modules = compProfile.enabled_modules || ['core_accounting', 'ecommerce_reconciliation', 'bank_reconciliation', 'multi_warehouse'];
+        const modules = compProfile.enabled_modules || ['core_accounting'];
         setActiveCorpEcomEnabled(modules.includes('ecommerce_reconciliation'));
         setActiveCorpBankReconEnabled(modules.includes('bank_reconciliation'));
         setActiveCorpWarehouseEnabled(modules.includes('multi_warehouse'));
@@ -241,7 +241,6 @@ const Settings: React.FC<SettingsProps> = ({
     setIsFeatureModalOpen(true);
   };
 
-  // ⭐ SAFE SAVE WITH SCHEMA FALLBACK
   const handleSaveModalFeatures = async () => {
     if (!selectedCompanyForFeatures) return;
 
@@ -546,7 +545,7 @@ const Settings: React.FC<SettingsProps> = ({
     <div className="max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-          Settings Panel
+          {t('settingsPanel')}
           <span className="text-xs font-bold px-2.5 py-0.5 bg-indigo-600 text-white rounded-md uppercase tracking-wider shadow-sm">
             {companyName || 'Resolving Scope Node...'}
           </span>
@@ -559,19 +558,19 @@ const Settings: React.FC<SettingsProps> = ({
         <div className="bg-white p-6 border border-gray-200 rounded-2xl shadow-xs space-y-6 h-fit">
           <div>
             <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2 border-b pb-3 mb-4">
-              <UserIcon size={16} className="text-indigo-600" /> User Profile Node
+              <UserIcon size={16} className="text-indigo-600" /> {t('userProfileNode')}
             </h2>
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Full Signature Name</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{t('fullSignatureName')}</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-xs font-bold bg-gray-50 outline-none" required />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Access Authorization Key</label>
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">{t('accessAuthKey')}</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-xl text-xs font-bold bg-gray-50 outline-none" required />
               </div>
               <button type="submit" className="w-full bg-indigo-600 text-white font-bold text-xs py-2 rounded-lg hover:bg-indigo-700 shadow-sm flex items-center justify-center gap-1.5 uppercase tracking-wider">
-                <Save size={13} /> Update Profile
+                <Save size={13} /> {t('updateProfile')}
               </button>
             </form>
           </div>
@@ -580,9 +579,9 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="pt-4 border-t border-gray-100 space-y-3">
             <div className="flex items-center gap-2">
               <Globe size={16} className="text-indigo-600" />
-              <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">Interface Language</h3>
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">{t('interfaceLanguage')}</h3>
             </div>
-            <p className="text-[11px] text-gray-400 font-medium">Select preferred operational system language:</p>
+            <p className="text-[11px] text-gray-400 font-medium">{t('selectLanguageDesc')}</p>
             <select
               value={language}
               onChange={(e) => {
