@@ -4,7 +4,7 @@ import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
 import { useLanguage, Language } from '../context/LanguageContext'; // ⭐ ACTIVE LANGUAGE ENGINE
-import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key, Globe } from 'lucide-react';
+import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key, Globe, CheckSquare, Square } from 'lucide-react';
 
 interface SettingsProps {
   currentUser: User;
@@ -67,8 +67,14 @@ const Settings: React.FC<SettingsProps> = ({
   
   const [newCorpBaseCurrency, setNewCorpBaseCurrency] = useState('PKR');
 
+  // ⭐ DYNAMIC FEATURE MODULE CHECKBOX STATES
   const [newCorpEcomEnabled, setNewCorpEcomEnabled] = useState(true);
+  const [newCorpBankReconEnabled, setNewCorpBankReconEnabled] = useState(true);
+  const [newCorpWarehouseEnabled, setNewCorpWarehouseEnabled] = useState(true);
+
   const [activeCorpEcomEnabled, setActiveCorpEcomEnabled] = useState(false);
+  const [activeCorpBankReconEnabled, setActiveCorpBankReconEnabled] = useState(false);
+  const [activeCorpWarehouseEnabled, setActiveCorpWarehouseEnabled] = useState(false);
 
   const [staffName, setStaffName] = useState('');
   const [staffUsername, setStaffUsername] = useState('');
@@ -140,9 +146,13 @@ const Settings: React.FC<SettingsProps> = ({
         if (compProfile.base_currency) setActiveCompanyBaseCurrency(compProfile.base_currency);
         const modules = compProfile.enabled_modules || ['core_accounting'];
         setActiveCorpEcomEnabled(modules.includes('ecommerce_reconciliation'));
+        setActiveCorpBankReconEnabled(modules.includes('bank_reconciliation'));
+        setActiveCorpWarehouseEnabled(modules.includes('multi_warehouse'));
       } else {
         setActiveCompanyBaseCurrency('PKR');
         setActiveCorpEcomEnabled(false);
+        setActiveCorpBankReconEnabled(false);
+        setActiveCorpWarehouseEnabled(false);
       }
     } catch (err) {
       console.error("Ledger maps registry reading crash:", err);
@@ -227,6 +237,8 @@ const Settings: React.FC<SettingsProps> = ({
       if (localActiveId) {
         const updatedModules = ['core_accounting'];
         if (activeCorpEcomEnabled) updatedModules.push('ecommerce_reconciliation');
+        if (activeCorpBankReconEnabled) updatedModules.push('bank_reconciliation');
+        if (activeCorpWarehouseEnabled) updatedModules.push('multi_warehouse');
         
         await supabase
           .from('companies')
@@ -338,6 +350,8 @@ const Settings: React.FC<SettingsProps> = ({
 
       const modulesArray = ['core_accounting'];
       if (newCorpEcomEnabled) modulesArray.push('ecommerce_reconciliation');
+      if (newCorpBankReconEnabled) modulesArray.push('bank_reconciliation');
+      if (newCorpWarehouseEnabled) modulesArray.push('multi_warehouse');
 
       const companyId = crypto.randomUUID();
       const { error: companyError } = await supabase.from('companies').insert([{ 
@@ -373,6 +387,8 @@ const Settings: React.FC<SettingsProps> = ({
       setStaffUsername('');
       setStaffPassword('');
       setNewCorpEcomEnabled(true);
+      setNewCorpBankReconEnabled(true);
+      setNewCorpWarehouseEnabled(true);
       
       alert("Independent Corporate Entity deployed successfully!");
       await syncEngineData();
@@ -484,7 +500,7 @@ const Settings: React.FC<SettingsProps> = ({
             </form>
           </div>
 
-          {/* ⭐ SYSTEM MULTI-LANGUAGE PREFERENCE SELECTOR (Pristine Addition with Global Options) */}
+          {/* ⭐ SYSTEM MULTI-LANGUAGE PREFERENCE SELECTOR */}
           <div className="pt-4 border-t border-gray-100 space-y-3">
             <div className="flex items-center gap-2">
               <Globe size={16} className="text-indigo-600" />
@@ -554,17 +570,40 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
 
               {currentUser.role === 'ADMIN' && (
-                <div className="p-4 border rounded-xl bg-indigo-50/20 border-indigo-100 space-y-2">
+                <div className="p-4 border rounded-xl bg-indigo-50/20 border-indigo-100 space-y-3">
                   <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Active Workspace Capability Enforcements</h4>
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
-                    <input 
-                      type="checkbox" 
-                      checked={activeCorpEcomEnabled} 
-                      onChange={e => setActiveCorpEcomEnabled(e.target.checked)}
-                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" 
-                    />
-                    Enable One-Click E-Commerce Reconciliation Portal
-                  </label>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700 p-2 bg-white rounded-lg border">
+                      <input 
+                        type="checkbox" 
+                        checked={activeCorpEcomEnabled} 
+                        onChange={e => setActiveCorpEcomEnabled(e.target.checked)}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" 
+                      />
+                      E-Commerce Payouts
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700 p-2 bg-white rounded-lg border">
+                      <input 
+                        type="checkbox" 
+                        checked={activeCorpBankReconEnabled} 
+                        onChange={e => setActiveCorpBankReconEnabled(e.target.checked)}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" 
+                      />
+                      Bank Reconciliation
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700 p-2 bg-white rounded-lg border">
+                      <input 
+                        type="checkbox" 
+                        checked={activeCorpWarehouseEnabled} 
+                        onChange={e => setActiveCorpWarehouseEnabled(e.target.checked)}
+                        className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4" 
+                      />
+                      Multi-Warehouse & Batches
+                    </label>
+                  </div>
                 </div>
               )}
 
@@ -626,17 +665,41 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
 
+              {/* ⭐ FEATURE ACCESS CONTROL CHECKBOXES */}
               <div className="p-4 bg-indigo-950/40 border border-indigo-500/20 rounded-xl space-y-3">
                 <h4 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Ecosystem Capabilities Allocations Configuration</h4>
-                <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={newCorpEcomEnabled} 
-                    onChange={e => setNewCorpEcomEnabled(e.target.checked)}
-                    className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
-                  />
-                  Provision One-Click E-Commerce Payout Splitter Reconciliation Module
-                </label>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
+                    <input 
+                      type="checkbox" 
+                      checked={newCorpEcomEnabled} 
+                      onChange={e => setNewCorpEcomEnabled(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
+                    />
+                    E-Commerce Payouts
+                  </label>
+
+                  <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
+                    <input 
+                      type="checkbox" 
+                      checked={newCorpBankReconEnabled} 
+                      onChange={e => setNewCorpBankReconEnabled(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
+                    />
+                    Bank Reconciliation
+                  </label>
+
+                  <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
+                    <input 
+                      type="checkbox" 
+                      checked={newCorpWarehouseEnabled} 
+                      onChange={e => setNewCorpWarehouseEnabled(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-indigo-500 w-4 h-4 focus:ring-indigo-500" 
+                    />
+                    Multi-Warehouse & Batches
+                  </label>
+                </div>
               </div>
 
               <div className="bg-indigo-950/30 border border-indigo-900/30 p-4 rounded-xl space-y-4 shadow-inner">

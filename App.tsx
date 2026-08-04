@@ -472,8 +472,11 @@ const App: React.FC = () => {
             <SidebarItem view="CHART_OF_ACCOUNTS" icon={BookOpen} label="Chart of Accounts" />
             <SidebarItem view="JOURNAL_ENTRY" icon={FileText} label="Journal General" />
             <SidebarItem view="GENERAL_LEDGER" icon={ClipboardList} label="General Ledger" />
-            {/* ⭐ ADDED BANK RECONCILIATION SIDEBAR ITEM */}
-            <SidebarItem view="BANK_RECONCILIATION" icon={Landmark} label="Bank Reconciliation" />
+            
+            {/* ⭐ BANK RECONCILIATION COMPANY ACCESS GATE */}
+            {activeModules.includes('bank_reconciliation') && (
+              <SidebarItem view="BANK_RECONCILIATION" icon={Landmark} label="Bank Reconciliation" />
+            )}
             
             <div className="pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase px-4 tracking-widest">Business</div>
             
@@ -514,11 +517,15 @@ const App: React.FC = () => {
             </div>
 
             <SidebarItem view="INVENTORY" icon={Package} label="Inventory" badge={lowStockCount} />
-            {/* ⭐ OPTION A ALIGNED WAREHOUSE LABEL */}
-            <SidebarItem view="WAREHOUSES" icon={WarehouseIcon} label="Warehouses" />
+            
+            {/* ⭐ MULTI-WAREHOUSE COMPANY ACCESS GATE */}
+            {activeModules.includes('multi_warehouse') && (
+              <SidebarItem view="WAREHOUSES" icon={WarehouseIcon} label="Warehouses" />
+            )}
+
             <SidebarItem view="EXPENSES" icon={Wallet} label="Expenses" />
             
-            {/* ⭐ DYNAMIC MULTI-TENANT GATE ENFORCEMENT */}
+            {/* ⭐ DYNAMIC MULTI-TENANT E-COMMERCE GATE */}
             {activeModules.includes('ecommerce_reconciliation') && (
               <SidebarItem view="ECOM_RECONCILIATION" icon={Radio} label="E-Commerce Payouts" />
             )}
@@ -597,18 +604,18 @@ const App: React.FC = () => {
                   <GeneralLedgerView ledgers={ledgers} vouchers={vouchers} initialLedgerId={selectedLedgerForView} />
                 )}
 
-                {/* ⭐ INJECTED BANK RECONCILIATION VIEW RENDER BLOCK */}
-                {currentView === 'BANK_RECONCILIATION' && (
+                {/* ⭐ BANK RECONCILIATION VIEW GATE */}
+                {currentView === 'BANK_RECONCILIATION' && activeModules.includes('bank_reconciliation') && (
                   <BankReconciliation ledgers={ledgers} vouchers={vouchers} onSaveVoucher={handleSaveVoucher} />
                 )}
 
-                {/* ⭐ PROPER HANDLER CONNECTIONS TO PREVENT INVENTORY CRASH */}
+                {/* ⭐ INVENTORY VIEW */}
                 {currentView === 'INVENTORY' && (
                   <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteInventoryItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
 
-                {/* ⭐ WAREHOUSES VIEW RENDER BLOCK */}
-                {currentView === 'WAREHOUSES' && (
+                {/* ⭐ WAREHOUSES VIEW GATE */}
+                {currentView === 'WAREHOUSES' && activeModules.includes('multi_warehouse') && (
                   <WarehouseManager />
                 )}
 
@@ -663,7 +670,7 @@ const App: React.FC = () => {
                   <TransactionManager title="Expenses" type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={ExpenseEntry} formProps={{ ledgers, trialBalance }} />
                 )}
                 
-                {currentView === 'ECOM_RECONCILIATION' && (
+                {currentView === 'ECOM_RECONCILIATION' && activeModules.includes('ecommerce_reconciliation') && (
                   <EcommerceReconciliation ledgers={ledgers} onSave={handleSaveVoucher} />
                 )}
 
