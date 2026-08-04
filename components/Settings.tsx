@@ -4,7 +4,7 @@ import { getUsers, saveUser, deleteUser } from '../services/authService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 import { supabase } from '../services/supabaseService';
 import { useLanguage, Language } from '../context/LanguageContext';
-import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key, Globe, Settings as EditIcon, CheckSquare, Square, X } from 'lucide-react';
+import { User as UserIcon, Save, Building, Hash, Shield, Trash2, Plus, Landmark, AlertTriangle, Key, Globe, Settings as EditIcon, X } from 'lucide-react';
 
 interface SettingsProps {
   currentUser: User;
@@ -56,7 +56,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [isDeletingCompany, setIsDeletingCompany] = useState(false);
   const [isCreatingCorp, setIsCreatingCorp] = useState(false);
 
-  // FEATURE EDIT MODAL STATES
+  // ⭐ FEATURE EDIT MODAL STATES
   const [isFeatureModalOpen, setIsFeatureModalOpen] = useState(false);
   const [selectedCompanyForFeatures, setSelectedCompanyForFeatures] = useState<{id: string, name: string} | null>(null);
   const [modalEcomEnabled, setModalEcomEnabled] = useState(false);
@@ -198,6 +198,7 @@ const Settings: React.FC<SettingsProps> = ({
     syncEngineData();
   }, [currentUser, localActiveId, allDbCompanies.length]);
 
+  // ⭐ OPEN EDIT FEATURES MODAL FOR ANY COMPANY
   const handleOpenFeatureModal = async (companyId: string, companyNameStr: string) => {
     setSelectedCompanyForFeatures({ id: companyId, name: companyNameStr });
     
@@ -652,6 +653,63 @@ const Settings: React.FC<SettingsProps> = ({
         {/* MASTER LAYER */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 space-y-6">
+            {/* ⭐ SECTION 1: MASTER COMPANY FEATURES CONTROL DIRECT TABLE */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+              <div className="flex justify-between items-center border-b pb-3">
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-gray-800 flex items-center gap-2">
+                    <EditIcon size={18} className="text-indigo-600" /> Manage & Edit Company Features
+                  </h3>
+                  <p className="text-xs text-gray-400 font-medium">Click "Edit Features" next to any registered company to turn modules ON/OFF</p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden border border-gray-200 rounded-xl shadow-xs">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b">
+                    <tr>
+                      <th className="p-3 pl-4">Company Name</th>
+                      <th className="p-3">Company ID</th>
+                      <th className="p-3 text-center">Active Features</th>
+                      <th className="p-3 text-right pr-4">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 font-medium text-xs text-gray-800 bg-white">
+                    {allDbCompanies.map(comp => {
+                      const mods = comp.enabled_modules || ['core_accounting'];
+                      return (
+                        <tr key={comp.id} className="hover:bg-gray-50 transition">
+                          <td className="p-3 pl-4 font-bold text-gray-900">🏢 {comp.name}</td>
+                          <td className="p-3 font-mono text-[10px] text-gray-400">{comp.id}</td>
+                          <td className="p-3 text-center">
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                              {mods.includes('ecommerce_reconciliation') && (
+                                <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">E-Com</span>
+                              )}
+                              {mods.includes('bank_reconciliation') && (
+                                <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">Bank Recon</span>
+                              )}
+                              {mods.includes('multi_warehouse') && (
+                                <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">Warehouse</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3 text-right pr-4">
+                            <button
+                              onClick={() => handleOpenFeatureModal(comp.id, comp.name)}
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 ml-auto"
+                            >
+                              <EditIcon size={12} /> Edit Features
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* CREATE NEW COMPANY SECTION */}
             <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-black text-white rounded-2xl shadow-xl p-6 border border-indigo-900/40">
               <div className="flex items-center gap-3 mb-5 border-b border-indigo-900/60 pb-3">
@@ -939,17 +997,6 @@ const Settings: React.FC<SettingsProps> = ({
 
                       <td className="p-3 text-right pr-4">
                          <div className="flex justify-end gap-2 items-center">
-                            {/* DIRECT EDIT FEATURES BUTTON IN TABLE */}
-                            {isMasterZenithScope && compMatch && (
-                              <button
-                                onClick={() => handleOpenFeatureModal(compMatch.id, compMatch.name)}
-                                className="px-2.5 py-1 text-xs font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg flex items-center gap-1 transition-colors"
-                                title="Edit Company Feature Access"
-                              >
-                                <EditIcon size={12} /> Features
-                              </button>
-                            )}
-
                             {u.id !== currentUser.id && currentUser.role === 'ADMIN' && (
                                 <button onClick={() => handleDeleteUser(u.id)} className="text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition"><Trash2 size={15} /></button>
                             )}
