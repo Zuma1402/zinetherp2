@@ -5,8 +5,8 @@ import { calculateStockValue } from '../services/inventoryService';
 import { getCompanySettings, saveCompanySettings } from '../services/settingsService';
 
 interface InventoryListProps {
-  items: InventoryItem[];
-  units: Unit[];
+  items?: InventoryItem[];
+  units?: Unit[];
   transactions?: StockTransaction[];
   onAddItem: (item: InventoryItem) => void;
   onUpdateItem: (item: InventoryItem) => void;
@@ -23,6 +23,11 @@ const InventoryList: React.FC<InventoryListProps> = ({
     onDeleteItem, 
     onManageUnits 
 }) => {
+  // ⭐ SAFE ARRAY FALLBACK GUARDS (Prevents Blank White Screen)
+  const safeItems = Array.isArray(items) ? items : [];
+  const safeUnits = Array.isArray(units) ? units : [];
+  const safeTransactions = Array.isArray(transactions) ? transactions : [];
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
@@ -36,7 +41,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
     const loadSettings = async () => {
       try {
         const settings = await getCompanySettings();
-        if (settings.stockValuationMethod) {
+        if (settings && settings.stockValuationMethod) {
             setValuationMethod(settings.stockValuationMethod);
         }
       } catch (error) {
@@ -58,14 +63,14 @@ const InventoryList: React.FC<InventoryListProps> = ({
 
   // Form State
   const [name, setName] = useState('');
-  const [unit, setUnit] = useState(units[0]?.symbol || 'pcs');
+  const [unit, setUnit] = useState(safeUnits[0]?.symbol || 'pcs');
   const [rate, setRate] = useState(0);
   const [openingStock, setOpeningStock] = useState(0);
   const [minStockLevel, setMinStockLevel] = useState(0);
 
   const resetForm = () => {
     setName('');
-    setUnit(units[0]?.symbol || 'pcs');
+    setUnit(safeUnits[0]?.symbol || 'pcs');
     setRate(0);
     setOpeningStock(0);
     setMinStockLevel(0);
@@ -74,10 +79,10 @@ const InventoryList: React.FC<InventoryListProps> = ({
   };
 
   const handleEditClick = (item: InventoryItem) => {
-    setName(item.name);
-    setUnit(item.unit);
-    setRate(item.rate);
-    setOpeningStock(item.currentStock);
+    setName(item.name || '');
+    setUnit(item.unit || 'pcs');
+    setRate(item.rate || 0);
+    setOpeningStock(item.currentStock || 0);
     setMinStockLevel(item.minStockLevel || 0);
     setEditingId(item.id);
     setShowForm(true);
@@ -93,51 +98,53 @@ const InventoryList: React.FC<InventoryListProps> = ({
     e.preventDefault();
 
     if (editingId) {
-      const originalItem = items.find(i => i.id === editingId);
+      const originalItem = safeItems.find(i => i.id === editingId);
       if (originalItem) {
           onUpdateItem({
             ...originalItem,
             name,
             unit,
-            rate: Number(rate),
-            minStockLevel: Number(minStockLevel),
+            rate: Number(rate) || 0,
+            minStockLevel: Number(minStockLevel) || 0,
           });
       }
     } else {
       onAddItem({
         id: crypto.randomUUID(),
         name,
-        unit,
-        rate: Number(rate),
-        currentStock: Number(openingStock),
-        minStockLevel: Number(minStockLevel),
+        unit: unit || 'pcs',
+        rate: Number(rate) || 0,
+        currentStock: Number(openingStock) || 0,
+        minStockLevel: Number(minStockLevel) || 0,
         costPrice: 0 
       });
     }
     resetForm();
   };
 
-  const filteredTransactions = transactions.filter(t => {
-      return true; 
-  });
+  const filteredTransactions = safeTransactions.filter(t => true);
 
   const displayedItems = useMemo(() => {
-    if (!showLowStockOnly) return items;
-    return items.filter(item => (item.currentStock || 0) <= (item.minStockLevel || 0));
-  }, [items, showLowStockOnly]);
+    if (!showLowStockOnly) return safeItems;
+    return safeItems.filter(item => (item.currentStock || 0) <= (item.minStockLevel || 0));
+  }, [safeItems, showLowStockOnly]);
 
-  const totalStockValue = items.reduce((sum, item) => {
-      const val = calculateStockValue(item, filteredTransactions, valuationMethod);
+  const totalStockValue = useMemo(() => {
+    return safeItems.reduce((sum, item) => {
+      const val = calculateStockValue(item, filteredTransactions, valuationMethod) || 0;
       return sum + val;
-  }, 0);
+    }, 0);
+  }, [safeItems, filteredTransactions, valuationMethod]);
 
-  const lowStockItems = items.filter(item => (item.currentStock || 0) <= (item.minStockLevel || 0));
+  const lowStockItems = useMemo(() => {
+    return safeItems.filter(item => (item.currentStock || 0) <= (item.minStockLevel || 0));
+  }, [safeItems]);
 
   const itemTransactions = selectedHistoryItem 
-    ? transactions.filter(t => t.itemId === selectedHistoryItem).reverse() 
+    ? safeTransactions.filter(t => t.itemId === selectedHistoryItem).reverse() 
     : [];
 
-  const historyItemName = items.find(i => i.id === selectedHistoryItem)?.name;
+  const historyItemName = safeItems.find(i => i.id === selectedHistoryItem)?.name;
 
   return (
     <div className="space-y-6 relative">
@@ -248,7 +255,7 @@ const InventoryList: React.FC<InventoryListProps> = ({
                 <div>
                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Unit</label>
                     <select className="w-full p-2.5 border rounded-xl bg-white font-bold" value={unit} onChange={e => setUnit(e.target.value)}>
-                        {units.map(u => (
+                        {safeUnits.map(u => (
                             <option key={u.id} value={u.symbol}>
                                 {u.name} ({u.symbol})
                             </option>
@@ -364,23 +371,23 @@ const InventoryList: React.FC<InventoryListProps> = ({
                                 </div>
                             </td>
                             <td className="p-5 text-center">
-                                <span className="bg-white border border-gray-100 text-gray-500 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">{item.unit}</span>
+                                <span className="bg-white border border-gray-100 text-gray-500 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">{item.unit || 'pcs'}</span>
                             </td>
-                            <td className="p-5 text-right font-mono font-bold text-gray-700">{item.rate.toLocaleString()}</td>
+                            <td className="p-5 text-right font-mono font-bold text-gray-700">{(item.rate || 0).toLocaleString()}</td>
                             <td className="p-5 text-center">
                                  <div className="inline-flex flex-col items-center">
                                      <span className={`px-4 py-1 rounded-full text-xs font-black font-mono shadow-sm border ${
                                          isLowStock 
                                             ? 'bg-rose-500 text-white border-rose-400' 
-                                            : item.currentStock > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-100 text-gray-400 border-gray-200'
+                                            : (item.currentStock || 0) > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-100 text-gray-400 border-gray-200'
                                      }`}>
-                                         {item.currentStock}
+                                         {item.currentStock || 0}
                                      </span>
                                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Min: {item.minStockLevel || 0}</span>
                                  </div>
                             </td>
                             <td className="p-5 text-right font-mono font-black text-indigo-700">
-                                {calculatedValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                {(calculatedValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </td>
                             <td className="p-5 text-right">
                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">

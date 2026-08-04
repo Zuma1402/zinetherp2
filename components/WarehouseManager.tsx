@@ -39,7 +39,7 @@ export const WarehouseManager: React.FC = () => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const newWh = {
+    const newWh: Warehouse = {
       id: crypto.randomUUID(),
       name: name.trim(),
       code: code.trim().toUpperCase() || name.substring(0, 3).toUpperCase(),
@@ -47,7 +47,19 @@ export const WarehouseManager: React.FC = () => {
       company_id: activeCompanyId || undefined
     };
 
-    await supabase.from('warehouses').insert([newWh]);
+    // ⭐ INSTANT LOCAL STATE UPDATE (Guarantees immediate entry display on screen)
+    setWarehouses(prev => [newWh, ...prev]);
+
+    // Save to Database
+    try {
+      const { error } = await supabase.from('warehouses').insert([newWh]);
+      if (error) {
+        console.error("Database insert warning:", error);
+      }
+    } catch (error) {
+      console.error("Cloud insert error:", error);
+    }
+
     setName('');
     setCode('');
     setLocation('');
@@ -133,6 +145,11 @@ export const WarehouseManager: React.FC = () => {
                 </div>
               </div>
             ))}
+            {warehouses.length === 0 && (
+              <div className="col-span-2 p-8 bg-white border border-dashed rounded-2xl text-center text-xs font-bold text-gray-400">
+                No warehouses registered. Create your first warehouse using the form.
+              </div>
+            )}
           </div>
 
           {/* Batch Expiry Live Monitor Table */}
