@@ -165,12 +165,12 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
-      // ⭐ REAL COMPANY NAMES RESOLVER
+      // REAL COMPANY NAMES RESOLVER
       const { data: companiesData } = await supabase.from('companies').select('id, name, enabled_modules').order('name');
       
       let finalCompaniesList = companiesData || [];
 
-      // If empty due to RLS, map names using company_settings or local storage
+      // If empty due to RLS, map names using company_settings
       if (finalCompaniesList.length === 0) {
         const { data: compSettings } = await supabase.from('company_settings').select('company_id, company_name');
         if (compSettings && compSettings.length > 0) {
@@ -524,15 +524,14 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  // Helper to extract unique company objects mapped from users
-  const mappedUserCompanies = Array.from(
-    new Map(
-      users.map(u => {
-        const id = u.company_id || 'master-root';
-        const name = getResolvedCompanyName(u.company_id, u.username);
-        return [id, { id, name }];
-      })
-    ).values()
+  // ⭐ GUARANTEED REAL DYNAMIC COMPANIES ARRAY (Combines DB Companies & User Companies)
+  const displayCompaniesList = Array.from(
+    new Map([
+      ...allDbCompanies.map(c => [c.id, { id: c.id, name: c.name }]),
+      ...users
+        .filter(u => u.company_id)
+        .map(u => [u.company_id!, { id: u.company_id!, name: getResolvedCompanyName(u.company_id, u.username) }])
+    ]).values()
   );
 
   return (
@@ -712,7 +711,7 @@ const Settings: React.FC<SettingsProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium text-xs text-gray-800 bg-white">
-                    {mappedUserCompanies.map(comp => (
+                    {displayCompaniesList.map(comp => (
                       <tr key={comp.id} className="hover:bg-gray-50 transition">
                         <td className="p-3 pl-4 font-bold text-gray-900">🏢 {comp.name}</td>
                         <td className="p-3 font-mono text-[10px] text-gray-400">{comp.id}</td>
@@ -1049,7 +1048,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <label className="block text-[10px] font-bold text-rose-900 uppercase mb-1.5 tracking-wider">Select Corporate Target To Erase From Infrastructure Cloud</label>
                 <select value={selectedCompanyToDelete} onChange={e => setSelectedCompanyToDelete(e.target.value)} className="w-full p-2.5 text-xs bg-white border border-rose-200 rounded-lg text-gray-800 font-bold focus:ring-2 focus:ring-rose-500 outline-none shadow-inner">
                   <option value="">-- Click To Select Profile Node Target --</option>
-                  {allDbCompanies.map(comp => (
+                  {displayCompaniesList.map(comp => (
                     <option key={comp.id} value={comp.id}>🏢 {comp.name} ({comp.id.substring(0,8)}...)</option>
                   ))}
                 </select>
