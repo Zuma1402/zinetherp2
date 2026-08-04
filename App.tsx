@@ -58,6 +58,9 @@ import EcommerceReconciliation from './components/EcommerceReconciliation';
 import { BankReconciliation } from './components/BankReconciliation';
 import { WarehouseManager } from './components/WarehouseManager';
 
+// ⭐ IMPORT REPORT VIEW ENGINE
+import ReportView from './components/ReportView';
+
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
 import { calculateTrialBalance, calculateFinancialSummary } from './services/accountingService';
 import { getCurrentUser, logout } from './services/authService';
@@ -96,6 +99,10 @@ type View =
   | 'REPORT_PL'
   | 'REPORT_BS'
   | 'REPORT_AGING' 
+  | 'REPORT_TRIAL'
+  | 'REPORT_CASH'
+  | 'REPORT_STOCK'
+  | 'REPORT_SALES'
   | 'ECOM_RECONCILIATION'
   | 'SETTINGS';
 
@@ -522,6 +529,11 @@ const AppContent: React.FC = () => {
                      <SidebarItem view="REPORT_PL" label="Profit & Loss" nested />
                      <SidebarItem view="REPORT_BS" label="Balance Sheet" nested />
                      <SidebarItem view="REPORT_AGING" label="Aging Analysis" nested /> 
+                     {/* ⭐ 4 NAYI REPORTS IN SIDEBAR DROPDOWN */}
+                     <SidebarItem view="REPORT_TRIAL" label="Trial Balance" nested />
+                     <SidebarItem view="REPORT_CASH" label="Cash & Bank Book" nested />
+                     <SidebarItem view="REPORT_STOCK" label="Stock Summary" nested />
+                     <SidebarItem view="REPORT_SALES" label="Sales & Tax Report" nested />
                   </div>
                 )}
             </div>
@@ -652,6 +664,7 @@ const AppContent: React.FC = () => {
                   <EcommerceReconciliation ledgers={ledgers} onSave={handleSaveVoucher} />
                 )}
 
+                {/* REPORTS */}
                 {currentView === 'REPORT_PL' && (
                     <ProfitLossStatement 
                       vouchers={vouchers} 
@@ -671,6 +684,18 @@ const AppContent: React.FC = () => {
                 {currentView === 'REPORT_AGING' && ( 
                     <AgingReports ledgers={ledgers} vouchers={vouchers} />
                 )}
+
+                {/* ⭐ ROUTING ALL 4 NEW REPORTS TO ReportView */}
+                {(currentView === 'REPORT_TRIAL' || currentView === 'REPORT_CASH' || currentView === 'REPORT_STOCK' || currentView === 'REPORT_SALES') && (
+                  <ReportView 
+                    trialBalance={trialBalance} 
+                    summary={financialSummary} 
+                    ledgers={ledgers} 
+                    vouchers={vouchers} 
+                    inventory={inventoryItems} 
+                  />
+                )}
+
                 {currentView === 'SETTINGS' && user?.role === 'ADMIN' && (
                   <Settings 
                     currentUser={user} 
