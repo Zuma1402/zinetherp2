@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { TrialBalanceRow, FinancialSummary, Ledger, Voucher, InventoryItem, VoucherType } from '../types';
-import { BookOpen, Wallet, ArrowLeftRight, ShoppingBag, Search, Printer, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { BookOpen, Wallet, ArrowLeftRight, ShoppingBag, Search, Printer, Calendar, ArrowDownLeft, ArrowUpRight, PackageCheck, X } from 'lucide-react';
 
 interface ReportViewProps {
   type?: 'TRIAL_BALANCE' | 'CASH_BANK' | 'STOCK_MOVEMENT' | 'SALES_TAX';
@@ -14,14 +14,30 @@ interface ReportViewProps {
 const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBalance, summary, ledgers = [], vouchers = [], inventory = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCashBankLedger, setSelectedCashBankLedger] = useState('');
+  
+  // ⭐ Global Date Range Filters
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
-  // 1. Trial Balance Calculation
+  // ⭐ Item Stock Selector
+  const [selectedItemId, setSelectedItemId] = useState<string>('');
+
+  // Helper to filter vouchers by selected date range
+  const filteredVouchers = useMemo(() => {
+    return vouchers.filter(v => {
+      if (startDate && v.date < startDate) return false;
+      if (endDate && v.date > endDate) return false;
+      return true;
+    });
+  }, [vouchers, startDate, endDate]);
+
+  // 1. Trial Balance Calculation (With Date Range)
   const extendedTrialData = useMemo(() => {
     return ledgers.map(ledger => {
       let debit = 0;
       let credit = 0;
 
-      vouchers.forEach(v => {
+      filteredVouchers.forEach(v => {
         v.entries?.forEach(e => {
           if (e.ledgerId === ledger.id) {
             debit += e.debit || 0;
@@ -46,7 +62,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
       row.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       row.group.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [ledgers, vouchers, searchTerm]);
+  }, [ledgers, filteredVouchers, searchTerm]);
 
   const trialTotals = useMemo(() => {
     return extendedTrialData.reduce((acc, row) => ({
@@ -55,7 +71,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
     }), { debit: 0, credit: 0 });
   }, [extendedTrialData]);
 
-  // 2. Cash & Bank Accounts Filtering
+  // 2. Cash & Bank Accounts Filtering (With Date Range)
   const cashBankLedgers = useMemo(() => {
     return ledgers.filter(l => 
       l.type === 'ASSET' && (
@@ -72,7 +88,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
     if (!targetId) return [];
 
     const list: any[] = [];
-    vouchers.forEach(v => {
+    filteredVouchers.forEach(v => {
       v.entries?.forEach(e => {
         if (e.ledgerId === targetId) {
           list.push({
@@ -88,46 +104,77 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
     });
 
     return list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [selectedCashBankLedger, cashBankLedgers, vouchers]);
+  }, [selectedCashBankLedger, cashBankLedgers, filteredVouchers]);
 
-  // 3. Stock Inflow & Outflow Movement Calculation
-  const stockMovementData = useMemo(() => {
-    return inventory.map(item => {
-      let inflowQty = 0;
-      let outflowQty = 0;
+  // 3. Item Stock Ledger Movement (With Date Range)
+  const selectedItemObj = useMemo(() => {
+    const targetId = selectedItemId || (inventory[0]?.id || '');
+    return inventory.find(i => i.id === targetId) || inventory[0];
+  }, [selectedItemId, inventory]);
 
-      vouchers.forEach(v => {
-        if (v.items && Array.isArray(v.items)) {
-          v.items.forEach((line: any) => {
-            if (line.itemId === item.id || line.description === item.name) {
-              const qty = Number(line.quantity || line.qty || 0);
-              if (v.type === VoucherType.PURCHASE || v.type === VoucherType.CREDIT_NOTE) {
-                inflowQty += qty;
-              } else if (v.type === VoucherType.SALES || v.type === VoucherType.DEBIT_NOTE) {
-                outflowQty += qty;
-              }
+  const itemLedgerHistory = useMemo(() => {
+    if (!selectedItemObj) return { rows: [], totalIn: 0, totalOut: 0, currentBalance: 0 };
+
+    const transactions: any[] = [];
+
+    filteredVouchers.forEach(v => {
+      if (v.items && Array.isArray(v.items)) {
+        v.items.forEach((line: any) => {
+          if (line.itemId === selectedItemObj.id || line.description === selectedItemObj.name) {
+            const qty = Number(line.quantity || line.qty || 0);
+            let inQty = 0;
+            let outQty = 0;
+
+            if (v.type === VoucherType.PURCHASE || v.type === VoucherType.CREDIT_NOTE) {
+              inQty = qty;
+            } else if (v.type === VoucherType.SALES || v.type === VoucherType.DEBIT_NOTE) {
+              outQty = qty;
             }
-          });
-        }
-      });
 
+            if (inQty > 0 || outQty > 0) {
+              transactions.push({
+                date: v.date,
+                voucherNo: v.voucherNumber,
+                type: v.type,
+                partyName: v.partyName || 'Counter Transaction',
+                narration: v.narration || line.description || '-',
+                inQty,
+                outQty,
+                rate: line.unitPrice || line.rate || selectedItemObj.costPrice || 0
+              });
+            }
+          }
+        });
+      }
+    });
+
+    transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let runningBal = 0;
+    let totalIn = 0;
+    let totalOut = 0;
+
+    const rowsWithBalance = transactions.map(tx => {
+      runningBal += (tx.inQty - tx.outQty);
+      totalIn += tx.inQty;
+      totalOut += tx.outQty;
       return {
-        id: item.id,
-        name: item.name,
-        sku: item.sku || 'N/A',
-        unit: item.unit || 'Pcs',
-        inflowQty,
-        outflowQty,
-        currentStock: item.currentStock || 0,
-        costPrice: item.costPrice || 0,
-        valuation: (item.currentStock || 0) * (item.costPrice || 0)
+        ...tx,
+        runningBalance: runningBal
       };
-    }).filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()) || i.sku.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [inventory, vouchers, searchTerm]);
+    });
 
-  // 4. Sales & Tax Summary
+    return {
+      rows: rowsWithBalance,
+      totalIn,
+      totalOut,
+      currentBalance: selectedItemObj.currentStock || runningBal
+    };
+  }, [selectedItemObj, filteredVouchers]);
+
+  // 4. Sales & Tax Summary (With Date Range)
   const salesTaxData = useMemo(() => {
-    const salesVouchers = vouchers.filter(v => v.type === VoucherType.SALES);
+    const salesVouchers = filteredVouchers.filter(v => v.type === VoucherType.SALES);
     return salesVouchers.map(v => {
       const taxAmount = (v.totalAmount * (v.taxRate || 0)) / 100;
       return {
@@ -144,11 +191,10 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
       row.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       row.voucherNo.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [vouchers, searchTerm]);
+  }, [filteredVouchers, searchTerm]);
 
   return (
     <div className="space-y-6 printable-report">
-      {/* Print Specific Inline Styling */}
       <style>{`
         @media print {
           body * {
@@ -187,33 +233,72 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
           <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
             {type === 'TRIAL_BALANCE' && <><BookOpen className="text-indigo-600" size={22} /> Trial Balance (آزمائشی میزان)</>}
             {type === 'CASH_BANK' && <><Wallet className="text-emerald-600" size={22} /> Cash & Bank Book</>}
-            {type === 'STOCK_MOVEMENT' && <><ArrowLeftRight className="text-orange-600" size={22} /> Stock Inflow & Outflow Movement</>}
+            {type === 'STOCK_MOVEMENT' && <><ArrowLeftRight className="text-orange-600" size={22} /> Item Stock Ledger (Inflow & Outflow)</>}
             {type === 'SALES_TAX' && <><ShoppingBag className="text-blue-600" size={22} /> Sales & Tax Summary Report</>}
           </h2>
           <p className="text-xs text-gray-500 font-medium mt-1">Real-time dynamic audit summary generated from live transactions</p>
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <Search className="absolute left-3 top-2.5 text-gray-400" size={15} />
-            <input 
-              type="text" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-              placeholder="Filter search..." 
-              className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-xl font-bold bg-gray-50 outline-none focus:border-indigo-500" 
-            />
-          </div>
           <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm hover:bg-indigo-700 shrink-0">
             <Printer size={14} /> Print / Export PDF
           </button>
         </div>
       </div>
 
-      {/* Print Visible Watermark Header */}
+      {/* ⭐ GLOBAL FILTERS BAR: DATE RANGE & SEARCH */}
+      <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between no-print">
+        <div className="flex items-center gap-2.5 w-full md:w-auto">
+          <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+            <Calendar size={15} className="text-indigo-600"/> Date Range:
+          </label>
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-bold">
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={e => setStartDate(e.target.value)} 
+              className="bg-transparent outline-none text-xs font-bold text-gray-800" 
+            />
+            <span className="text-gray-400 font-normal">to</span>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={e => setEndDate(e.target.value)} 
+              className="bg-transparent outline-none text-xs font-bold text-gray-800" 
+            />
+          </div>
+
+          {(startDate || endDate) && (
+            <button 
+              onClick={() => { setStartDate(''); setEndDate(''); }} 
+              className="text-[11px] font-extrabold text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg flex items-center gap-1 shrink-0"
+              title="Reset Dates"
+            >
+              <X size={13}/> Clear Dates
+            </button>
+          )}
+        </div>
+
+        {type !== 'STOCK_MOVEMENT' && (
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-2.5 text-gray-400" size={15} />
+            <input 
+              type="text" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+              placeholder="Search in report..." 
+              className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-xl font-bold bg-gray-50 outline-none focus:border-indigo-500" 
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Print Header */}
       <div className="hidden print:block mb-4 border-b pb-2">
         <h1 className="text-xl font-black text-black uppercase">ZinethERP Financial Reporting</h1>
-        <p className="text-xs font-bold text-gray-600">Generated Report: {type.replace('_', ' ')} | Date: {new Date().toLocaleDateString()}</p>
+        <p className="text-xs font-bold text-gray-600">
+          Generated Report: {type.replace('_', ' ')} | Date Range: {startDate || 'Start'} to {endDate || 'Today'}
+        </p>
       </div>
 
       {/* 1. TRIAL BALANCE */}
@@ -291,7 +376,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
                 ))}
                 {cashBankTransactions.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-gray-400 italic">No transactions found for this account.</td>
+                    <td colSpan={5} className="p-8 text-center text-gray-400 italic">No transactions found for this account in selected period.</td>
                   </tr>
                 )}
               </tbody>
@@ -300,50 +385,111 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
         </div>
       )}
 
-      {/* 3. STOCK INFLOW & OUTFLOW MOVEMENT REPORT */}
+      {/* 3. ITEM STOCK LEDGER CARD */}
       {type === 'STOCK_MOVEMENT' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
-          <table className="w-full text-xs text-left">
-            <thead className="bg-slate-100 text-gray-600 font-black uppercase tracking-wider border-b">
-              <tr>
-                <th className="p-3.5 pl-6">Item Description</th>
-                <th className="p-3.5 text-center">SKU / Code</th>
-                <th className="p-3.5 text-right text-emerald-700">
-                  <span className="flex items-center justify-end gap-1"><ArrowDownLeft size={13}/> Inflow Qty (Aamad)</span>
-                </th>
-                <th className="p-3.5 text-right text-rose-700">
-                  <span className="flex items-center justify-end gap-1"><ArrowUpRight size={13}/> Outflow Qty (Kharij)</span>
-                </th>
-                <th className="p-3.5 text-right text-indigo-900">Available Stock Balance</th>
-                <th className="p-3.5 text-right pr-6">Asset Valuation</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 font-bold text-gray-800">
-              {stockMovementData.map(item => (
-                <tr key={item.id} className="hover:bg-gray-50 transition">
-                  <td className="p-3.5 pl-6 text-gray-900 font-extrabold">{item.name}</td>
-                  <td className="p-3.5 text-center text-gray-400 font-mono">{item.sku}</td>
-                  <td className="p-3.5 text-right text-emerald-600 font-black">
-                    {item.inflowQty > 0 ? `+${item.inflowQty} ${item.unit}` : '-'}
-                  </td>
-                  <td className="p-3.5 text-right text-rose-600 font-black">
-                    {item.outflowQty > 0 ? `-${item.outflowQty} ${item.unit}` : '-'}
-                  </td>
-                  <td className="p-3.5 text-right font-black text-indigo-950 bg-indigo-50/50">
-                    {item.currentStock} {item.unit}
-                  </td>
-                  <td className="p-3.5 text-right pr-6 font-black text-emerald-600">
-                    Rs {item.valuation.toLocaleString()}
-                  </td>
-                </tr>
+        <div className="space-y-5">
+          <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-3 no-print">
+            <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+              <PackageCheck size={16} className="text-indigo-600"/> Select Item:
+            </label>
+            <select 
+              value={selectedItemId || (selectedItemObj?.id || '')} 
+              onChange={e => setSelectedItemId(e.target.value)}
+              className="w-full md:w-72 p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-indigo-500"
+            >
+              {inventory.map(item => (
+                <option key={item.id} value={item.id}>📦 {item.name} ({item.sku || 'No SKU'})</option>
               ))}
-              {stockMovementData.length === 0 && (
+            </select>
+          </div>
+
+          {selectedItemObj && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Inflow Qty (Aamad)</p>
+                <h3 className="text-2xl font-black text-emerald-600 mt-1 flex items-center gap-1.5">
+                  <ArrowDownLeft size={20} /> +{itemLedgerHistory.totalIn} <span className="text-xs text-gray-500 font-bold">{selectedItemObj.unit || 'Pcs'}</span>
+                </h3>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Outflow Qty (Kharij)</p>
+                <h3 className="text-2xl font-black text-rose-600 mt-1 flex items-center gap-1.5">
+                  <ArrowUpRight size={20} /> -{itemLedgerHistory.totalOut} <span className="text-xs text-gray-500 font-bold">{selectedItemObj.unit || 'Pcs'}</span>
+                </h3>
+              </div>
+
+              <div className="bg-indigo-900 text-white p-4 rounded-xl shadow-md border border-indigo-800">
+                <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Current Stock Available</p>
+                <h3 className="text-2xl font-black text-emerald-400 mt-1">
+                  {selectedItemObj.currentStock} <span className="text-xs text-indigo-200 font-bold">{selectedItemObj.unit || 'Pcs'}</span>
+                </h3>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+            <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
+              <div>
+                <h3 className="text-xs font-black text-gray-900 uppercase tracking-wider">
+                  Item Stock Ledger: <span className="text-indigo-600">{selectedItemObj?.name}</span>
+                </h3>
+                <p className="text-[10px] text-gray-400 font-bold">SKU: {selectedItemObj?.sku || 'N/A'} | Cost Rate: Rs {selectedItemObj?.costPrice?.toLocaleString() || 0}</p>
+              </div>
+              <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 rounded-md uppercase">
+                Sequential In/Out Ledger
+              </span>
+            </div>
+
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-100 text-gray-600 font-black uppercase tracking-wider border-b">
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-400 italic">No inventory movement recorded in system.</td>
+                  <th className="p-3.5 pl-6">Date</th>
+                  <th className="p-3.5">Voucher #</th>
+                  <th className="p-3.5">Transaction Type</th>
+                  <th className="p-3.5">Party / Narration</th>
+                  <th className="p-3.5 text-right text-emerald-700">Inflow Qty (Aamad)</th>
+                  <th className="p-3.5 text-right text-rose-700">Outflow Qty (Kharij)</th>
+                  <th className="p-3.5 text-right pr-6 text-indigo-900">Running Stock Balance</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-bold text-gray-800">
+                {itemLedgerHistory.rows.map((row, idx) => (
+                  <tr key={idx} className="hover:bg-gray-50 transition">
+                    <td className="p-3.5 pl-6 text-gray-500 font-medium">{row.date}</td>
+                    <td className="p-3.5 font-mono text-indigo-600">{row.voucherNo}</td>
+                    <td className="p-3.5">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
+                        row.inQty > 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+                      }`}>
+                        {row.type}
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-gray-800">
+                      <div>{row.partyName}</div>
+                      <div className="text-[10px] text-gray-400 font-medium">{row.narration}</div>
+                    </td>
+                    <td className="p-3.5 text-right text-emerald-600 font-black">
+                      {row.inQty > 0 ? `+${row.inQty} ${selectedItemObj?.unit || 'Pcs'}` : '-'}
+                    </td>
+                    <td className="p-3.5 text-right text-rose-600 font-black">
+                      {row.outQty > 0 ? `-${row.outQty} ${selectedItemObj?.unit || 'Pcs'}` : '-'}
+                    </td>
+                    <td className="p-3.5 text-right pr-6 font-black text-indigo-950 bg-indigo-50/30">
+                      {row.runningBalance} {selectedItemObj?.unit || 'Pcs'}
+                    </td>
+                  </tr>
+                ))}
+                {itemLedgerHistory.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-gray-400 italic">
+                      No stock movement history recorded for "{selectedItemObj?.name}" in selected period.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -376,7 +522,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
               ))}
               {salesTaxData.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-400 italic">No sales invoices recorded yet.</td>
+                  <td colSpan={7} className="p-8 text-center text-gray-400 italic">No sales invoices recorded in selected date period.</td>
                 </tr>
               )}
             </tbody>
