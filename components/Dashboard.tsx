@@ -6,7 +6,6 @@ import {
   ShoppingCart, 
   ShoppingBag, 
   Package, 
-  AlertCircle,
   ArrowUpRight,
   ArrowDownRight,
   Clock,
@@ -22,13 +21,11 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer, 
-  Cell, 
-  PieChart, 
-  Pie 
+  ResponsiveContainer
 } from 'recharts';
 import { FinancialSummary, Voucher, Ledger, InventoryItem, AccountType } from '../types';
 import { calculateTrialBalance } from '../services/accountingService';
+import { useLanguage } from '../context/LanguageContext';
 
 interface DashboardProps {
   summary: FinancialSummary;
@@ -39,8 +36,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inventory, onNavigate }) => {
-  
-  // ⭐ PRISTINE FOREX SIMULATOR ENGINE STATES (Additive Additions Only)
+  const { t } = useLanguage();
   const [exchangeFluctuation, setExchangeFluctuation] = useState<number>(0);
 
   const recentVouchers = useMemo(() => {
@@ -53,10 +49,8 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
     return inventory.filter(item => item.currentStock <= (item.minStockLevel || 0));
   }, [inventory]);
 
-  // Calculate trial balance
   const trialBalance = useMemo(() => calculateTrialBalance(ledgers, vouchers), [ledgers, vouchers]);
 
-  // Dynamic Net Profit Trend (current month vs previous month)
   const netProfitTrend = useMemo(() => {
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
@@ -81,7 +75,6 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
     return prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / Math.abs(prev)) * 100);
   }, [vouchers, ledgers]);
 
-  // Dynamic Revenue Trend
   const revenueTrend = useMemo(() => {
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
@@ -105,7 +98,6 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
     return prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
   }, [vouchers, ledgers]);
 
-  // Dynamic Expense Trend
   const expenseTrend = useMemo(() => {
     const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
@@ -129,12 +121,10 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
     return prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
   }, [vouchers, ledgers]);
 
-  // Calculate expense percentage of revenue
   const expensePercentage = useMemo(() => {
     return summary.totalIncome === 0 ? 0 : Math.round((summary.totalExpenses / summary.totalIncome) * 100);
   }, [summary]);
 
-  // Chart Data: Monthly Revenue vs Expenses
   const monthlyData = useMemo(() => {
     const months: Record<string, { name: string, income: number, expense: number }> = {};
     const last6Months = Array.from({ length: 6 }).map((_, i) => {
@@ -159,25 +149,20 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
     return Object.values(months);
   }, [vouchers, ledgers]);
 
-  // Liquidity (Cash + Bank)
   const liquidity = useMemo(() => {
     return ledgers
       .filter(l => l.group.includes('Cash') || l.group.includes('Bank'))
-      .reduce((sum, l) => {
-          return sum + l.openingBalance; 
-      }, 0);
+      .reduce((sum, l) => sum + (l.openingBalance || 0), 0);
   }, [ledgers]);
 
-  // ⭐ DYNAMIC FOREX SIMULATION CALCULATOR BLUEPRINT (Additive Additions)
   const forexCalculations = useMemo(() => {
-    // Isolate foreign exposure items inside debtors/creditors groups
     const foreignReceivables = ledgers
       .filter(l => l.group.includes('Debtors') || l.group.includes('Receivable'))
-      .reduce((sum, l) => sum + (l.openingBalance || 0), 0) * 0.25; // Assumption: 25% foreign pipeline index
+      .reduce((sum, l) => sum + (l.openingBalance || 0), 0) * 0.25;
 
     const foreignPayables = ledgers
       .filter(l => l.group.includes('Creditors') || l.group.includes('Payable') || l.group.includes('Suppliers'))
-      .reduce((sum, l) => sum + (l.openingBalance || 0), 0) * 0.40; // Assumption: 40% material core import index
+      .reduce((sum, l) => sum + (l.openingBalance || 0), 0) * 0.40;
 
     const grossExposure = foreignReceivables - foreignPayables;
     const impactBuffer = (grossExposure * (exchangeFluctuation / 100));
@@ -201,9 +186,9 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
         <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">{title}</div>
         <div className="flex items-end gap-3">
           <div className="text-2xl md:text-3xl font-black text-gray-900 font-mono tracking-tighter">
-            {value.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+            {typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 0 }) : value}
           </div>
-          {trend && (
+          {trend !== undefined && trend !== null && (
             <div className={`flex items-center gap-0.5 text-xs font-bold mb-1 ${trend > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                {trend > 0 ? <ArrowUpRight size={14}/> : <ArrowDownRight size={14}/>}
                {Math.abs(trend)}%
@@ -218,7 +203,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row justify-between md:items-end gap-4">
         <div>
-           <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">Business Insights</h1>
+           <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">{t('dashboard')}</h1>
            <p className="text-gray-500 font-medium mt-1 uppercase text-[10px] tracking-[0.3em]">Accounting Intelligence Hub</p>
         </div>
         <div className="flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-2xl border border-indigo-100 w-fit">
@@ -227,16 +212,14 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
         </div>
       </div>
 
-      {/* KPI Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <KpiCard title="Net Profit" value={summary.netProfit} icon={TrendingUp} color="indigo" trend={netProfitTrend} />
-        <KpiCard title="Operating Revenue" value={summary.totalIncome} icon={ShoppingCart} color="emerald" trend={revenueTrend} />
-        <KpiCard title="Expenses % of Revenue" value={expensePercentage} icon={ShoppingBag} color="rose" trend={expenseTrend} />
-        <KpiCard title="Cash & Bank" value={liquidity} icon={Wallet} color="blue" />
+        <KpiCard title={t('profitLoss')} value={`Rs ${summary.netProfit.toLocaleString()}`} icon={TrendingUp} color="indigo" trend={netProfitTrend} />
+        <KpiCard title={t('sales')} value={`Rs ${summary.totalIncome.toLocaleString()}`} icon={ShoppingCart} color="emerald" trend={revenueTrend} />
+        <KpiCard title={t('expenses')} value={`${expensePercentage}%`} icon={ShoppingBag} color="rose" trend={expenseTrend} />
+        <KpiCard title={t('cashBankBook')} value={`Rs ${liquidity.toLocaleString()}`} icon={Wallet} color="blue" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-        {/* Main Chart */}
         <div className="lg:col-span-2 bg-white p-6 md:p-10 rounded-2xl md:rounded-[3rem] shadow-2xl shadow-gray-200/40 border border-gray-100 overflow-hidden">
           <div className="flex flex-col sm:flex-row justify-between items-start mb-6 md:mb-10 gap-4">
             <div>
@@ -246,11 +229,11 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
             <div className="flex gap-4">
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-indigo-600 rounded-full"></div>
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Revenue</span>
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{t('sales')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-rose-400 rounded-full"></div>
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Expense</span>
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{t('expenses')}</span>
                 </div>
             </div>
           </div>
@@ -282,9 +265,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
           </div>
         </div>
 
-        {/* Right Sidebar: Alerts & Activity */}
         <div className="space-y-6">
-           {/* Inventory Alert */}
            <div className="bg-amber-900 p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] text-white shadow-2xl shadow-amber-900/20 relative overflow-hidden group">
               <div className="absolute inset-0 bg-white/5 translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
               <div className="flex items-center gap-3 mb-6">
@@ -312,7 +293,6 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
               </div>
            </div>
 
-           {/* Recent Activity Mini-Feed */}
            <div className="bg-white p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/30">
               <div className="flex justify-between items-center mb-6">
                 <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Journal Log</h4>
@@ -333,7 +313,6 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
         </div>
       </div>
 
-      {/* Bottom Grid: Quick Actions & Extended Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
          <div className="bg-gray-900 p-8 md:p-10 rounded-2xl md:rounded-[3rem] text-white flex flex-col justify-between shadow-2xl shadow-gray-900/20">
             <div>
@@ -356,21 +335,20 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
                <div className="text-center p-6 bg-gray-50 rounded-2xl md:rounded-[2rem]">
                   <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Assets</div>
-                  <div className="text-lg md:text-xl font-black text-gray-900 font-mono">{summary.totalAssets.toLocaleString()}</div>
+                  <div className="text-lg md:text-xl font-black text-gray-900 font-mono">Rs {summary.totalAssets.toLocaleString()}</div>
                </div>
                <div className="text-center p-6 bg-gray-50 rounded-2xl md:rounded-[2rem]">
                   <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Liabilities</div>
-                  <div className="text-lg md:text-xl font-black text-gray-900 font-mono">{summary.totalLiabilities.toLocaleString()}</div>
+                  <div className="text-lg md:text-xl font-black text-gray-900 font-mono">Rs {summary.totalLiabilities.toLocaleString()}</div>
                </div>
                <div className="text-center p-6 bg-gray-50 rounded-2xl md:rounded-[2rem]">
                   <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Equity</div>
-                  <div className="text-lg md:text-xl font-black text-gray-900 font-mono">{summary.totalEquity.toLocaleString()}</div>
+                  <div className="text-lg md:text-xl font-black text-gray-900 font-mono">Rs {summary.totalEquity.toLocaleString()}</div>
                </div>
             </div>
          </div>
       </div>
 
-      {/* ⭐ 100% BRAND NEW ADDITIVE: PREDICTIVE FOREX RISK BUFFER MATRIX PANEL */}
       <div className="bg-white p-6 md:p-10 rounded-2xl md:rounded-[3rem] border border-gray-100 shadow-2xl shadow-gray-200/40 grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
         <div className="lg:col-span-1 space-y-4">
           <div className="flex items-center gap-2 text-indigo-600">
@@ -407,7 +385,6 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
         </div>
 
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-          {/* Risk Alert Callouts */}
           <div className="space-y-3">
             <div className="p-4 bg-gray-50 border rounded-2xl flex justify-between items-center">
               <div>
@@ -425,21 +402,19 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
               <span className="text-[10px] font-black bg-rose-50 text-rose-600 px-2 py-1 rounded-md border border-rose-200">Payables</span>
             </div>
 
-            {/* Dynamic Real-time Condition Card Trigger */}
             {forexCalculations.impactBuffer !== 0 && (
               <div className={`p-4 rounded-2xl border flex items-start gap-3 animate-in fade-in duration-200 ${forexCalculations.impactBuffer < 0 ? 'bg-rose-50/50 border-rose-100 text-rose-900' : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'}`}>
                 <ShieldAlert size={18} className={`shrink-0 mt-0.5 ${forexCalculations.impactBuffer < 0 ? 'text-rose-600' : 'text-emerald-600'}`} />
                 <div>
                   <h5 className="text-xs font-black uppercase tracking-wider">Estimated Margin Buffer Impact</h5>
                   <p className="text-[11px] font-medium opacity-80 mt-0.5">
-                    Currency rate fluctuation ki wajah se aapki ledger value par pratical buffer impact <span className="font-bold font-mono">{forexCalculations.impactBuffer.toLocaleString(undefined, {maximumFractionDigits:0})}</span> parh sakta hai.
+                    Currency rate fluctuation ki wajah se aapki ledger value par practical buffer impact <span className="font-bold font-mono">{forexCalculations.impactBuffer.toLocaleString(undefined, {maximumFractionDigits:0})}</span> parh sakta hai.
                   </p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Simulated Impact Gauge Meter Card */}
           <div className="p-6 bg-slate-900 text-white rounded-3xl md:rounded-[2rem] border border-slate-800 shadow-xl flex flex-col justify-between h-full min-h-[180px]">
             <div>
               <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase flex items-center gap-1.5">
@@ -457,7 +432,6 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
           </div>
         </div>
       </div>
-
     </div>
   );
 };
