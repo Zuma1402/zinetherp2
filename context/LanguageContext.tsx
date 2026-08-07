@@ -72,7 +72,7 @@ const translations: Translations = {
     eraseCorporateProfileNode: 'Erase Corporate Profile Node',
     wipingNode: 'Wiping Node...',
 
-    // ⭐ DYNAMIC SUB-REPORTS & INNER CONTENT TRANSLATIONS
+    // DYNAMIC SUB-REPORTS & INNER CONTENT TRANSLATIONS
     profitLoss: 'Profit & Loss',
     balanceSheet: 'Balance Sheet',
     agingAnalysis: 'Aging Analysis',
@@ -81,7 +81,7 @@ const translations: Translations = {
     stockInOutflow: 'Stock In & Outflow',
     salesTaxReport: 'Sales & Tax Report',
 
-    // ⭐ SALES & PURCHASES SUB-MENU TRANSLATIONS
+    // SALES & PURCHASES SUB-MENU TRANSLATIONS
     quotation: 'Quotation',
     order: 'Order',
     delivery: 'Delivery',

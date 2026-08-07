@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Ledger, Voucher, AccountType, Department, Division } from '../types';
 import { Calendar, Info, TrendingUp, Clock, Layers, Compass, Download } from 'lucide-react';
 import { supabase } from '../services/supabaseService';
+import { useLanguage } from '../context/LanguageContext';
 
 interface GeneralLedgerViewProps {
   ledgers: Ledger[];
@@ -10,6 +11,7 @@ interface GeneralLedgerViewProps {
 }
 
 const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers, initialLedgerId }) => {
+  const { t } = useLanguage();
   const [selectedLedgerId, setSelectedLedgerId] = useState<string>(initialLedgerId || ledgers[0]?.id || '');
   
   const [filterDept, setFilterDept] = useState('');
@@ -117,7 +119,7 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6 bg-slate-50 p-6 rounded-2xl border border-gray-200/60">
         <div>
-           <h2 className="text-3xl font-black text-gray-900 tracking-tight">Ledger Analysis</h2>
+           <h2 className="text-3xl font-black text-gray-900 tracking-tight">{t('generalLedger')} Analysis</h2>
            <p className="text-gray-500 font-medium text-xs uppercase tracking-widest mt-1">Integrated Chart of Account Balances</p>
         </div>
         <div className="flex gap-4 items-end flex-wrap flex-1 lg:justify-end text-xs font-bold text-gray-800">
@@ -171,14 +173,13 @@ const GeneralLedgerView: React.FC<GeneralLedgerViewProps> = ({ ledgers, vouchers
             <span className="font-black text-gray-900 block text-2xl tracking-tight">{selectedLedger?.name}</span>
             <span className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em]">{selectedLedger?.group}</span>
           </div>
-          {/* ✅ Fixed Label: Clean Corporate Name */}
           <button onClick={handleExportLedgerToExcel} className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-md transition-all">
             <Download size={15} /> Download Excel
           </button>
         </div>
         <table className="w-full text-left text-sm">
             <thead className="bg-white text-gray-400 border-b font-black uppercase text-[10px] tracking-widest">
-                <tr><th className="p-6">Date</th><th className="p-6">Voucher #</th><th className="p-6">Particulars</th><th className="p-6 text-right">Debit</th><th className="p-6 text-right">Credit</th><th className="p-6 text-right bg-gray-50/50">Running Balance</th></tr>
+                <tr><th className="p-6">{t('date')}</th><th className="p-6">{t('voucherNo')}</th><th className="p-6">{t('description')}</th><th className="p-6 text-right">Debit</th><th className="p-6 text-right">Credit</th><th className="p-6 text-right bg-gray-50/50">Running Balance</th></tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
                 <tr className="bg-indigo-50/20">

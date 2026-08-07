@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { AccountType, Ledger, TrialBalanceRow, Voucher } from '../types';
 import { ACCOUNT_GROUPS } from '../constants';
-import { Plus, Search, Trash2, Eye, AlertCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Eye } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface LedgerListProps {
   ledgers: Ledger[];
@@ -13,6 +14,7 @@ interface LedgerListProps {
 }
 
 const LedgerList: React.FC<LedgerListProps> = ({ ledgers, vouchers, onAddLedger, onDeleteLedger, onViewLedger, trialBalance = [] }) => {
+  const { t } = useLanguage();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -74,7 +76,7 @@ const LedgerList: React.FC<LedgerListProps> = ({ ledgers, vouchers, onAddLedger,
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">Chart of Accounts</h2>
+           <h2 className="text-2xl font-bold text-gray-800 tracking-tight">{t('chartOfAccounts')}</h2>
            <p className="text-gray-500 text-sm">Organize your ledger accounts and view live balances</p>
         </div>
         <button 
@@ -82,7 +84,7 @@ const LedgerList: React.FC<LedgerListProps> = ({ ledgers, vouchers, onAddLedger,
             className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 flex items-center gap-2 transition shadow-lg shadow-indigo-100 font-bold"
         >
             <Plus size={18} />
-            {showForm ? 'Cancel' : 'Add New Account'}
+            {showForm ? t('cancel') : t('add')}
         </button>
       </div>
 
@@ -111,7 +113,7 @@ const LedgerList: React.FC<LedgerListProps> = ({ ledgers, vouchers, onAddLedger,
                     <input type="number" step="0.01" className="w-full p-3 border-2 border-gray-100 rounded-xl bg-white text-gray-900 font-mono font-bold" value={newOpening} onChange={e => setNewOpening(Number(e.target.value))} />
                 </div>
                 <div className="md:col-span-2 flex justify-end mt-4">
-                    <button type="submit" className="bg-gray-900 text-white px-8 py-3 rounded-xl hover:bg-black transition font-bold shadow-lg">Create Ledger</button>
+                    <button type="submit" className="bg-gray-900 text-white px-8 py-3 rounded-xl hover:bg-black transition font-bold shadow-lg">{t('save')}</button>
                 </div>
             </form>
         </div>
@@ -122,7 +124,7 @@ const LedgerList: React.FC<LedgerListProps> = ({ ledgers, vouchers, onAddLedger,
              <Search className="text-gray-400" size={20} />
              <input 
                 type="text" 
-                placeholder="Search accounts by name or group..." 
+                placeholder={t('search')} 
                 className="flex-1 outline-none text-gray-700 bg-transparent font-medium"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -137,7 +139,7 @@ const LedgerList: React.FC<LedgerListProps> = ({ ledgers, vouchers, onAddLedger,
                         <th className="p-6">Type</th>
                         <th className="p-6 text-right">Opening</th>
                         <th className="p-6 text-right">Closing Balance</th>
-                        <th className="p-6 text-center w-32">Actions</th>
+                        <th className="p-6 text-center w-32">{t('actions')}</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
