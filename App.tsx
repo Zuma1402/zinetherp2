@@ -58,7 +58,6 @@ import EcommerceReconciliation from './components/EcommerceReconciliation';
 import { BankReconciliation } from './components/BankReconciliation';
 import { WarehouseManager } from './components/WarehouseManager';
 
-// ⭐ IMPORT REPORT VIEW ENGINE
 import ReportView from './components/ReportView';
 
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
@@ -477,14 +476,14 @@ const AppContent: React.FC = () => {
                 </button>
                 {salesMenuOpen && (
                   <div className="space-y-0.5 mt-1 animate-in slide-in-from-top-2 duration-200">
-                     <SidebarItem view="QUOTATION" label="Quotation" nested />
-                     <SidebarItem view="SALES_ORDER" label="Order" nested />
-                     <SidebarItem view="DELIVERY" label="Delivery" nested />
-                     <SidebarItem view="INVOICE" label="Invoice" nested />
-                     <SidebarItem view="RECURRING_INVOICE" label="Recurring Invoice" nested />
-                     <SidebarItem view="SALES_RETURN" label="Return" nested />
-                     <SidebarItem view="PAYMENT_RECEIVED" label="Receive Payment" nested />
-                     <SidebarItem view="SALES_REFUND" label="Refund" nested />
+                     <SidebarItem view="QUOTATION" label={t('quotation')} nested />
+                     <SidebarItem view="SALES_ORDER" label={t('order')} nested />
+                     <SidebarItem view="DELIVERY" label={t('delivery')} nested />
+                     <SidebarItem view="INVOICE" label={t('invoice')} nested />
+                     <SidebarItem view="RECURRING_INVOICE" label={t('recurringInvoice')} nested />
+                     <SidebarItem view="SALES_RETURN" label={t('return')} nested />
+                     <SidebarItem view="PAYMENT_RECEIVED" label={t('receivePayment')} nested />
+                     <SidebarItem view="SALES_REFUND" label={t('refund')} nested />
                   </div>
                 )}
             </div>
@@ -496,12 +495,12 @@ const AppContent: React.FC = () => {
                 </button>
                 {purchaseMenuOpen && (
                   <div className="space-y-0.5 mt-1 animate-in slide-in-from-top-2 duration-200">
-                     <SidebarItem view="PURCHASE_ORDER" label="Order" nested />
-                     <SidebarItem view="GOODS_RECEIVING" label="Good Receiving" nested />
-                     <SidebarItem view="PURCHASE" label="Invoice" nested />
-                     <SidebarItem view="PURCHASE_RETURN" label="Return" nested />
-                     <SidebarItem view="MAKE_PAYMENT" label="Make Payment" nested />
-                     <SidebarItem view="PURCHASE_REFUND" label="Refund" nested />
+                     <SidebarItem view="PURCHASE_ORDER" label={t('order')} nested />
+                     <SidebarItem view="GOODS_RECEIVING" label={t('goodReceiving')} nested />
+                     <SidebarItem view="PURCHASE" label={t('invoice')} nested />
+                     <SidebarItem view="PURCHASE_RETURN" label={t('return')} nested />
+                     <SidebarItem view="MAKE_PAYMENT" label={t('makePayment')} nested />
+                     <SidebarItem view="PURCHASE_REFUND" label={t('refund')} nested />
                   </div>
                 )}
             </div>
@@ -526,13 +525,13 @@ const AppContent: React.FC = () => {
                 </button>
                 {reportsMenuOpen && (
                   <div className="space-y-0.5 mt-1 animate-in slide-in-from-top-2 duration-200">
-                     <SidebarItem view="REPORT_PL" label="Profit & Loss" nested />
-                     <SidebarItem view="REPORT_BS" label="Balance Sheet" nested />
-                     <SidebarItem view="REPORT_AGING" label="Aging Analysis" nested /> 
-                     <SidebarItem view="REPORT_TRIAL" label="Trial Balance" nested />
-                     <SidebarItem view="REPORT_CASH" label="Cash & Bank Book" nested />
-                     <SidebarItem view="REPORT_STOCK" label="Stock In & Outflow" nested />
-                     <SidebarItem view="REPORT_SALES" label="Sales & Tax Report" nested />
+                     <SidebarItem view="REPORT_PL" label={t('profitLoss')} nested />
+                     <SidebarItem view="REPORT_BS" label={t('balanceSheet')} nested />
+                     <SidebarItem view="REPORT_AGING" label={t('agingAnalysis')} nested /> 
+                     <SidebarItem view="REPORT_TRIAL" label={t('trialBalance')} nested />
+                     <SidebarItem view="REPORT_CASH" label={t('cashBankBook')} nested />
+                     <SidebarItem view="REPORT_STOCK" label={t('stockInOutflow')} nested />
+                     <SidebarItem view="REPORT_SALES" label={t('salesTaxReport')} nested />
                   </div>
                 )}
             </div>
@@ -590,7 +589,7 @@ const AppContent: React.FC = () => {
                     <LedgerList ledgers={ledgers} vouchers={vouchers} onAddLedger={handleAddLedger} onDeleteLedger={handleDeleteLedger} onViewLedger={handleViewLedgerHistory} trialBalance={trialBalance} />
                 )}
                 {currentView === 'JOURNAL_ENTRY' && (
-                    <TransactionManager title="Journal Entries" type={VoucherType.JOURNAL} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={VoucherEntry} formProps={{ ledgers, trialBalance }} />
+                    <TransactionManager title={t('journalEntry')} type={VoucherType.JOURNAL} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={VoucherEntry} formProps={{ ledgers, trialBalance }} />
                 )}
                 {currentView === 'GENERAL_LEDGER' && (
                   <GeneralLedgerView ledgers={ledgers} vouchers={vouchers} initialLedgerId={selectedLedgerForView} />
@@ -601,7 +600,7 @@ const AppContent: React.FC = () => {
                 )}
 
                 {currentView === 'INVENTORY' && (
-                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteInventoryItem} onManageUnits={() => setCurrentView('UNITS')} />
+                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
 
                 {currentView === 'WAREHOUSES' && activeModules.includes('multi_warehouse') && (
@@ -612,51 +611,51 @@ const AppContent: React.FC = () => {
                   <UnitManager units={units} onAddUnit={handleAddUnit} onDeleteUnit={handleDeleteUnit} onBack={() => setCurrentView('INVENTORY')} />
                 )}
                 {currentView === 'QUOTATION' && (
-                   <TransactionManager title="Sales Quotations" type="QUOTATION" vouchers={[]} ledgers={ledgers} onSave={() => {}} FormComponent={QuotationEntry} formProps={{ ledgers, items: inventoryItems }} />
+                   <TransactionManager title={t('quotation')} type="QUOTATION" vouchers={[]} ledgers={ledgers} onSave={() => {}} FormComponent={QuotationEntry} formProps={{ ledgers, items: inventoryItems }} />
                 )}
                 {currentView === 'SALES_ORDER' && (
-                   <TransactionManager title="Sales Orders" type="ORDER" vouchers={[]} ledgers={ledgers} onSave={() => {}} FormComponent={SalesOrderEntry} formProps={{ ledgers, items: inventoryItems }} />
+                   <TransactionManager title={t('order')} type="ORDER" vouchers={[]} ledgers={ledgers} onSave={() => {}} FormComponent={SalesOrderEntry} formProps={{ ledgers, items: inventoryItems }} />
                 )}
                 {currentView === 'DELIVERY' && (
-                   <TransactionManager title="Delivery Notes" type="DELIVERY" vouchers={[]} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} FormComponent={DeliveryNoteEntry} formProps={{ ledgers, items: inventoryItems }} />
+                   <TransactionManager title={t('delivery')} type="DELIVERY" vouchers={[]} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} FormComponent={DeliveryNoteEntry} formProps={{ ledgers, items: inventoryItems }} />
                 )}
                 {currentView === 'INVOICE' && (
-                  <TransactionManager title="Sales Invoices" type={VoucherType.SALES} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={SalesInvoice} formProps={{ ledgers, items: inventoryItems, onAddLedger: handleAddLedger, trialBalance }} />
+                  <TransactionManager title={t('invoice')} type={VoucherType.SALES} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={SalesInvoice} formProps={{ ledgers, items: inventoryItems, onAddLedger: handleAddLedger, trialBalance }} />
                 )}
                 {currentView === 'RECURRING_INVOICE' && (
                    <RecurringInvoiceManager ledgers={ledgers} items={inventoryItems} />
                 )}
                 {currentView === 'SALES_RETURN' && (
-                  <TransactionManager title="Sales Returns" type={VoucherType.CREDIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={SalesReturn} formProps={{ ledgers, items: inventoryItems, trialBalance }} />
+                  <TransactionManager title={t('return')} type={VoucherType.CREDIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={SalesReturn} formProps={{ ledgers, items: inventoryItems, trialBalance }} />
                 )}
                 {currentView === 'PAYMENT_RECEIVED' && (
-                  <TransactionManager title="Payments Received" type={VoucherType.RECEIPT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={PaymentReceived} formProps={{ ledgers, onAddLedger: handleAddLedger, trialBalance }} />
+                  <TransactionManager title={t('receivePayment')} type={VoucherType.RECEIPT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={PaymentReceived} formProps={{ ledgers, onAddLedger: handleAddLedger, trialBalance }} />
                 )}
                 {currentView === 'SALES_REFUND' && (
-                  <TransactionManager title="Sales Refunds" type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={SalesRefundEntry} formProps={{ ledgers, trialBalance }} />
+                  <TransactionManager title={t('refund')} type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={SalesRefundEntry} formProps={{ ledgers, trialBalance }} />
                 )}
                 {currentView === 'PURCHASE_ORDER' && (
-                   <TransactionManager title="Purchase Orders" type="PURCHASE_ORDER" vouchers={[]} ledgers={ledgers} onSave={() => {}} FormComponent={PurchaseOrderEntry} formProps={{ ledgers, items: inventoryItems }} />
+                   <TransactionManager title={t('order')} type="PURCHASE_ORDER" vouchers={[]} ledgers={ledgers} onSave={() => {}} FormComponent={PurchaseOrderEntry} formProps={{ ledgers, items: inventoryItems }} />
                 )}
                 {currentView === 'GOODS_RECEIVING' && (
-                   <TransactionManager title="Goods Receiving Notes" type="GRN" vouchers={[]} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} FormComponent={GoodsReceivingEntry} formProps={{ ledgers, items: inventoryItems }} />
+                   <TransactionManager title={t('goodReceiving')} type="GRN" vouchers={[]} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} FormComponent={GoodsReceivingEntry} formProps={{ ledgers, items: inventoryItems }} />
                 )}
                 {currentView === 'PURCHASE' && (
-                  <TransactionManager title="Purchase Bills" type={VoucherType.PURCHASE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseInvoice} formProps={{ ledgers, items: inventoryItems, onAddLedger: handleAddLedger, trialBalance }} />
+                  <TransactionManager title={t('invoice')} type={VoucherType.PURCHASE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseInvoice} formProps={{ ledgers, items: inventoryItems, onAddLedger: handleAddLedger, trialBalance }} />
                 )}
                 
                 {currentView === 'PURCHASE_RETURN' && (
-                  <TransactionManager title="Purchase Returns" type={VoucherType.DEBIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseReturn} formProps={{ ledgers, items: inventoryItems, trialBalance }} />
+                  <TransactionManager title={t('return')} type={VoucherType.DEBIT_NOTE} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveInvoiceWithStock} onDelete={handleDeleteVoucher} FormComponent={PurchaseReturn} formProps={{ ledgers, items: inventoryItems, trialBalance }} />
                 )}
                 
                 {currentView === 'MAKE_PAYMENT' && (
-                  <TransactionManager title="Payments to Vendors" type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={MakePaymentEntry} formProps={{ ledgers, trialBalance }} />
+                  <TransactionManager title={t('makePayment')} type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={MakePaymentEntry} formProps={{ ledgers, trialBalance }} />
                 )}
                 {currentView === 'PURCHASE_REFUND' && (
-                  <TransactionManager title="Purchase Refunds" type={VoucherType.RECEIPT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={PurchaseRefundEntry} formProps={{ ledgers, trialBalance }} />
+                  <TransactionManager title={t('refund')} type={VoucherType.RECEIPT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={PurchaseRefundEntry} formProps={{ ledgers, trialBalance }} />
                 )}
                 {currentView === 'EXPENSES' && (
-                  <TransactionManager title="Expenses" type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={ExpenseEntry} formProps={{ ledgers, trialBalance }} />
+                  <TransactionManager title={t('expenses')} type={VoucherType.PAYMENT} vouchers={vouchers} ledgers={ledgers} onSave={handleSaveVoucher} onDelete={handleDeleteVoucher} FormComponent={ExpenseEntry} formProps={{ ledgers, trialBalance }} />
                 )}
                 
                 {currentView === 'ECOM_RECONCILIATION' && activeModules.includes('ecommerce_reconciliation') && (
@@ -684,7 +683,6 @@ const AppContent: React.FC = () => {
                     <AgingReports ledgers={ledgers} vouchers={vouchers} />
                 )}
 
-                {/* ⭐ ROUTING DIRECTLY TO ReportView WITH EXACT MATCHING TYPES */}
                 {currentView === 'REPORT_TRIAL' && (
                   <ReportView type="TRIAL_BALANCE" trialBalance={trialBalance} summary={financialSummary} ledgers={ledgers} vouchers={vouchers} inventory={inventoryItems} />
                 )}
