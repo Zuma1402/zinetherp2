@@ -463,7 +463,7 @@ const Settings: React.FC<SettingsProps> = ({
       if (onCompanyCreated) onCompanyCreated();
     } catch (err: any) {
       alert(`Server cluster failure: ${err?.message}`);
-    } font-bold {
+    } finally {
       setIsCreatingCorp(false);
     }
   };
