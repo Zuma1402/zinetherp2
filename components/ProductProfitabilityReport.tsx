@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { InventoryItem, Voucher, VoucherType } from '../../types';
-import { ShoppingBag, Calendar, Search, Printer, ArrowUpDown, Award, TrendingUp, DollarSign } from 'lucide-react';
-import { useLanguage } from '../../context/LanguageContext';
+import { InventoryItem, Voucher, VoucherType } from '../types';
+import { ShoppingBag, Calendar, Search, Printer, ArrowUpDown, Award, TrendingUp } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ProductProfitabilityReportProps {
   inventory: InventoryItem[];
@@ -15,7 +15,6 @@ export const ProductProfitabilityReport: React.FC<ProductProfitabilityReportProp
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortBy, setSortBy] = useState<'PROFIT' | 'QTY' | 'REVENUE'>('PROFIT');
 
-  // Profitability Calculation Engine
   const profitabilityData = useMemo(() => {
     const itemMap = new Map<string, {
       id: string;
@@ -27,7 +26,6 @@ export const ProductProfitabilityReport: React.FC<ProductProfitabilityReportProp
       totalRevenue: number;
     }>();
 
-    // Initialize inventory items
     inventory.forEach(item => {
       itemMap.set(item.id, {
         id: item.id,
@@ -40,7 +38,6 @@ export const ProductProfitabilityReport: React.FC<ProductProfitabilityReportProp
       });
     });
 
-    // Parse sales vouchers
     vouchers.forEach(v => {
       if (startDate && v.date < startDate) return;
       if (endDate && v.date > endDate) return;
@@ -68,7 +65,6 @@ export const ProductProfitabilityReport: React.FC<ProductProfitabilityReportProp
       }
     });
 
-    // Calculate final metrics (COGS, Net Profit, Margin %)
     const result = Array.from(itemMap.values()).map(item => {
       const avgSellingPrice = item.qtySold > 0 ? item.totalRevenue / item.qtySold : 0;
       const totalCost = item.qtySold * item.costPrice;
@@ -87,7 +83,6 @@ export const ProductProfitabilityReport: React.FC<ProductProfitabilityReportProp
       row.sku.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Sorting
     return result.sort((a, b) => {
       if (sortBy === 'PROFIT') return b.netProfit - a.netProfit;
       if (sortBy === 'QTY') return b.qtySold - a.qtySold;
@@ -96,7 +91,6 @@ export const ProductProfitabilityReport: React.FC<ProductProfitabilityReportProp
     });
   }, [inventory, vouchers, startDate, endDate, searchTerm, sortBy]);
 
-  // Overall Report KPI Summaries
   const totals = useMemo(() => {
     let totalQty = 0;
     let totalRevenue = 0;

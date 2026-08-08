@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Ledger, Voucher } from '../../types';
-import { UserCheck, Calendar, Search, Printer, Share2, DollarSign, FileText, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
-import { useLanguage } from '../../context/LanguageContext';
+import { Ledger, Voucher } from '../types';
+import { UserCheck, Calendar, Search, Printer, Share2, FileText, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface PartyLedgerReportProps {
   ledgers: Ledger[];
@@ -16,7 +16,6 @@ export const PartyLedgerReport: React.FC<PartyLedgerReportProps> = ({ ledgers, v
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [printMode, setPrintMode] = useState<'A4' | 'THERMAL'>('A4');
 
-  // Filter party ledgers (Debtors / Creditors / Customers / Suppliers)
   const partyLedgers = useMemo(() => {
     return ledgers.filter(l => 
       l.group.toLowerCase().includes('debtor') ||
@@ -32,7 +31,6 @@ export const PartyLedgerReport: React.FC<PartyLedgerReportProps> = ({ ledgers, v
     return partyLedgers.find(p => p.id === selectedPartyId) || partyLedgers[0];
   }, [partyLedgers, selectedPartyId]);
 
-  // Statements calculation with Running Balance
   const partyStatement = useMemo(() => {
     if (!selectedParty) return { rows: [], openingBalance: 0, totalBilled: 0, totalPaid: 0, closingBalance: 0 };
 
@@ -81,7 +79,6 @@ export const PartyLedgerReport: React.FC<PartyLedgerReportProps> = ({ ledgers, v
     };
   }, [selectedParty, vouchers, startDate, endDate, searchTerm]);
 
-  // Direct WhatsApp Share Handler
   const handleWhatsAppShare = () => {
     if (!selectedParty) return;
 
