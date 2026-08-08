@@ -165,10 +165,12 @@ const Settings: React.FC<SettingsProps> = ({
       setInvoicePrefix(settings.invoicePrefix || 'INV-');
       setNextInvoiceNumber(settings.nextInvoiceNumber || 1);
 
+      // REAL COMPANY NAMES RESOLVER
       const { data: companiesData } = await supabase.from('companies').select('id, name, enabled_modules').order('name');
       
       let finalCompaniesList = companiesData || [];
 
+      // If empty due to RLS, map names using company_settings
       if (finalCompaniesList.length === 0) {
         const { data: compSettings } = await supabase.from('company_settings').select('company_id, company_name');
         if (compSettings && compSettings.length > 0) {
@@ -257,7 +259,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       if (error) {
         if (error.message.includes('column') || error.message.includes('schema')) {
-          alert("Supabase Database Notice: Please run the SQL command in Supabase to create 'enabled_modules' column. Features updated locally for session.");
+          alert("Supabase Database Notice: Please run the SQL command in Supabase to create 'enabled_modules' column.");
         } else {
           alert("Error: " + error.message);
           return;
@@ -461,7 +463,7 @@ const Settings: React.FC<SettingsProps> = ({
       if (onCompanyCreated) onCompanyCreated();
     } catch (err: any) {
       alert(`Server cluster failure: ${err?.message}`);
-    } finally {
+    } font-bold {
       setIsCreatingCorp(false);
     }
   };
@@ -602,8 +604,8 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         </div>
 
-        {/* ISOLATED CONFIGURATIONS LAYER */}
-        {!isMasterZenithScope && (
+        {/* ISOLATED CONFIGURATIONS LAYER (RESTRICTED ONLY TO ZINETHERP / GLOBAL MASTER PARENT SCOPE) */}
+        {isMasterZenithScope && (
           <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-fit">
             <div className="flex items-center gap-3 mb-5">
                <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
@@ -697,14 +699,14 @@ const Settings: React.FC<SettingsProps> = ({
         {/* MASTER LAYER */}
         {isMasterZenithScope && (
           <div className="md:col-span-3 space-y-6">
-            {/* MASTER COMPANY FEATURES DIRECT LIST TABLE */}
+            {/* ⭐ MASTER COMPANY FEATURES DIRECT LIST TABLE */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
               <div className="flex justify-between items-center border-b pb-3">
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-wider text-gray-800 flex items-center gap-2">
-                    <EditIcon size={18} className="text-indigo-600" /> Manage & Edit Company Features
+                    <EditIcon size={18} className="text-indigo-600" /> {t('manageCompanyFeatures')}
                   </h3>
-                  <p className="text-xs text-gray-400 font-medium">Click "Edit Features" next to any registered company to turn modules ON/OFF</p>
+                  <p className="text-xs text-gray-400 font-medium">{t('clickEditFeaturesDesc')}</p>
                 </div>
               </div>
 
@@ -712,9 +714,9 @@ const Settings: React.FC<SettingsProps> = ({
                 <table className="w-full text-sm text-left">
                   <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b">
                     <tr>
-                      <th className="p-3 pl-4">Company Name</th>
-                      <th className="p-3">Company ID</th>
-                      <th className="p-3 text-right pr-4">Action Options</th>
+                      <th className="p-3 pl-4">{t('companyName')}</th>
+                      <th className="p-3">{t('companyId')}</th>
+                      <th className="p-3 text-right pr-4">{t('actionOptions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-medium text-xs text-gray-800 bg-white">
@@ -727,7 +729,7 @@ const Settings: React.FC<SettingsProps> = ({
                             onClick={() => handleOpenFeatureModal(comp.id, comp.name)}
                             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-lg shadow-xs transition-all flex items-center gap-1.5 ml-auto"
                           >
-                            <EditIcon size={12} /> Edit Features
+                            <EditIcon size={12} /> {t('editFeatures')}
                           </button>
                         </td>
                       </tr>
@@ -744,30 +746,30 @@ const Settings: React.FC<SettingsProps> = ({
                    <Landmark size={22} />
                  </div>
                  <div>
-                   <h2 className="text-md font-bold tracking-tight">Enterprise Multi-Company Control Centre</h2>
-                   <p className="text-sm text-gray-400 font-medium">Configure ecosystem access signatures, core numbering sequences, and tenant user boundaries</p>
+                   <h2 className="text-md font-bold tracking-tight">{t('enterpriseControlCenter')}</h2>
+                   <p className="text-sm text-gray-400 font-medium">{t('enterpriseControlDesc')}</p>
                  </div>
               </div>
 
               <form onSubmit={handleMasterClusterDeployment} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Company Profile Title</label>
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">{t('companyProfileTitle')}</label>
                     <input type="text" value={newCorpCompanyName} onChange={e => setNewCorpCompanyName(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white placeholder-gray-500 outline-none" placeholder="e.g. Khaochey NW" required />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Official Contact Email</label>
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">{t('officialContactEmail')}</label>
                     <input type="email" value={newCorpEmail} onChange={e => setNewCorpEmail(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-medium text-white placeholder-gray-500 outline-none" placeholder="billing@corporate.com" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Tax Node / NTN ID (Optional)</label>
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">{t('taxNodeId')}</label>
                     <input type="text" value={newCorpTaxId} onChange={e => setNewCorpTaxId(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-medium text-white placeholder-gray-500 outline-none" placeholder="Optional Registry NTN" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 border-t border-indigo-950/50 pt-4">
                   <div>
-                    <label className="block text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1.5">Reporting / Base Currency</label>
+                    <label className="block text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1.5">{t('reportingBaseCurrency')}</label>
                     <select value={newCorpBaseCurrency} onChange={e => setNewCorpBaseCurrency(e.target.value)} className="w-full p-3 bg-slate-900 text-indigo-300 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold outline-none">
                       <option value="PKR">PKR (Pakistani Rupee)</option>
                       <option value="USD">USD (United States Dollar)</option>
@@ -777,18 +779,18 @@ const Settings: React.FC<SettingsProps> = ({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Invoice Format Prefix</label>
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">{t('invoiceFormatPrefix')}</label>
                     <input type="text" value={newCorpPrefix} onChange={e => setNewCorpPrefix(e.target.value)} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white outline-none" required />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">Initial Next Index Sequence</label>
+                    <label className="block text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1.5">{t('initialNextIndex')}</label>
                     <input type="number" value={newCorpNextNumber} onChange={e => setNewCorpNextNumber(Number(e.target.value))} className="w-full p-3 bg-slate-900/60 border border-slate-700/60 focus:border-indigo-500 rounded-xl text-xs font-bold text-white outline-none" required />
                   </div>
                 </div>
 
                 {/* FEATURE ACCESS CONTROL CHECKBOXES */}
                 <div className="p-4 bg-indigo-950/40 border border-indigo-500/20 rounded-xl space-y-3">
-                  <h4 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">Ecosystem Capabilities Allocations Configuration</h4>
+                  <h4 className="text-[10px] font-black tracking-widest text-indigo-400 uppercase">{t('ecosystemCapabilities')}</h4>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <label className="flex items-center gap-2.5 text-xs font-bold text-indigo-200 cursor-pointer p-2.5 bg-slate-900/80 rounded-xl border border-slate-800">
@@ -824,22 +826,22 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <div className="bg-indigo-950/30 border border-indigo-900/30 p-4 rounded-xl space-y-4 shadow-inner">
-                  <h4 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase">Bind Initial Workspace Staff Member Identity (Optional)</h4>
+                  <h4 className="text-[11px] font-black tracking-widest text-indigo-400 uppercase">{t('bindInitialStaff')}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Staff Display Name</label>
+                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">{t('staffDisplayName')}</label>
                       <input type="text" placeholder="e.g. Accountant Staff" value={staffName} onChange={e => setStaffName(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Unique Username Handle</label>
+                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">{t('uniqueUsernameHandle')}</label>
                       <input type="text" placeholder="e.g. khaocheynw" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Security Login Password</label>
+                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">{t('securityLoginPassword')}</label>
                       <input type="text" placeholder="Default: Testing@123" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} className="w-full p-2 text-xs bg-indigo-950/40 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none text-white font-medium" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">Scope Locked Role Assignment</label>
+                      <label className="block text-[10px] font-bold text-indigo-300 uppercase mb-1">{t('scopeLockedRole')}</label>
                       <select value={staffRole} onChange={e => setStaffRole(e.target.value as Role)} className="w-full p-2 text-xs bg-indigo-950 text-indigo-300 border border-indigo-900/40 rounded focus:ring-1 focus:ring-indigo-500 outline-none font-bold">
                         <option value="ADMIN">ADMIN (Company-Level Sub Admin)</option>
                         <option value="ACCOUNTANT">Editor / Accountant</option>
@@ -850,7 +852,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <button type="submit" disabled={isCreatingCorp} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs py-3 rounded-xl transition flex items-center justify-center gap-2 shadow-lg tracking-wider uppercase">
-                  {isCreatingCorp ? 'Deploying Decentralized Nodes...' : <><Plus size={15} /> Execute & Launch Corporate Cluster</>}
+                  {isCreatingCorp ? t('deployingCluster') : <><Plus size={15} /> {t('executeLaunchCluster')}</>}
                 </button>
               </form>
             </div>
@@ -917,13 +919,13 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-md font-bold text-gray-800">User Workspace Management Terminal</h2>
+                  <h2 className="text-md font-bold text-gray-800">{t('userWorkspaceTerminal')}</h2>
                   <span className="text-xs font-bold px-2.5 py-0.5 bg-indigo-600 text-white rounded-md uppercase tracking-wider shadow-sm">
                     {companyName || 'Resolving Scope Node...'}
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 font-medium">
-                  {isMasterZenithScope ? 'Supervising every active deployment employee across all corporate entities' : `Displaying staff members mapped exclusively inside ${companyName}`}
+                  {isMasterZenithScope ? t('supervisingAllEmployees') : `${t('displayingScopeStaff')} ${companyName}`}
                 </p>
               </div>
             </div>
@@ -940,19 +942,19 @@ const Settings: React.FC<SettingsProps> = ({
               <h4 className="text-xs font-bold text-gray-700 uppercase">Lock New Employee Account into "{companyName}" Workspace</h4>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Staff Display Name</label>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t('staffDisplayName')}</label>
                     <input required placeholder="e.g. Jane Accountant" className="w-full p-2 border rounded text-sm bg-white font-medium outline-none" value={staffName} onChange={e => setStaffName(e.target.value)} />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Username Key Handle</label>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t('uniqueUsernameHandle')}</label>
                     <input required placeholder="jane_staff" className="w-full p-2 border rounded text-sm bg-white font-medium outline-none" value={staffUsername} onChange={e => setStaffUsername(e.target.value)} />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Password Credentials</label>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t('securityLoginPassword')}</label>
                     <input placeholder="Default: Testing@123" className="w-full p-2 border rounded text-sm bg-white font-medium outline-none" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Role Type Control</label>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">{t('scopeLockedRole')}</label>
                     <select value={staffRole} onChange={e => setStaffRole(e.target.value as Role)} className="w-full p-2 border rounded text-sm font-bold bg-white outline-none">
                       <option value="ADMIN">ADMIN (Company-Level Sub Admin)</option>
                       <option value="ACCOUNTANT">Editor / Accountant</option>
@@ -972,12 +974,12 @@ const Settings: React.FC<SettingsProps> = ({
             <table className="w-full text-sm text-left">
               <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase tracking-wider border-b">
                 <tr>
-                  <th className="p-3 pl-4">Company Context Node</th>
-                  <th className="p-3">Staff Member Identity</th>
-                  <th className="p-3">Security Access Password</th>
-                  <th className="p-3">Ecosystem Workspace Boundary Locking Node</th>
-                  <th className="p-3">Scope Permissions</th>
-                  <th className="p-3 text-right pr-4">Action Options</th>
+                  <th className="p-3 pl-4">{t('companyContextNode')}</th>
+                  <th className="p-3">{t('staffMemberIdentity')}</th>
+                  <th className="p-3">{t('securityAccessPassword')}</th>
+                  <th className="p-3">{t('workspaceBoundaryNode')}</th>
+                  <th className="p-3">{t('scopePermissions')}</th>
+                  <th className="p-3 text-right pr-4">{t('actionOptions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-medium text-sm text-gray-800 bg-white">
@@ -1045,14 +1047,14 @@ const Settings: React.FC<SettingsProps> = ({
                 <AlertTriangle size={20} />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-rose-900">Infrastructure Cascade Deletion Zone</h2>
-                <p className="text-xs text-rose-500 font-semibold">Irreversible structural cloud cluster cleanups</p>
+                <h2 className="text-sm font-bold text-rose-900">{t('cascadeDeletionZone')}</h2>
+                <p className="text-xs text-rose-500 font-semibold">{t('deletionZoneDesc')}</p>
               </div>
             </div>
             
             <div className="bg-white border border-rose-200 p-4 rounded-xl flex flex-col md:flex-row items-end gap-4 shadow-sm">
               <div className="flex-1 w-full">
-                <label className="block text-[10px] font-bold text-rose-900 uppercase mb-1.5 tracking-wider">Select Corporate Target To Erase From Infrastructure Cloud</label>
+                <label className="block text-[10px] font-bold text-rose-900 uppercase mb-1.5 tracking-wider">{t('selectCorporateTargetErase')}</label>
                 <select value={selectedCompanyToDelete} onChange={e => setSelectedCompanyToDelete(e.target.value)} className="w-full p-2.5 text-xs bg-white border border-rose-200 rounded-lg text-gray-800 font-bold focus:ring-2 focus:ring-rose-500 outline-none shadow-inner">
                   <option value="">-- Click To Select Profile Node Target --</option>
                   {displayCompaniesList.map(comp => (
@@ -1061,7 +1063,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </select>
               </div>
               <button type="button" disabled={isDeletingCompany || !selectedCompanyToDelete} onClick={handleDeleteActiveCompany} className="w-full md:w-auto bg-rose-600 hover:bg-rose-700 disabled:bg-gray-100 disabled:text-gray-400 text-white font-bold text-xs py-3 px-6 rounded-xl flex items-center justify-center gap-1.5 transition shrink-0 shadow-md uppercase tracking-wider">
-                <Trash2 size={13} /> {isDeletingCompany ? 'Wiping Node...' : 'Erase Corporate Profile Node'}
+                <Trash2 size={13} /> {isDeletingCompany ? t('wipingNode') : t('eraseCorporateProfileNode')}
               </button>
             </div>
           </div>
@@ -1076,7 +1078,7 @@ const Settings: React.FC<SettingsProps> = ({
             <div className="flex justify-between items-center border-b pb-3">
               <div>
                 <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <EditIcon size={16} className="text-indigo-600" /> Edit Features
+                  <EditIcon size={16} className="text-indigo-600" /> {t('editFeatures')}
                 </h3>
                 <p className="text-xs font-bold text-indigo-600">{selectedCompanyForFeatures.name}</p>
               </div>
