@@ -20,7 +20,9 @@ import {
   Building2,
   Radio,
   Landmark,
-  Warehouse as WarehouseIcon
+  Warehouse as WarehouseIcon,
+  UserCheck,
+  TrendingUp
 } from 'lucide-react';
 
 import LedgerList from './components/LedgerList';
@@ -58,7 +60,10 @@ import EcommerceReconciliation from './components/EcommerceReconciliation';
 import { BankReconciliation } from './components/BankReconciliation';
 import { WarehouseManager } from './components/WarehouseManager';
 
+// ⭐ IMPORT REPORT VIEW ENGINE & NEW ADVANCED REPORTS (EXACT MATCHING YOUR FILE PATHS)
 import ReportView from './components/ReportView';
+import PartyLedgerReport from './components/PartyLedgerReport';
+import ProductProfitabilityReport from './components/ProductProfitabilityReport';
 
 import { Ledger, Voucher, User, Role, InventoryItem, StockTransaction, Unit, VoucherType } from './types';
 import { calculateTrialBalance, calculateFinancialSummary } from './services/accountingService';
@@ -102,6 +107,8 @@ type View =
   | 'REPORT_CASH'
   | 'REPORT_STOCK'
   | 'REPORT_SALES'
+  | 'REPORT_PARTY_STATEMENT'
+  | 'REPORT_PRODUCT_MARGIN'
   | 'ECOM_RECONCILIATION'
   | 'SETTINGS';
 
@@ -525,6 +532,8 @@ const AppContent: React.FC = () => {
                 </button>
                 {reportsMenuOpen && (
                   <div className="space-y-0.5 mt-1 animate-in slide-in-from-top-2 duration-200">
+                     <SidebarItem view="REPORT_PARTY_STATEMENT" label="Party Wise Statement" nested />
+                     <SidebarItem view="REPORT_PRODUCT_MARGIN" label="Product Profitability" nested />
                      <SidebarItem view="REPORT_PL" label={t('profitLoss')} nested />
                      <SidebarItem view="REPORT_BS" label={t('balanceSheet')} nested />
                      <SidebarItem view="REPORT_AGING" label={t('agingAnalysis')} nested /> 
@@ -660,6 +669,14 @@ const AppContent: React.FC = () => {
                 
                 {currentView === 'ECOM_RECONCILIATION' && activeModules.includes('ecommerce_reconciliation') && (
                   <EcommerceReconciliation ledgers={ledgers} onSave={handleSaveVoucher} />
+                )}
+
+                {/* NEW ADVANCED REPORTS ROUTING */}
+                {currentView === 'REPORT_PARTY_STATEMENT' && (
+                  <PartyLedgerReport ledgers={ledgers} vouchers={vouchers} />
+                )}
+                {currentView === 'REPORT_PRODUCT_MARGIN' && (
+                  <ProductProfitabilityReport inventory={inventoryItems} vouchers={vouchers} />
                 )}
 
                 {/* REPORTS */}
