@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Ledger, Voucher } from '../types';
-import { UserCheck, Calendar, Search, Printer, Share2, FileText, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { UserCheck, Calendar, Search, Printer, FileText, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 interface PartyLedgerReportProps {
@@ -79,29 +79,6 @@ export const PartyLedgerReport: React.FC<PartyLedgerReportProps> = ({ ledgers, v
     };
   }, [selectedParty, vouchers, startDate, endDate, searchTerm]);
 
-  const handleWhatsAppShare = () => {
-    if (!selectedParty) return;
-
-    const partyName = selectedParty.name;
-    const totalBilled = partyStatement.totalBilled.toLocaleString();
-    const totalPaid = partyStatement.totalPaid.toLocaleString();
-    const closing = Math.abs(partyStatement.closingBalance).toLocaleString();
-    const balanceType = partyStatement.closingBalance >= 0 ? 'Dr (Receivable)' : 'Cr (Payable)';
-
-    const message = `*Statement of Account: ${partyName}*\n` +
-      `-----------------------------------\n` +
-      `Period: ${startDate || 'Start'} to ${endDate || 'Today'}\n` +
-      `*Opening Balance:* Rs ${partyStatement.openingBalance.toLocaleString()}\n` +
-      `*Total Invoices / Billed:* Rs ${totalBilled}\n` +
-      `*Total Payments / Received:* Rs ${totalPaid}\n` +
-      `-----------------------------------\n` +
-      `*Net Balance Due:* Rs ${closing} ${balanceType}\n\n` +
-      `Generated via ZinethERP`;
-
-    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-  };
-
   return (
     <div className="space-y-6 printable-party-report">
       <style>{`
@@ -128,13 +105,6 @@ export const PartyLedgerReport: React.FC<PartyLedgerReportProps> = ({ ledgers, v
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <button 
-            onClick={handleWhatsAppShare}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl flex items-center gap-1.5 shadow-sm transition"
-          >
-            <Share2 size={14} /> Share via WhatsApp
-          </button>
-          
           <button 
             onClick={() => { setPrintMode('A4'); setTimeout(() => window.print(), 200); }} 
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl flex items-center gap-1.5 shadow-sm"
