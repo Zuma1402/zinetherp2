@@ -25,6 +25,9 @@ import {
   TrendingUp
 } from 'lucide-react';
 
+// ⭐ DIRECT LOGO IMPORT FROM SRC FOLDER
+import logoImg from './Logo.png';
+
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
 import ProfitLossStatement from './components/ProfitLossStatement';
@@ -410,10 +413,10 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ OFFICIAL ZINETHERP LOGO INTEGRATION */}
+            {/* ⭐ OFFICIAL ZINETHERP LOGO IMAGE INTEGRATION */}
             <div className="flex items-center gap-3 mb-4">
               <img 
-                src="/logo.png" 
+                src={logoImg} 
                 alt="ZinethERP Logo" 
                 className="h-10 w-auto object-contain shrink-0"
               />
@@ -613,7 +616,7 @@ const AppContent: React.FC = () => {
                 )}
 
                 {currentView === 'INVENTORY' && (
-                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteInventoryItem} onManageUnits={() => setCurrentView('UNITS')} />
+                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
 
                 {currentView === 'WAREHOUSES' && activeModules.includes('multi_warehouse') && (
