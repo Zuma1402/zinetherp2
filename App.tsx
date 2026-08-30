@@ -25,6 +25,10 @@ import {
   TrendingUp
 } from 'lucide-react';
 
+// ⭐ IMPORT YOUR SEPARATE LOGO & TEXT IMAGES
+import cloudLogoImg from './Logo.png';
+import textLogoImg from './text.png';
+
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
 import ProfitLossStatement from './components/ProfitLossStatement';
@@ -410,67 +414,18 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ PERMANENT HIGH-QUALITY VECTOR CLOUD LOGO (WILL NEVER BREAK) */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-11 h-11 shrink-0 flex items-center justify-center filter drop-shadow-sm">
-                <svg viewBox="0 0 120 100" className="w-full h-full">
-                  <defs>
-                    <linearGradient id="cloudStrokeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#00d2ff" />
-                      <stop offset="50%" stopColor="#0072ff" />
-                      <stop offset="100%" stopColor="#0052d4" />
-                    </linearGradient>
-                    <linearGradient id="zRibbonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#2563eb" />
-                      <stop offset="40%" stopColor="#3b82f6" />
-                      <stop offset="80%" stopColor="#6366f1" />
-                      <stop offset="100%" stopColor="#8b5cf6" />
-                    </linearGradient>
-                  </defs>
-                  
-                  {/* Outer Cloud Outline */}
-                  <path 
-                    d="M 28,68 A 18,18 0 0,1 26,32 A 22,22 0 0,1 70,22 A 22,22 0 0,1 92,52 A 16,16 0 0,1 80,72 Z" 
-                    fill="none" 
-                    stroke="url(#cloudStrokeGrad)" 
-                    strokeWidth="7" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                  />
-                  
-                  {/* Chart Bars inside Cloud */}
-                  <rect x="25" y="52" width="4.5" height="12" rx="2" fill="#8b5cf6" />
-                  <rect x="32" y="44" width="4.5" height="20" rx="2" fill="#2563eb" />
-                  
-                  {/* 3D Z Ribbon */}
-                  <path 
-                    d="M 38,40 L 78,40 L 46,68 L 74,68" 
-                    fill="none" 
-                    stroke="url(#zRibbonGrad)" 
-                    strokeWidth="11" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                  />
-                  
-                  {/* Network Nodes */}
-                  <line x1="74" y1="68" x2="88" y2="68" stroke="#6366f1" strokeWidth="2.5" />
-                  <line x1="88" y1="68" x2="88" y2="58" stroke="#3b82f6" strokeWidth="2.5" />
-                  <rect x="85" y="54" width="6" height="6" rx="1.5" fill="#3b82f6" />
-                  <rect x="85" y="65" width="6" height="6" rx="1.5" fill="#00d2ff" />
-                  <rect x="76" y="72" width="6" height="6" rx="1.5" fill="#8b5cf6" />
-                </svg>
-              </div>
-
-              {/* Exact Styled ZinethERP Typography */}
-              <div className="flex flex-col justify-center">
-                <div className="flex items-baseline leading-none text-[22px] font-sans tracking-tight">
-                  <span className="text-[#0a1128] font-black">Zineth</span>
-                  <span className="text-[#2563eb] font-black">ERP</span>
-                </div>
-                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-[0.18em] mt-1.5 whitespace-nowrap">
-                  CONNECT <span className="text-blue-500 font-bold">•</span> AUTOMATE <span className="text-blue-500 font-bold">•</span> GROW
-                </span>
-              </div>
+            {/* ⭐ BOTH ORIGINAL SEPARATE IMAGES INTEGRATED SIDE-BY-SIDE */}
+            <div className="flex items-center gap-2 mb-4">
+              <img 
+                src={cloudLogoImg} 
+                alt="Zineth Cloud Icon" 
+                className="h-11 w-auto object-contain shrink-0"
+              />
+              <img 
+                src={textLogoImg} 
+                alt="ZinethERP Text" 
+                className="h-9 w-auto object-contain shrink-0"
+              />
             </div>
 
             <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 shadow-sm mb-2">
