@@ -410,22 +410,43 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ PERFECT ALIGNED BRANDING: ORIGINAL CLOUD LOGO + PIXEL-PERFECT TYPOGRAPHY */}
+            {/* ⭐ PERMANENT INLINE VECTOR LOGO (3rd Image Icon + 2nd Image Typography) */}
             <div className="flex items-center gap-2.5 mb-4">
-              <img 
-                src="https://i.ibb.co/3s6S3mC/zineth-erp-full.png" 
-                alt="Zineth Cloud Icon" 
-                className="h-11 w-11 object-contain shrink-0"
-                onError={(e) => {
-                  e.currentTarget.src = "https://i.postimg.cc/mD8zQY1N/Zineth-ERP-logo.png";
-                }}
-              />
+              {/* Cloud Z Logo Icon */}
+              <div className="w-10 h-10 shrink-0 flex items-center justify-center">
+                <svg viewBox="0 0 100 100" className="w-full h-full">
+                  <defs>
+                    <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#00c6ff" />
+                      <stop offset="100%" stopColor="#0072ff" />
+                    </linearGradient>
+                    <linearGradient id="zGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#2563eb" />
+                      <stop offset="50%" stopColor="#4f46e5" />
+                      <stop offset="100%" stopColor="#7c3aed" />
+                    </linearGradient>
+                  </defs>
+                  {/* Cloud Path */}
+                  <path d="M 22,64 A 18,18 0 0,1 22,28 A 22,22 0 0,1 64,21 A 20,20 0 0,1 80,54 A 15,15 0 0,1 70,68 Z" fill="none" stroke="url(#cloudGrad)" strokeWidth="6.5" strokeLinecap="round" />
+                  {/* Chart Bars inside Cloud */}
+                  <rect x="22" y="48" width="4.5" height="12" rx="2" fill="#7c3aed" />
+                  <rect x="29.5" y="42" width="4.5" height="18" rx="2" fill="#2563eb" />
+                  {/* Z Path */}
+                  <path d="M 33,38 L 68,38 L 40,65 L 62,65" fill="none" stroke="url(#zGrad)" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+                  {/* Connection Nodes */}
+                  <circle cx="75" cy="54" r="3" fill="#06b6d4" />
+                  <rect x="71" y="61" width="6" height="6" rx="1.5" fill="#00c6ff" />
+                  <rect x="63" y="67" width="6" height="6" rx="1.5" fill="#8b5cf6" />
+                </svg>
+              </div>
+
+              {/* Exact Styled ZinethERP Typography */}
               <div className="flex flex-col justify-center">
-                <div className="flex items-baseline leading-none font-extrabold text-[22px] tracking-tight font-sans">
+                <div className="flex items-baseline leading-none text-[21px] font-sans tracking-tight">
                   <span className="text-[#0a1128] font-black">Zineth</span>
                   <span className="text-[#2563eb] font-black">ERP</span>
                 </div>
-                <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1 whitespace-nowrap">
+                <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.18em] mt-1 whitespace-nowrap">
                   CONNECT <span className="text-blue-500 font-bold">•</span> AUTOMATE <span className="text-blue-500 font-bold">•</span> GROW
                 </span>
               </div>
