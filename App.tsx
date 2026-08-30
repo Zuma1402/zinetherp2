@@ -60,7 +60,7 @@ import EcommerceReconciliation from './components/EcommerceReconciliation';
 import { BankReconciliation } from './components/BankReconciliation';
 import { WarehouseManager } from './components/WarehouseManager';
 
-// ⭐ IMPORT REPORT VIEW ENGINE & NEW ADVANCED REPORTS (EXACT MATCHING YOUR FILE PATHS)
+// ⭐ IMPORT REPORT VIEW ENGINE & NEW ADVANCED REPORTS
 import ReportView from './components/ReportView';
 import PartyLedgerReport from './components/PartyLedgerReport';
 import ProductProfitabilityReport from './components/ProductProfitabilityReport';
@@ -410,12 +410,16 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-black text-lg shadow-sm shadow-indigo-200">
-                z
-              </div>
+            {/* ⭐ OFFICIAL ZINETHERP LOGO INTEGRATION */}
+            <div className="flex items-center gap-3 mb-4">
+              <img 
+                src="/logo.png" 
+                alt="ZinethERP Logo" 
+                className="h-10 w-auto object-contain shrink-0"
+              />
               <div>
-                <h2 className="font-extrabold text-gray-800 text-md tracking-tight leading-none">ZinethERP</h2>
+                <h2 className="font-black text-gray-900 text-lg tracking-tight leading-none">ZinethERP</h2>
+                <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-widest block mt-0.5">Cloud System</span>
               </div>
             </div>
 
