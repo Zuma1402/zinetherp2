@@ -25,9 +25,9 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-// ⭐ IMPORT YOUR SEPARATE LOGO & TEXT IMAGES
-import cloudLogoImg from './Logo.png';
-import textLogoImg from './text.png';
+// ⭐ IMPORT YOUR SEPARATE LOGO & TEXT IMAGES FROM SERVICES FOLDER
+import cloudLogoImg from './services/Logo.png';
+import textLogoImg from './services/text.png';
 
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
@@ -618,7 +618,7 @@ const AppContent: React.FC = () => {
                 )}
 
                 {currentView === 'INVENTORY' && (
-                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteInventoryItem} onManageUnits={() => setCurrentView('UNITS')} />
+                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
 
                 {currentView === 'WAREHOUSES' && activeModules.includes('multi_warehouse') && (
