@@ -413,7 +413,7 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-5 border-b border-gray-100 bg-white">
-            {/* ⭐ PROPER WIDE CONTAINER + PURE WHITE BACKGROUND + BADAA LOGO */}
+            {/* ⭐ PROPER WIDE CONTAINER + PURE WHITE BACKGROUND + BADAA LOGO WITH TRANSPARENT BLEND */}
             <div className="flex items-center gap-3 mb-4 bg-white p-1 rounded-lg">
               <img 
                 src={cloudLogoImg} 
