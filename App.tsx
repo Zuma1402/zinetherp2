@@ -414,17 +414,17 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ BOTH ORIGINAL SEPARATE IMAGES INTEGRATED SIDE-BY-SIDE */}
-            <div className="flex items-center gap-2 mb-4">
+            {/* ⭐ SEAMLESS LOGO INTEGRATION WITH ZERO EXTRA PADDING */}
+            <div className="flex items-center gap-0 -ml-2 mb-3 overflow-hidden h-12">
               <img 
                 src={cloudLogoImg} 
                 alt="Zineth Cloud Icon" 
-                className="h-11 w-auto object-contain shrink-0"
+                className="h-14 w-auto object-contain shrink-0 mix-blend-multiply -mr-3"
               />
               <img 
                 src={textLogoImg} 
                 alt="ZinethERP Text" 
-                className="h-9 w-auto object-contain shrink-0"
+                className="h-9 w-auto object-contain shrink-0 mix-blend-multiply"
               />
             </div>
 
@@ -618,7 +618,7 @@ const AppContent: React.FC = () => {
                 )}
 
                 {currentView === 'INVENTORY' && (
-                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteItem} onManageUnits={() => setCurrentView('UNITS')} />
+                  <InventoryList items={inventoryItems} units={units} transactions={stockTransactions} onAddItem={handleAddItem} onUpdateItem={handleUpdateInventoryItem} onDeleteItem={handleDeleteInventoryItem} onManageUnits={() => setCurrentView('UNITS')} />
                 )}
 
                 {currentView === 'WAREHOUSES' && activeModules.includes('multi_warehouse') && (
