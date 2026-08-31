@@ -25,6 +25,9 @@ import {
   TrendingUp
 } from 'lucide-react';
 
+// ⭐ IMPORT CLEAN HD IMAGE FROM SERVICES FOLDER
+import cloudLogoImg from './services/CloudLogo.png';
+
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
 import ProfitLossStatement from './components/ProfitLossStatement';
@@ -410,55 +413,13 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ CLEAN EMBEDDED VECTOR CLOUD Z LOGO */}
+            {/* ⭐ HD IMAGE LOGO ON LEFT + TEXT ON RIGHT */}
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-10 h-10 shrink-0 flex items-center justify-center">
-                <svg viewBox="0 0 100 100" className="w-full h-full">
-                  <defs>
-                    <linearGradient id="cloudBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#00c6ff" />
-                      <stop offset="100%" stopColor="#0072ff" />
-                    </linearGradient>
-                    <linearGradient id="zGradRibbon" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#2563eb" />
-                      <stop offset="50%" stopColor="#4f46e5" />
-                      <stop offset="100%" stopColor="#7c3aed" />
-                    </linearGradient>
-                  </defs>
-                  
-                  {/* Outer Cloud Stroke */}
-                  <path 
-                    d="M 22,64 A 18,18 0 0,1 22,28 A 22,22 0 0,1 64,21 A 20,20 0 0,1 80,54 A 15,15 0 0,1 70,68 Z" 
-                    fill="none" 
-                    stroke="url(#cloudBorder)" 
-                    strokeWidth="6" 
-                    strokeLinecap="round" 
-                  />
-                  
-                  {/* Inner Bar Charts */}
-                  <rect x="22" y="48" width="4" height="12" rx="2" fill="#7c3aed" />
-                  <rect x="28" y="42" width="4" height="18" rx="2" fill="#2563eb" />
-                  
-                  {/* Z Path Ribbon */}
-                  <path 
-                    d="M 33,38 L 68,38 L 40,65 L 62,65" 
-                    fill="none" 
-                    stroke="url(#zGradRibbon)" 
-                    strokeWidth="9" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                  />
-                  
-                  {/* Circuit Nodes */}
-                  <line x1="62" y1="65" x2="74" y2="65" stroke="#4f46e5" strokeWidth="2" />
-                  <line x1="74" y1="65" x2="74" y2="52" stroke="#2563eb" strokeWidth="2" />
-                  <circle cx="74" cy="50" r="3" fill="#00c6ff" />
-                  <rect x="71" y="58" width="5.5" height="5.5" rx="1" fill="#0072ff" />
-                  <rect x="63" y="66" width="5.5" height="5.5" rx="1" fill="#7c3aed" />
-                </svg>
-              </div>
-
-              {/* Text Typography */}
+              <img 
+                src={cloudLogoImg} 
+                alt="Zineth Cloud Logo" 
+                className="h-11 w-auto object-contain shrink-0 mix-blend-multiply"
+              />
               <div className="flex flex-col justify-center">
                 <div className="flex items-baseline leading-none text-[22px] font-sans tracking-tight">
                   <span className="text-[#0a1128] font-black">Zineth</span>
