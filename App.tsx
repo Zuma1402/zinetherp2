@@ -25,9 +25,8 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-// ⭐ IMPORT YOUR SEPARATE LOGO & TEXT IMAGES FROM SERVICES FOLDER
+// ⭐ FAQUAT ORIGINAL CLOUD LOGO IMAGE
 import cloudLogoImg from './services/Logo.png';
-import textLogoImg from './services/text.png';
 
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
@@ -414,18 +413,22 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ SEAMLESS LOGO INTEGRATION WITH ZERO EXTRA PADDING */}
-            <div className="flex items-center gap-0 -ml-2 mb-3 overflow-hidden h-12">
+            {/* ⭐ ORIGINAL IMAGE ON LEFT + TEXT ON RIGHT */}
+            <div className="flex items-center gap-2.5 mb-4">
               <img 
                 src={cloudLogoImg} 
                 alt="Zineth Cloud Icon" 
-                className="h-14 w-auto object-contain shrink-0 mix-blend-multiply -mr-3"
+                className="h-11 w-auto object-contain shrink-0 mix-blend-multiply"
               />
-              <img 
-                src={textLogoImg} 
-                alt="ZinethERP Text" 
-                className="h-9 w-auto object-contain shrink-0 mix-blend-multiply"
-              />
+              <div className="flex flex-col justify-center">
+                <div className="flex items-baseline leading-none text-[22px] font-sans tracking-tight">
+                  <span className="text-[#0a1128] font-black">Zineth</span>
+                  <span className="text-[#2563eb] font-black">ERP</span>
+                </div>
+                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-[0.18em] mt-1 whitespace-nowrap">
+                  CONNECT <span className="text-blue-500 font-bold">•</span> AUTOMATE <span className="text-blue-500 font-bold">•</span> GROW
+                </span>
+              </div>
             </div>
 
             <div className="relative flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 shadow-sm mb-2">
