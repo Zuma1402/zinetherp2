@@ -25,8 +25,8 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-// ⭐ FAQUAT ORIGINAL CLOUD LOGO IMAGE
-import cloudLogoImg from './services/Logo.png';
+// ⭐ IMPORT YOUR NEW CLEAN HD IMAGE FROM SERVICES FOLDER
+import cloudLogoImg from './services/CloudLogo.png';
 
 import LedgerList from './components/LedgerList';
 import VoucherEntry from './components/VoucherEntry';
@@ -413,19 +413,19 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ ORIGINAL CLOUD IMAGE ON LEFT + TEXT ON RIGHT */}
-            <div className="flex items-center gap-2 mb-4">
+            {/* ⭐ YOUR NEW CLEAN IMAGE ON LEFT + UNTOUCHED TEXT ON RIGHT */}
+            <div className="flex items-center gap-2.5 mb-4">
               <img 
                 src={cloudLogoImg} 
                 alt="Zineth Cloud Icon" 
-                className="h-10 w-auto object-contain shrink-0 mix-blend-multiply"
+                className="h-11 w-auto object-contain shrink-0 mix-blend-multiply"
               />
               <div className="flex flex-col justify-center">
                 <div className="flex items-baseline leading-none text-[22px] font-sans tracking-tight">
                   <span className="text-[#0a1128] font-black">Zineth</span>
                   <span className="text-[#2563eb] font-black">ERP</span>
                 </div>
-                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-[0.18em] mt-1.5 whitespace-nowrap">
+                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-[0.18em] mt-1 whitespace-nowrap">
                   CONNECT <span className="text-blue-500 font-bold">•</span> AUTOMATE <span className="text-blue-500 font-bold">•</span> GROW
                 </span>
               </div>
