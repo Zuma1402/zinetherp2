@@ -410,7 +410,7 @@ const AppContent: React.FC = () => {
   const SidebarContent = () => (
     <>
         <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ REALISTIC NATIVE VECTOR CLOUD Z LOGO (NO IMAGE BACKGROUND BOX) */}
+            {/* ⭐ CLEAN EMBEDDED VECTOR CLOUD Z LOGO */}
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-10 h-10 shrink-0 flex items-center justify-center">
                 <svg viewBox="0 0 100 100" className="w-full h-full">
