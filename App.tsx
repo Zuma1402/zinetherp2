@@ -412,20 +412,20 @@ const AppContent: React.FC = () => {
 
   const SidebarContent = () => (
     <>
-        <div className="p-6 border-b border-gray-100 bg-slate-50/50">
-            {/* ⭐ HD IMAGE LOGO ON LEFT + TEXT ON RIGHT */}
-            <div className="flex items-center gap-2.5 mb-4">
+        <div className="p-5 border-b border-gray-100 bg-white">
+            {/* ⭐ PROPER WIDE CONTAINER + PURE WHITE BACKGROUND + BADAA LOGO */}
+            <div className="flex items-center gap-3 mb-4 bg-white p-1 rounded-lg">
               <img 
                 src={cloudLogoImg} 
                 alt="Zineth Cloud Logo" 
-                className="h-11 w-auto object-contain shrink-0 mix-blend-multiply"
+                className="h-14 w-auto object-contain shrink-0 mix-blend-multiply"
               />
               <div className="flex flex-col justify-center">
-                <div className="flex items-baseline leading-none text-[22px] font-sans tracking-tight">
+                <div className="flex items-baseline leading-none text-[24px] font-sans tracking-tight">
                   <span className="text-[#0a1128] font-black">Zineth</span>
                   <span className="text-[#2563eb] font-black">ERP</span>
                 </div>
-                <span className="text-[7.5px] font-black text-slate-500 uppercase tracking-[0.18em] mt-1.5 whitespace-nowrap">
+                <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1.5 whitespace-nowrap">
                   CONNECT <span className="text-blue-500 font-bold">•</span> AUTOMATE <span className="text-blue-500 font-bold">•</span> GROW
                 </span>
               </div>
@@ -571,7 +571,8 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden relative" dir={language === 'ur' || language === 'ar' ? 'rtl' : 'ltr'}>
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex">
+      {/* Sidebar Width Increased to w-72 so Logo gets plenty of space */}
+      <aside className="w-72 bg-white border-r border-gray-200 flex flex-col hidden md:flex shrink-0">
         <SidebarContent />
       </aside>
 
