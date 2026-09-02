@@ -81,6 +81,16 @@ const translations: Translations = {
     stockInOutflow: 'Stock In & Outflow',
     salesTaxReport: 'Sales & Tax Report',
 
+    // MISSING MODULE TRANSLATIONS (FOREX & AUDIT)
+    forexBufferTitle: 'Predictive Forex Risk Buffer',
+    forexMatrixSub: 'CROSS-BORDER VALUATION SENSITIVITY MATRIX',
+    forexBufferDesc: 'Calculating shock index for foreign liabilities (imports/procurement) based on your current accounts ledger exposure. Tilt the slider to analyze potential margin risk:',
+    exchangeFluctuationRisk: 'EXCHANGE FLUCTUATION RISK',
+    devaluation: 'DEVALUATION',
+    resetBase: 'RESET (BASE)',
+    appreciation: 'APPRECIATION',
+    auditSummaryDesc: 'Real-time dynamic audit summary generated from live transactions',
+
     // SALES & PURCHASES SUB-MENU TRANSLATIONS
     quotation: 'Quotation',
     order: 'Order',
@@ -203,6 +213,15 @@ const translations: Translations = {
     stockInOutflow: 'Flux d’Entrée & Sortie de Stock',
     salesTaxReport: 'Rapport de Ventes & Taxes',
 
+    forexBufferTitle: 'Tampon de Risque Forex Prédictif',
+    forexMatrixSub: 'MATRICE DE SENSIBILITÉ DE VALORISATION TRANSFRONTALIÈRE',
+    forexBufferDesc: 'Calcul de l’indice de choc pour les passifs étrangers en fonction de vos comptes. Utilisez le curseur pour analyser le risque :',
+    exchangeFluctuationRisk: 'RISQUE DE FLUCTUATION DU CHANGE',
+    devaluation: 'DÉVALUATION',
+    resetBase: 'RÉINITIALISER',
+    appreciation: 'APPRÉCIATION',
+    auditSummaryDesc: 'Résumé d’audit dynamique généré en temps réel.',
+
     quotation: 'Devis',
     order: 'Commande',
     delivery: 'Livraison',
@@ -324,6 +343,15 @@ const translations: Translations = {
     stockInOutflow: 'اسٹاک آمد و اخراج',
     salesTaxReport: 'سیلز و ٹیکس رپورٹ',
 
+    forexBufferTitle: 'پیش گوئی فوریکس رسک بفر',
+    forexMatrixSub: 'غیر ملکی قدر کی حسّاسیت کا تجزیہ',
+    forexBufferDesc: 'آپ کے لیجر کی بنیاد پر غیر ملکی واجبات کا انڈیکس تیار کیا جا رہا ہے۔ ممکنہ نقصان کا اندازہ لگانے کے لیے سلائیڈر کا استعمال کریں:',
+    exchangeFluctuationRisk: 'زرِ مبادلہ میں اتارے چڑھاؤ کا خطرہ',
+    devaluation: 'قدر میں کمی',
+    resetBase: 'ری سیٹ (بنیادی)',
+    appreciation: 'قدر میں اضافہ',
+    auditSummaryDesc: 'لائیو لین دین کی بنیاد پر تیار کردہ فوری آڈٹ رپورٹ',
+
     quotation: 'کوٹیشن',
     order: 'آرڈر',
     delivery: 'ڈلیوری',
@@ -440,10 +468,19 @@ const translations: Translations = {
     profitLoss: 'Nafa o Nuqsan (P&L)',
     balanceSheet: 'Balance Sheet',
     agingAnalysis: 'Aging Analysis',
-    trialBalance: 'Trial Balance (Aazmaishi Mizan)',
+    trialBalance: 'Trial Balance',
     cashBankBook: 'Cash & Bank Khata Book',
     stockInOutflow: 'Stock Aamad o Kharij',
     salesTaxReport: 'Sales & Tax Summary Report',
+
+    forexBufferTitle: 'Predictive Forex Risk Buffer',
+    forexMatrixSub: 'CROSS-BORDER VALUATION SENSITIVITY MATRIX',
+    forexBufferDesc: 'Aapke current accounts ledger exposure ke mutabiq foreign liabilities (imports/procurement) ka shock index calculate ho raha hai. Slider ko tilt karke potential margin risk analyze karein:',
+    exchangeFluctuationRisk: 'EXCHANGE FLUCTUATION RISK',
+    devaluation: 'DEVALUATION',
+    resetBase: 'RESET (BASE)',
+    appreciation: 'APPRECIATION',
+    auditSummaryDesc: 'Live transactions se tayyar karda real-time dynamic audit summary',
 
     quotation: 'Quotation',
     order: 'Order',
@@ -566,6 +603,15 @@ const translations: Translations = {
     stockInOutflow: 'حركة المخزون الوارد والصادر',
     salesTaxReport: 'تقرير المبيعات والضرائب',
 
+    forexBufferTitle: 'مصد مخاطر العملات الأجنبية التنبؤي',
+    forexMatrixSub: 'مصفوفة حساسية التقييم عبر الحدود',
+    forexBufferDesc: 'حساب مؤشر الصدمة للالتزامات الخارجية بناءً على حساباتك الحالية. استخدم الشريط لتحليل المخاطر:',
+    exchangeFluctuationRisk: 'مخاطر تقلبات أسعار الصرف',
+    devaluation: 'انخفاض القيمة',
+    resetBase: 'إعادة ضبط',
+    appreciation: 'ارتفاع القيمة',
+    auditSummaryDesc: 'ملخص تدقيق ديناميكي مباشر تم إنشاؤه من المعاملات.',
+
     quotation: 'عرض سعر',
     order: 'أمر بيع',
     delivery: 'إذن تسليم',
@@ -687,6 +733,15 @@ const translations: Translations = {
     stockInOutflow: '库存出入库明细',
     salesTaxReport: '销售与税收报告',
 
+    forexBufferTitle: '预测性外汇风险缓冲区',
+    forexMatrixSub: '跨境估值敏感性矩阵',
+    forexBufferDesc: '根据当前的账簿头寸计算外债冲击指数。调节滑块分析潜在风险：',
+    exchangeFluctuationRisk: '汇率波动风险',
+    devaluation: '贬值',
+    resetBase: '重置',
+    appreciation: '升值',
+    auditSummaryDesc: '基于实时交易生成的动态审计摘要。',
+
     quotation: '报价单',
     order: '销售订单',
     delivery: '发货单',
@@ -807,6 +862,15 @@ const translations: Translations = {
     cashBankBook: 'Libro de Caja y Banco',
     stockInOutflow: 'Entrada y Salida de Inventario',
     salesTaxReport: 'Informe de Ventas e Impuestos',
+
+    forexBufferTitle: 'Colchón de Riesgo Forex Predictivo',
+    forexMatrixSub: 'MATRIZ DE SENSIBILIDAD DE VALORACIÓN TRANSFRONTERIZA',
+    forexBufferDesc: 'Calculando el índice de impacto para pasivos exteriores en función de sus libros. Incline el deslizador para analizar el riesgo:',
+    exchangeFluctuationRisk: 'RIESGO DE FLUCTUACIÓN DE CAMBIO',
+    devaluation: 'DEVALUACIÓN',
+    resetBase: 'REINICIAR',
+    appreciation: 'APRECIACIÓN',
+    auditSummaryDesc: 'Resumen de auditoría dinámico generado a partir de transacciones activas.',
 
     quotation: 'Cotización',
     order: 'Pedido',
