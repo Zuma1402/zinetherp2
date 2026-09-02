@@ -45,7 +45,7 @@ export const PartyLedgerReport: React.FC<PartyLedgerReportProps> = ({ ledgers, v
         if (endDate && v.date > endDate) return false;
         return v.entries?.some(e => e.ledgerId === selectedParty.id) || v.partyName === selectedParty.name;
       })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => new Date(a.date).getTime() - new Date(a.date).getTime());
 
     const rows = filteredVouchers.map(v => {
       const entry = v.entries?.find(e => e.ledgerId === selectedParty.id);
@@ -151,7 +151,7 @@ export const PartyLedgerReport: React.FC<PartyLedgerReportProps> = ({ ledgers, v
             type="text" 
             value={searchTerm} 
             onChange={e => setSearchTerm(e.target.value)} 
-            placeholder="Search voucher or narration..." 
+            placeholder={t('search')} 
             className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-xl font-bold bg-gray-50 outline-none" 
           />
         </div>
@@ -200,9 +200,9 @@ export const PartyLedgerReport: React.FC<PartyLedgerReportProps> = ({ ledgers, v
         <table className="w-full text-xs text-left">
           <thead className="bg-slate-100 text-gray-600 font-black uppercase tracking-wider border-b">
             <tr>
-              <th className="p-3.5 pl-6">Date</th>
-              <th className="p-3.5">Voucher #</th>
-              <th className="p-3.5">Particulars / Description</th>
+              <th className="p-3.5 pl-6">{t('date')}</th>
+              <th className="p-3.5">{t('voucherNo')}</th>
+              <th className="p-3.5">{t('description')}</th>
               <th className="p-3.5 text-right text-indigo-700">Debit (Billed)</th>
               <th className="p-3.5 text-right text-emerald-700">Credit (Paid)</th>
               <th className="p-3.5 text-right pr-6 text-slate-900">Running Balance</th>

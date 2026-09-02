@@ -266,7 +266,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
         </div>
 
         <div className="space-y-6">
-           <div className="bg-amber-900 p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] text-white shadow-2xl shadow-amber-900/20 relative overflow-hidden group">
+            <div className="bg-amber-900 p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] text-white shadow-2xl shadow-amber-900/20 relative overflow-hidden group">
               <div className="absolute inset-0 bg-white/5 translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
               <div className="flex items-center gap-3 mb-6">
                  <div className="p-2 bg-amber-800 rounded-xl">
@@ -291,9 +291,9 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
                     Resolve Now <ArrowRight size={14}/>
                  </button>
               </div>
-           </div>
+            </div>
 
-           <div className="bg-white p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/30">
+            <div className="bg-white p-6 md:p-8 rounded-2xl md:rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/30">
               <div className="flex justify-between items-center mb-6">
                 <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Journal Log</h4>
                 <button onClick={() => onNavigate('JOURNAL_ENTRY')} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-800">View All</button>
@@ -309,7 +309,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
                     </div>
                  ))}
               </div>
-           </div>
+            </div>
         </div>
       </div>
 
@@ -353,16 +353,16 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
         <div className="lg:col-span-1 space-y-4">
           <div className="flex items-center gap-2 text-indigo-600">
             <Globe size={22} className="animate-spin-slow" />
-            <h4 className="text-lg font-black tracking-tight text-gray-900">Predictive Forex Risk Buffer</h4>
+            <h4 className="text-lg font-black tracking-tight text-gray-900">{t('forexBufferTitle')}</h4>
           </div>
-          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Cross-Border Valuation Sensitivity Matrix</p>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{t('forexMatrixSub')}</p>
           <p className="text-xs text-gray-500 font-medium leading-relaxed">
-            Aapke current accounts ledger exposure ke mutabiq foreign liabilities (imports/procurement) ka shock index calculate ho raha hai. Slider ko tilt karke potential margin risk analyze karein:
+            {t('forexBufferDesc')}
           </p>
           
           <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl space-y-2">
             <div className="flex justify-between items-center text-[10px] font-black text-gray-400 tracking-widest">
-              <span>EXCHANGE FLUCTUATION RISK</span>
+              <span>{t('exchangeFluctuationRisk')}</span>
               <span className={`font-mono text-xs ${exchangeFluctuation >= 0 ? 'text-indigo-600' : 'text-rose-600'}`}>
                 {exchangeFluctuation > 0 ? `+${exchangeFluctuation}` : exchangeFluctuation}%
               </span>
@@ -377,9 +377,9 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
               className="w-full accent-indigo-600 cursor-pointer h-1.5 bg-gray-200 rounded-lg"
             />
             <div className="flex justify-between text-[9px] font-black text-gray-400">
-              <span>-15% DEVALUATION</span>
-              <button onClick={() => setExchangeFluctuation(0)} className="hover:text-indigo-600 text-indigo-500">RESET (BASE)</button>
-              <span>+15% APPRECIATION</span>
+              <span>-15% {t('devaluation')}</span>
+              <button onClick={() => setExchangeFluctuation(0)} className="hover:text-indigo-600 text-indigo-500">{t('resetBase')}</button>
+              <span>+15% {t('appreciation')}</span>
             </div>
           </div>
         </div>
@@ -408,7 +408,7 @@ const Dashboard: React.FC<DashboardProps> = ({ summary, vouchers, ledgers, inven
                 <div>
                   <h5 className="text-xs font-black uppercase tracking-wider">Estimated Margin Buffer Impact</h5>
                   <p className="text-[11px] font-medium opacity-80 mt-0.5">
-                    Currency rate fluctuation ki wajah se aapki ledger value par practical buffer impact <span className="font-bold font-mono">{forexCalculations.impactBuffer.toLocaleString(undefined, {maximumFractionDigits:0})}</span> parh sakta hai.
+                    Impact Buffer: <span className="font-bold font-mono">{forexCalculations.impactBuffer.toLocaleString(undefined, {maximumFractionDigits:0})}</span>
                   </p>
                 </div>
               </div>
