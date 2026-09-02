@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { TrialBalanceRow, FinancialSummary, Ledger, Voucher, InventoryItem, VoucherType } from '../types';
 import { BookOpen, Wallet, ArrowLeftRight, ShoppingBag, Search, Printer, Calendar, ArrowDownLeft, ArrowUpRight, PackageCheck, X } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ReportViewProps {
   type?: 'TRIAL_BALANCE' | 'CASH_BANK' | 'STOCK_MOVEMENT' | 'SALES_TAX';
@@ -12,6 +13,7 @@ interface ReportViewProps {
 }
 
 const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBalance, summary, ledgers = [], vouchers = [], inventory = [] }) => {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCashBankLedger, setSelectedCashBankLedger] = useState('');
   
@@ -231,17 +233,17 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
         <div>
           <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-            {type === 'TRIAL_BALANCE' && <><BookOpen className="text-indigo-600" size={22} /> Trial Balance (آزمائشی میزان)</>}
-            {type === 'CASH_BANK' && <><Wallet className="text-emerald-600" size={22} /> Cash & Bank Book</>}
-            {type === 'STOCK_MOVEMENT' && <><ArrowLeftRight className="text-orange-600" size={22} /> Item Stock Ledger (Inflow & Outflow)</>}
-            {type === 'SALES_TAX' && <><ShoppingBag className="text-blue-600" size={22} /> Sales & Tax Summary Report</>}
+            {type === 'TRIAL_BALANCE' && <><BookOpen className="text-indigo-600" size={22} /> {t('trialBalance')}</>}
+            {type === 'CASH_BANK' && <><Wallet className="text-emerald-600" size={22} /> {t('cashBankBook')}</>}
+            {type === 'STOCK_MOVEMENT' && <><ArrowLeftRight className="text-orange-600" size={22} /> {t('stockInOutflow')}</>}
+            {type === 'SALES_TAX' && <><ShoppingBag className="text-blue-600" size={22} /> {t('salesTaxReport')}</>}
           </h2>
-          <p className="text-xs text-gray-500 font-medium mt-1">Real-time dynamic audit summary generated from live transactions</p>
+          <p className="text-xs text-gray-500 font-medium mt-1">{t('auditSummaryDesc')}</p>
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
           <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm hover:bg-indigo-700 shrink-0">
-            <Printer size={14} /> Print / Export PDF
+            <Printer size={14} /> {t('exportPrint')}
           </button>
         </div>
       </div>
@@ -250,7 +252,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
       <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row gap-4 items-center justify-between no-print">
         <div className="flex items-center gap-2.5 w-full md:w-auto">
           <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-            <Calendar size={15} className="text-indigo-600"/> Date Range:
+            <Calendar size={15} className="text-indigo-600"/> {t('dateRange')}
           </label>
           <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl p-2 text-xs font-bold">
             <input 
@@ -274,7 +276,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
               className="text-[11px] font-extrabold text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1.5 rounded-lg flex items-center gap-1 shrink-0"
               title="Reset Dates"
             >
-              <X size={13}/> Clear Dates
+              <X size={13}/> {t('clearDates')}
             </button>
           )}
         </div>
@@ -286,7 +288,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
               type="text" 
               value={searchTerm} 
               onChange={e => setSearchTerm(e.target.value)} 
-              placeholder="Search in report..." 
+              placeholder={t('search')} 
               className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-xl font-bold bg-gray-50 outline-none focus:border-indigo-500" 
             />
           </div>
@@ -327,7 +329,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
             </tbody>
             <tfoot className="bg-slate-900 text-white print:bg-gray-200 print:text-black font-black text-xs border-t">
               <tr>
-                <td colSpan={2} className="p-4 pl-6 uppercase tracking-wider">Total Trial Balance Mizan</td>
+                <td colSpan={2} className="p-4 pl-6 uppercase tracking-wider">Total {t('trialBalance')}</td>
                 <td className="p-4 text-right text-emerald-400 print:text-black">Rs {trialTotals.debit.toLocaleString()}</td>
                 <td className="p-4 text-right text-rose-400 print:text-black">Rs {trialTotals.credit.toLocaleString()}</td>
                 <td className="p-4 text-right pr-6 text-indigo-300 print:text-black">Audited Node</td>
@@ -341,7 +343,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
       {type === 'CASH_BANK' && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-center gap-3 no-print">
-            <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Select Cash/Bank Account:</label>
+            <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">{t('selectAccount')}</label>
             <select 
               value={selectedCashBankLedger} 
               onChange={e => setSelectedCashBankLedger(e.target.value)}
@@ -357,9 +359,9 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
             <table className="w-full text-xs text-left">
               <thead className="bg-gray-50 text-gray-500 font-bold uppercase tracking-wider border-b">
                 <tr>
-                  <th className="p-3.5 pl-6">Date</th>
-                  <th className="p-3.5">Voucher #</th>
-                  <th className="p-3.5">Particulars / Narration</th>
+                  <th className="p-3.5 pl-6">{t('date')}</th>
+                  <th className="p-3.5">{t('voucherNo')}</th>
+                  <th className="p-3.5">{t('description')}</th>
                   <th className="p-3.5 text-right">Inflow (Debit)</th>
                   <th className="p-3.5 text-right pr-6">Outflow (Credit)</th>
                 </tr>
@@ -390,7 +392,7 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
         <div className="space-y-5">
           <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex items-center gap-3 no-print">
             <label className="text-xs font-black text-gray-700 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
-              <PackageCheck size={16} className="text-indigo-600"/> Select Item:
+              <PackageCheck size={16} className="text-indigo-600"/> {t('selectItem')}
             </label>
             <select 
               value={selectedItemId || (selectedItemObj?.id || '')} 
@@ -444,8 +446,8 @@ const ReportView: React.FC<ReportViewProps> = ({ type = 'TRIAL_BALANCE', trialBa
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-100 text-gray-600 font-black uppercase tracking-wider border-b">
                 <tr>
-                  <th className="p-3.5 pl-6">Date</th>
-                  <th className="p-3.5">Voucher #</th>
+                  <th className="p-3.5 pl-6">{t('date')}</th>
+                  <th className="p-3.5">{t('voucherNo')}</th>
                   <th className="p-3.5">Transaction Type</th>
                   <th className="p-3.5">Party / Narration</th>
                   <th className="p-3.5 text-right text-emerald-700">Inflow Qty (Aamad)</th>
